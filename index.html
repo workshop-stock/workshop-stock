@@ -1154,8 +1154,53 @@ setInterval(heartbeat,30000);
 // ─── LOCATIONS & CATEGORIES (dynamic, stored in db) ──────────────────────────
 // wsc_local_backup_v1 kept for legacy compat
 
-const DEFAULT_LOC_AREAS=['Shelving Unit A','Shelving Unit B','Shelving Unit C','Cabinet 1','Cabinet 2','Cabinet 3','Cabinet 4','Racking 1','Racking 2','Wall Storage A','Wall Storage B','Workshop Floor','Stores Room','Quarantine'];
-const DEFAULT_LOC_SECTIONS=['Shelf 1','Shelf 2','Shelf 3','Shelf 4','Shelf 5','Shelf 6','Drawer 1','Drawer 2','Drawer 3','Drawer 4','Bay 1','Bay 2','Bay 3','Section A','Section B','Section C','Row 1','Row 2'];
+const DEFAULT_LOC_AREAS=[
+  // Electrical shelving
+  'Shelf A','Shelf B','Shelf C','Shelf D','Shelf H',
+  // Cabinets
+  'CB-01','CB-02','CB-03','CB-04','CB-05','CB-06','CB-07','CB-08','CB-09','CB-10',
+  // Electrical storage bay
+  'D11 - Electrical Bay',
+  // Mechanical rack
+  'Mechanical Rack',
+  // Current project shelves
+  'Project Shelf 1','Project Shelf 2',
+  // Lab shelves
+  'Lab Shelf N','Lab Shelf O','Lab Shelf P',
+  // Pallet rack
+  'Pallet Rack',
+  // Wall storage
+  'Wall Storage 1','Wall Storage 2',
+  // Workbenches
+  'Workbench 1','Workbench 2',
+  // Tool boxes
+  'Tool Box 1','Tool Box 2',
+  // General
+  'Workshop Floor','Quarantine'
+];
+const DEFAULT_LOC_SECTIONS=[
+  // Shelf A slots
+  'A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','A12','A13',
+  'A14','A15','A16','A17','A18','A19','A20',
+  // Shelf B slots
+  'B1','B2','B3','B4','B5','B6','B7','B8','B9','B10','B11','B12','B13',
+  'B14','B15','B16','B17','B18','B19','B20',
+  // Shelf C slots
+  'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','C12','C13',
+  'C14','C15','C16','C17','C18','C19','C20',
+  // Shelf D slots
+  'D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
+  'D14','D15','D16','D17','D18','D19','D20',
+  // Shelf H slots
+  'H1','H2','H3','H4',
+  // Cabinet / lab / project shelves
+  'Shelf 1','Shelf 2','Shelf 3','Shelf 4','Shelf 5','Shelf 6',
+  // Pallet rack heights
+  'Level 1 (Ground)','Level 2 (Mid)','Level 3 (Top)',
+  // Drawer / bench positions
+  'Drawer 1','Drawer 2','Drawer 3','Drawer 4',
+  'Top','Middle','Bottom','Left Side','Right Side'
+];
 const DEFAULT_LOC_CONTAINERS=['Bin 1','Bin 2','Bin 3','Bin 4','Bin 5','Bin 6','Bin 7','Bin 8','Bin 9','Bin 10','Bin 11','Bin 12','Box 1','Box 2','Box 3','Box 4','Tray 1','Tray 2','Tray 3','Compartment A','Compartment B','Compartment C','Compartment D'];
 const DEFAULT_CATS=['PLC','HMI','VFD / Drives','Relays & Contactors','Sensors','Cables & Connectors','Power Supplies','Circuit Breakers','Enclosures & DIN','I/O Modules','Consumables','Other'];
 
@@ -1175,9 +1220,78 @@ function formatLoc(p){
   return p.loc||'';
 }
 
-function areaOpts(sel){return`<option value="">Area / unit…</option>`+getLocAreas().map(l=>`<option${sel===l?' selected':''}>${l}</option>`).join('');}
-function sectionOpts(sel){return`<option value="">Section / shelf…</option>`+getLocSections().map(l=>`<option${sel===l?' selected':''}>${l}</option>`).join('');}
-function containerOpts(sel){return`<option value="">Bin / box…</option>`+getLocContainers().map(l=>`<option${sel===l?' selected':''}>${l}</option>`).join('');}
+function areaOpts(sel){
+  const s=(v)=>sel===v?' selected':'';
+  return`<option value="">— Select area / unit —</option>
+    <optgroup label="⚡ Electrical Shelves">
+      ${['Shelf A','Shelf B','Shelf C','Shelf D','Shelf H'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="🗄 Cabinets (CB-01–CB-10)">
+      ${['CB-01','CB-02','CB-03','CB-04','CB-05','CB-06','CB-07','CB-08','CB-09','CB-10'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="🔧 Storage Bays">
+      ${['D11 - Electrical Bay','Mechanical Rack'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="📦 Project &amp; Lab Shelves">
+      ${['Project Shelf 1','Project Shelf 2','Lab Shelf N','Lab Shelf O','Lab Shelf P'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="🏗 Pallet Rack">
+      <option${s('Pallet Rack')}>Pallet Rack</option>
+    </optgroup>
+    <optgroup label="🧰 Workbenches &amp; Tool Boxes">
+      ${['Workbench 1','Workbench 2','Tool Box 1','Tool Box 2'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="📍 Wall &amp; Floor">
+      ${['Wall Storage 1','Wall Storage 2','Workshop Floor','Quarantine'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>`;
+}
+function sectionOpts(sel){
+  const s=(v)=>sel===v?' selected':'';
+  return`<option value="">— Select position / shelf —</option>
+    <optgroup label="Shelf A (A1–A20)">
+      ${Array.from({length:20},(_,i)=>`A${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Shelf B (B1–B20)">
+      ${Array.from({length:20},(_,i)=>`B${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Shelf C (C1–C20)">
+      ${Array.from({length:20},(_,i)=>`C${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Shelf D (D1–D20)">
+      ${Array.from({length:20},(_,i)=>`D${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Shelf H (H1–H4)">
+      ${['H1','H2','H3','H4'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Cabinet / Lab / Project Shelves">
+      ${['Shelf 1','Shelf 2','Shelf 3','Shelf 4','Shelf 5','Shelf 6'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Pallet Rack Heights">
+      ${['Level 1 (Ground)','Level 2 (Mid)','Level 3 (Top)'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Drawers &amp; Positions">
+      ${['Drawer 1','Drawer 2','Drawer 3','Drawer 4','Top','Middle','Bottom','Left Side','Right Side'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>`;
+}
+function containerOpts(sel){
+  const s=(v)=>sel===v?' selected':'';
+  return`<option value="">— Select box / bin / container —</option>
+    <optgroup label="Boxes">
+      ${Array.from({length:12},(_,i)=>`Box ${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Bins">
+      ${Array.from({length:6},(_,i)=>`Bin ${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Trays &amp; Bags">
+      ${['Tray 1','Tray 2','Tray 3','Bag 1','Bag 2','Bag 3'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Compartments">
+      ${['Compartment A','Compartment B','Compartment C','Compartment D'].map(l=>`<option${s(l)}>${l}</option>`).join('')}
+    </optgroup>
+    <optgroup label="Other">
+      <option${s('Loose')}>Loose</option>
+    </optgroup>`;
+}
 function catOpts(sel,blank='Select…'){return`<option value="">${blank}</option>`+getCats().map(c=>`<option${sel===c?' selected':''}>${c}</option>`).join('');}
 function catFilterOpts(){return`<option value="">All categories</option>`+getCats().map(c=>`<option>${c}</option>`).join('');}
 
@@ -1202,9 +1316,9 @@ function populateLocDropdowns(){
   const ciL=document.getElementById('ci-newloc');
   const ciL2=document.getElementById('ci-newloc2');
   const ciL3=document.getElementById('ci-newloc3');
-  if(ciL)ciL.innerHTML=`<option value="">Keep area</option>`+getLocAreas().map(l=>`<option>${l}</option>`).join('');
-  if(ciL2)ciL2.innerHTML=`<option value="">Keep section</option>`+getLocSections().map(l=>`<option>${l}</option>`).join('');
-  if(ciL3)ciL3.innerHTML=`<option value="">Keep container</option>`+getLocContainers().map(l=>`<option>${l}</option>`).join('');
+  if(ciL)ciL.innerHTML=`<option value="">Keep current area</option>`+getLocAreas().map(l=>`<option>${l}</option>`).join('');
+  if(ciL2)ciL2.innerHTML=`<option value="">Keep current position</option>`+getLocSections().map(l=>`<option>${l}</option>`).join('');
+  if(ciL3)ciL3.innerHTML=`<option value="">Keep current container</option>`+getLocContainers().map(l=>`<option>${l}</option>`).join('');
 }
 
 function populateCatDropdowns(){
