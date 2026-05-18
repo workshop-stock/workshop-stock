@@ -958,9 +958,8 @@ function forceCloseSetup(){
   if(ov){
     ov.classList.remove('visible');
     ov.classList.add('hidden');
-    ov.style.display='none'; // belt and braces
+    ov.style.display='none';
   }
-  if(cfg.apiKey&&cfg.binId){loadDB().catch(()=>{});}
 }
 
 function showSetup(){
@@ -1028,8 +1027,9 @@ const API='https://api.jsonbin.io/v3/b/';
 
 async function loadDB(){
   loadCfg();
-  // Always hide setup overlay — credentials are hardcoded
-  const ov=document.getElementById('setup-overlay');forceCloseSetup();
+  // Always hide setup overlay
+  const ov=document.getElementById('setup-overlay');
+  if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
   if(!cfg.binId||!cfg.apiKey){setStatus('Not configured','#f59e0b');return;}
   setStatus('Syncing…','#f59e0b');
   try{
@@ -3187,32 +3187,35 @@ function doImport(){
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 loadCfg();
 
-// ALWAYS hide setup overlay if we have credentials — do this first, no waiting
-if(HARDCODED_API_KEY&&HARDCODED_BIN_ID){
-  const ov=document.getElementById('setup-overlay');
-  forceCloseSetup();
-}
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Step 1: Load credentials
+loadCfg();
 
+// Step 2: Hide setup overlay immediately — credentials are baked in
+(function(){
+  const ov=document.getElementById('setup-overlay');
+  if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
+})();
+
+// Step 3: Populate dropdowns with defaults
 populateCatDropdowns();
 populateLocDropdowns();
 
-// Show local data instantly — never a blank screen
+// Step 4: Show local data instantly if available
 const _localOnStart=readLocal();
 if(_localOnStart){
-  db={...db,..._localOnStart};
+  db=_localOnStart;
   initDefaults();
-  forceCloseSetup();
   renderAll();
   populateBrandDropdowns();
-  doSearch();
 }
 
-// Sync with cloud in background
+// Step 5: Sync with cloud once in background
 if(cfg.apiKey&&cfg.binId){
-  forceCloseSetup();
-  loadDB().then(()=>{try{heartbeat();}catch{}}).catch(e=>{console.warn('Init loadDB:',e);});
+  loadDB().then(()=>{try{heartbeat();}catch{}}).catch(e=>console.warn('Init:',e));
 }else{
   populateBrandDropdowns();
+  setStatus('Not configured — check Settings','#ef4444');
 }
 </script>
 </body>
