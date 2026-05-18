@@ -1152,7 +1152,7 @@ async function heartbeat(){
 setInterval(heartbeat,30000);
 
 // ─── LOCATIONS & CATEGORIES (dynamic, stored in db) ──────────────────────────
-const LOCAL_BACKUP_KEY='wsc_local_backup_v1';
+// wsc_local_backup_v1 kept for legacy compat
 
 const DEFAULT_LOC_AREAS=['Shelving Unit A','Shelving Unit B','Shelving Unit C','Cabinet 1','Cabinet 2','Cabinet 3','Cabinet 4','Racking 1','Racking 2','Wall Storage A','Wall Storage B','Workshop Floor','Stores Room','Quarantine'];
 const DEFAULT_LOC_SECTIONS=['Shelf 1','Shelf 2','Shelf 3','Shelf 4','Shelf 5','Shelf 6','Drawer 1','Drawer 2','Drawer 3','Drawer 4','Bay 1','Bay 2','Bay 3','Section A','Section B','Section C','Row 1','Row 2'];
@@ -3175,9 +3175,6 @@ function doImport(){
     setTimeout(()=>toast('Give this BOM a name then save it','info'),1200);
   }
 }
-
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-loadCfg();
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 // Step 1: Load credentials
