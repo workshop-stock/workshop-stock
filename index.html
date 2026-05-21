@@ -1381,19 +1381,33 @@ function normalise(s){return(s||'').toLowerCase().replace(/[\s\-_]/g,'');}
 function findPart(v){
   const vn=normalise(v);
   if(!vn)return null;
-  // Exact match first (code, barcode, mfrno) — ignoring spaces/case
+  // 1. Exact match — code, barcode, mfrno (ignoring spaces/case/dashes)
   const exact=Object.values(db.parts).find(p=>
     normalise(p.code)===vn ||
     normalise(p.barcode||'')===vn ||
     normalise(p.mfrno||'')===vn
   );
   if(exact)return exact;
-  // Prefix match — typed value is start of part code or mfrno
+  // 2. Prefix match — typed value starts a code or mfrno
   const prefix=Object.values(db.parts).find(p=>
     normalise(p.code).startsWith(vn)||
     normalise(p.mfrno||'').startsWith(vn)
   );
-  return prefix||null;
+  if(prefix)return prefix;
+  // 3. Name/description search with unit conversion
+  // Build all measurement variants e.g. "0.5m" → ["500mm","50cm","0.5m"]
+  const variants=measurementVariants(v.trim());
+  const searchTerms=[vn];
+  if(variants)variants.forEach(mv=>searchTerms.push(normalise(mv)));
+  // Also add the raw query for natural text match
+  const qRaw=v.toLowerCase().trim();
+  const nameMatch=Object.values(db.parts).find(p=>{
+    const nameN=normalise(p.name);
+    const nameRaw=p.name.toLowerCase();
+    return searchTerms.some(t=>nameN.includes(t)||nameRaw.includes(t))||
+           (variants&&variants.some(mv=>nameRaw.includes(mv)));
+  });
+  return nameMatch||null;
 }
 function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function nowD(){return new Date().toLocaleDateString('en-GB');}
@@ -1645,11 +1659,39 @@ function matchesSupplier(p,sup){
   if(!sup)return true;
   return (p.sup||'').toLowerCase()===sup.toLowerCase();
 }
-// ─── UNIT CONVERSION FOR SEARCH ───────────────────────────────────────────────
-// Converts a measurement string to all equivalent forms
-// e.g. "20cm" → ["20cm","200mm","0.2m"]  "0.5m" → ["0.5m","50cm","500mm"]
+// ─── SMART SEARCH ENGINE ──────────────────────────────────────────────────────
+// Handles: any word order, partial words, typos, abbreviations, unit conversion
+// spaces/dashes ignored, upper/lower ignored, all words must match somewhere
+
+// Common abbreviation expansions
+const ABBREVS={
+  'psu':['power supply','psu'],
+  'mcb':['circuit breaker','mcb','miniature circuit breaker'],
+  'cb':['circuit breaker','cb'],
+  'vfd':['vfd','variable frequency drive','inverter','drive'],
+  'plc':['plc','programmable logic controller'],
+  'hmi':['hmi','human machine interface','touch screen','panel'],
+  'io':['i/o','input output','input/output','io module'],
+  'ac':['ac','alternating current'],
+  'dc':['dc','direct current'],
+  'servo':['servo','servo motor','servo drive'],
+  'sensor':['sensor','proximity','photoelectric','switch'],
+  'relay':['relay','contactor','control relay'],
+  'pwr':['power','power supply','psu'],
+  'cat6':['cat6','cat6a','ethernet','cable'],
+  'cat5':['cat5','cat5e','ethernet','cable'],
+  'eth':['ethernet','cat6','cat5','network cable'],
+  'din':['din rail','din'],
+  'encl':['enclosure','cabinet','panel'],
+};
+
+function expandAbbrevs(word){
+  const w=word.toLowerCase();
+  return ABBREVS[w]?[w,...ABBREVS[w]]:[w];
+}
+
+// Unit conversion — 0.5m finds 500mm finds 50cm
 function measurementVariants(q){
-  // Strip spaces between number and unit e.g. "20 cm" → "20cm"
   const clean=q.replace(/(\d)\s+(mm|cm|m)\b/gi,'$1$2');
   const match=clean.match(/^([\d.]+)\s*(mm|cm|m)\b/i);
   if(!match)return null;
@@ -1660,44 +1702,63 @@ function measurementVariants(q){
   else if(unit==='cm')mm=val*10;
   else if(unit==='m')mm=val*1000;
   else return null;
-  const variants=[];
-  // mm
-  variants.push(mm+'mm');
-  // cm — only show clean numbers
-  const cm=mm/10;
-  variants.push(cm+'cm');
-  variants.push(cm+' cm');
-  // m
-  const m=mm/1000;
-  variants.push(m+'m');
-  variants.push(m+' m');
-  // also the normalised (no space) versions
-  return [...new Set(variants.map(v=>v.toLowerCase()))];
+  const cm=mm/10, m=mm/1000;
+  return [...new Set([
+    mm+'mm', mm+' mm',
+    cm+'cm', cm+' cm',
+    m+'m',   m+' m'
+  ].map(v=>v.toLowerCase()))];
 }
 
-function partFilter(p,q,cat,brand,volt){
-  if(!q&&!cat&&!brand&&!volt)return true;
-  const qn=normalise(q);
-  const haystackRaw=(p.name+' '+p.code+' '+(p.mfrno||'')+' '+(p.barcode||'')+' '+(p.mfr||'')+' '+p.loc+' '+p.cat+' '+(p.sup||'')+' '+(p.notes||'')).toLowerCase();
-  const haystackNorm=normalise(haystackRaw);
-  // Standard match — ignoring spaces/case
-  let textMatch=!q||(haystackNorm.includes(qn)||haystackRaw.includes(q.toLowerCase().trim()));
-  // Unit conversion match — "20cm" also finds "200mm" etc.
-  if(!textMatch&&q){
-    const variants=measurementVariants(q.trim());
-    if(variants){
-      textMatch=variants.some(v=>haystackRaw.includes(v)||haystackNorm.includes(normalise(v)));
-    }
-  }
-  return textMatch&&(!cat||p.cat===cat)&&matchesBrand(p,brand)&&matchesVoltage(p,volt);
+// Score how well a part matches a single word
+function wordMatches(word, haystack, haystackN){
+  const wn=normalise(word);
+  if(!wn)return true;
+  // Direct match
+  if(haystackN.includes(wn)||haystack.includes(word))return true;
+  // Unit conversion
+  const units=measurementVariants(word);
+  if(units&&units.some(u=>haystack.includes(u)||haystackN.includes(normalise(u))))return true;
+  // Abbreviation expansion
+  const expanded=expandAbbrevs(word);
+  if(expanded.some(e=>haystack.includes(e)||haystackN.includes(normalise(e))))return true;
+  return false;
 }
+
+// Build full searchable text for a part
+function partHaystack(p){
+  return [
+    p.name, p.code, p.mfrno||'', p.barcode||'',
+    p.mfr||'', p.cat||'', p.sup||'', p.notes||'',
+    p.loc||'', p.loc2||'', p.loc3||''
+  ].join(' ').toLowerCase();
+}
+
+// Main filter — ALL words must match (AND search)
+function partFilter(p, q, cat, brand, volt){
+  if(!q&&!cat&&!brand&&!volt)return true;
+  // Category, brand, voltage dropdowns
+  if(cat&&p.cat!==cat)return false;
+  if(brand&&(p.mfr||'').toLowerCase()!==brand.toLowerCase())return false;
+  if(volt){const h=(p.name+' '+(p.notes||'')).toLowerCase();if(!h.includes(volt.toLowerCase()))return false;}
+  if(!q)return true;
+  const hay=partHaystack(p);
+  const hayN=normalise(hay);
+  // Split query into words — ALL must match somewhere
+  const words=q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return words.every(w=>wordMatches(w, hay, hayN));
+}
+
 
 function doSearch(){
-  const q=(document.getElementById('sq').value||'').toLowerCase();
+  const q=(document.getElementById('sq').value||'').trim();
   const cat=document.getElementById('scat').value;
   const brand=(document.getElementById('sbrand')||{value:''}).value;
   const volt=(document.getElementById('svolt')||{value:''}).value;
   const loc=(document.getElementById('sloc')||{value:''}).value;
+  const total=Object.keys(db.parts).length;
+  const el=document.getElementById('s-results');
+  if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">No parts in catalogue yet — use Add Part to get started.</div>';return;}
   const res=Object.values(db.parts).filter(p=>{
     if(!partFilter(p,q,cat,brand,volt))return false;
     if(loc){
@@ -1706,28 +1767,27 @@ function doSearch(){
     }
     return true;
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  const el=document.getElementById('s-results');
-  if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">No parts found</div>';return;}
-  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${res.length} part${res.length!==1?'s':''} found</div>
-  <div style="overflow-x:auto"><table><thead><tr>
-    <th>Internal no.</th><th>Mfr part no.</th><th>Barcode</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th>Qty</th><th>Min</th><th>Status</th><th></th>
+  const hint=q?`${res.length} of ${total} parts match "<strong>${q}</strong>"`:`Showing all ${total} parts — type anything to filter`;
+  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
+  <div style="overflow-x:auto;max-height:600px;overflow-y:auto">
+  <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
+    <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
   </tr></thead><tbody>${
-    res.map(p=>`<tr>
+    res.length?res.map(p=>`<tr>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}</td>
-      <td style="font-size:12px;color:#6b7280">${p.barcode||'—'}</td>
       <td style="font-weight:500">${p.name}${getAllocTag(p.code)}</td>
       <td style="font-size:12px">${p.mfr||'—'}</td>
       <td><span class="chip">${p.cat}</span></td>
-      <td style="font-size:12px">${formatLoc(p)}</td>
-      <td style="font-weight:600">${p.qty}</td>
-      <td>${p.min}</td>
+      <td style="font-size:12px">${formatLoc(p)||'—'}</td>
+      <td style="font-weight:600;text-align:center;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
       <td>${sb(p)}</td>
       <td style="display:flex;gap:4px">
         <button onclick="prefillCI('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-green">In</button>
         <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-blue">Edit</button>
       </td>
     </tr>`).join('')
+    :`<tr><td colspan="9" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
   }</tbody></table></div>`;
 }
 function prefillCI(code){go('checkin');document.getElementById('ci-scan').value=code;ciLook();}
@@ -1772,18 +1832,23 @@ async function addPart(){
 let curBOM=[];
 
 function bomSug(){
-  const q=document.getElementById('bom-q').value.toLowerCase().trim();
+  const q=document.getElementById('bom-q').value.trim();
   const el=document.getElementById('bom-sug');
   if(!q){el.innerHTML='';return;}
-  const res=Object.values(db.parts).filter(p=>(p.name+p.code+p.cat).toLowerCase().includes(q)).slice(0,8);
-  if(!res.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af;padding:6px 0">No parts found</div>';return;}
-  el.innerHTML=`<div class="sug-wrap">${res.map(p=>`<div class="sug-item" onclick="addToBOM('${p.code}')"><div><span style="font-weight:600">${p.name}</span> <span style="font-size:11px;color:#9ca3af">${p.code}</span></div><div style="display:flex;gap:6px;align-items:center"><span class="chip">${p.cat}</span>${sb(p)}</div></div>`).join('')}</div>`;
+  // Use smart partFilter — same engine as Search Parts
+  const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,10);
+  if(!res.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af;padding:6px 0">No parts found — try different words or check spelling</div>';return;}
+  el.innerHTML=`<div class="sug-wrap">${res.map(p=>`<div class="sug-item" onclick="addToBOM('${p.code}')">
+    <div><span style="font-weight:600">${p.name}</span> <span style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</span></div>
+    <div style="display:flex;gap:6px;align-items:center"><span class="chip">${p.cat}</span>${sb(p)}</div>
+  </div>`).join('')}</div>`;
 }
 function bomScanAdd(){
   const v=document.getElementById('bom-q').value.trim();
   if(!v)return;
-  const p=findPart(v);
-  if(p){addToBOM(p.code);}else{toast('Part not found — check part number','err');}
+  // Try exact lookup first, then smart search
+  const p=findPart(v)||Object.values(db.parts).find(pt=>partFilter(pt,v,'','',''));
+  if(p){addToBOM(p.code);}else{toast('Part not found — try typing part of the name','err');}
 }
 function addToBOM(code){
   const ex=curBOM.find(x=>x.code===code);
@@ -1803,24 +1868,51 @@ function renderBOMRows(){
     return`<div class="bom-row"><div><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af;margin-top:1px">${item.code}</div></div><span class="chip">${item.cat}</span><input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows()"><div style="font-weight:600;color:${item.inStock>0?'#166534':'#991b1b'}">${item.inStock}</div><div>${st}</div><button onclick="curBOM.splice(${i},1);renderBOMRows()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button></div>`;
   }).join('');
 }
+// Smart part lookup for BOM — tries code first, then mfrno, then name match
+function findPartForBOM(item){
+  // 1. Exact code match
+  if(db.parts[item.code])return db.parts[item.code];
+  // 2. Normalised code match (ignore dashes/spaces)
+  const nc=normalise(item.code);
+  const byCode=Object.values(db.parts).find(p=>normalise(p.code)===nc||normalise(p.mfrno||'')===nc||normalise(p.barcode||'')===nc);
+  if(byCode)return byCode;
+  // 3. Name match using smart search
+  const byName=Object.values(db.parts).find(p=>partFilter(p,item.name,'','',''));
+  return byName||null;
+}
+
 function checkStock(){
   if(!curBOM.length){toast('Add parts to BOM first','err');return;}
-  curBOM.forEach(item=>{if(db.parts[item.code])item.inStock=db.parts[item.code].qty;});
+  let matched=0,unmatched=0;
+  curBOM.forEach(item=>{
+    const p=findPartForBOM(item);
+    if(p){
+      item.inStock=p.qty;
+      // Update the code to the matched part's code so future ops work
+      item.matchedCode=p.code;
+      matched++;
+    }else{
+      item.inStock=0;
+      unmatched++;
+    }
+  });
   renderBOMRows();
   const short=curBOM.filter(i=>i.qty>i.inStock);
   const ok=curBOM.filter(i=>i.qty<=i.inStock);
   const btn=document.getElementById('btn-shortfall');
   const sum=document.getElementById('bom-summary');
+  let msg='';
+  if(unmatched)msg=`<div style="font-size:12px;color:#92400e;margin-top:6px">⚠ ${unmatched} part${unmatched!==1?'s':''} not found in catalogue — check part numbers match</div>`;
   if(short.length){
     btn.style.display='inline-block';
     btn.textContent=`Order shortfall only (${short.length} line${short.length!==1?'s':''})`;
     btn.className='btn-amber';
-    sum.innerHTML=`<div style="padding:10px 14px;background:#fefce8;border:1px solid #fcd34d;border-radius:6px;font-size:13px"><span class="badge b-ok" style="margin-right:8px">${ok.length} in stock</span><span class="badge b-low">${short.length} short or out</span></div>`;
+    sum.innerHTML=`<div style="padding:10px 14px;background:#fefce8;border:1px solid #fcd34d;border-radius:6px;font-size:13px"><span class="badge b-ok" style="margin-right:8px">${ok.length} in stock</span><span class="badge b-low">${short.length} short or out</span></div>${msg}`;
   }else{
     btn.style.display='none';
-    sum.innerHTML=`<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:13px;color:#166534;font-weight:600">All ${ok.length} parts are in stock — nothing to order!</div>`;
+    sum.innerHTML=`<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:13px;color:#166534;font-weight:600">All ${ok.length} parts are in stock — nothing to order!</div>${msg}`;
   }
-  toast(`Stock checked: ${ok.length} OK, ${short.length} need ordering`,'info');
+  toast(`Stock checked: ${ok.length} OK, ${short.length} short${unmatched?' — '+unmatched+' not found':''}`,'info');
 }
 async function orderShortfall(){
   const short=curBOM.filter(i=>i.qty>i.inStock);
@@ -2915,7 +3007,7 @@ function smSendEmails(){
 
 // ─── CHECKIN STOCK BROWSER ────────────────────────────────────────────────────
 function renderCIBrowse(){
-  const q=(document.getElementById('ci-browse-q')||{value:''}).value.toLowerCase();
+  const q=(document.getElementById('ci-browse-q')||{value:''}).value.trim();
   const cat=(document.getElementById('ci-browse-cat')||{value:''}).value;
   const brand=(document.getElementById('ci-browse-brand')||{value:''}).value;
   const volt=(document.getElementById('ci-browse-volt')||{value:''}).value;
@@ -2923,17 +3015,19 @@ function renderCIBrowse(){
     .sort((a,b)=>a.cat.localeCompare(b.cat)||a.name.localeCompare(b.name));
   const el=document.getElementById('ci-browse-list');
   if(!el)return;
-  if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts found</div>';return;}
-  el.innerHTML=`<div style="overflow-x:auto"><table><thead><tr>
-    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th>Current stock</th><th></th>
-  </tr></thead><tbody>${res.map(p=>`<tr>
+  const total=Object.keys(db.parts).length;
+  if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
+  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
+  <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
+    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Stock</th><th></th>
+  </tr></thead><tbody>${res.length?res.map(p=>`<tr>
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
-    <td style="font-weight:700;color:#166534">${p.qty}</td>
+    <td style="font-weight:700;text-align:center;color:#166534">${p.qty}</td>
     <td><button onclick="browseAddToCheckin('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-green">Check in</button></td>
-  </tr>`).join('')}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="6" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckin(code){
@@ -2946,7 +3040,7 @@ function browseAddToCheckin(code){
 
 // ─── CHECKOUT STOCK BROWSER ───────────────────────────────────────────────────
 function renderCOBrowse(){
-  const q=(document.getElementById('co-browse-q')||{value:''}).value.toLowerCase();
+  const q=(document.getElementById('co-browse-q')||{value:''}).value.trim();
   const cat=(document.getElementById('co-browse-cat')||{value:''}).value;
   const brand=(document.getElementById('co-browse-brand')||{value:''}).value;
   const volt=(document.getElementById('co-browse-volt')||{value:''}).value;
@@ -2954,17 +3048,19 @@ function renderCOBrowse(){
     .sort((a,b)=>a.cat.localeCompare(b.cat)||a.name.localeCompare(b.name));
   const el=document.getElementById('co-browse-list');
   if(!el)return;
-  if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts found</div>';return;}
-  el.innerHTML=`<div style="overflow-x:auto"><table><thead><tr>
-    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th>In stock</th><th></th>
-  </tr></thead><tbody>${res.map(p=>`<tr style="${p.qty<=0?'opacity:.5':''}">
+  const total=Object.keys(db.parts).length;
+  if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
+  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
+  <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
+    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">In stock</th><th></th>
+  </tr></thead><tbody>${res.length?res.map(p=>`<tr style="${p.qty<=0?'opacity:.5':''}">
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
-    <td style="font-weight:700;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
+    <td style="font-weight:700;text-align:center;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
     <td>${p.qty>0?`<button onclick="browseAddToCheckout('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-amber">Take</button>`:'<span style="font-size:11px;color:#9ca3af">None</span>'}</td>
-  </tr>`).join('')}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="6" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckout(code){
