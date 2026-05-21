@@ -1377,13 +1377,23 @@ function go(t){
   if(t==='checkin'){renderCIBrowse();populateBrandDropdowns();}
   if(t==='addpart'){populateCatDropdowns();populateLocDropdowns();populateBrandDropdowns();}
 }
+function normalise(s){return(s||'').toLowerCase().replace(/[\s\-_]/g,'');}
 function findPart(v){
-  const vl=v.toLowerCase().trim();
-  return Object.values(db.parts).find(p=>
-    p.code.toLowerCase()===vl ||
-    (p.barcode&&p.barcode.toLowerCase()===vl) ||
-    (p.mfrno&&p.mfrno.toLowerCase()===vl)
+  const vn=normalise(v);
+  if(!vn)return null;
+  // Exact match first (code, barcode, mfrno) — ignoring spaces/case
+  const exact=Object.values(db.parts).find(p=>
+    normalise(p.code)===vn ||
+    normalise(p.barcode||'')===vn ||
+    normalise(p.mfrno||'')===vn
   );
+  if(exact)return exact;
+  // Prefix match — typed value is start of part code or mfrno
+  const prefix=Object.values(db.parts).find(p=>
+    normalise(p.code).startsWith(vn)||
+    normalise(p.mfrno||'').startsWith(vn)
+  );
+  return prefix||null;
 }
 function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function nowD(){return new Date().toLocaleDateString('en-GB');}
@@ -1635,8 +1645,50 @@ function matchesSupplier(p,sup){
   if(!sup)return true;
   return (p.sup||'').toLowerCase()===sup.toLowerCase();
 }
+// ─── UNIT CONVERSION FOR SEARCH ───────────────────────────────────────────────
+// Converts a measurement string to all equivalent forms
+// e.g. "20cm" → ["20cm","200mm","0.2m"]  "0.5m" → ["0.5m","50cm","500mm"]
+function measurementVariants(q){
+  // Strip spaces between number and unit e.g. "20 cm" → "20cm"
+  const clean=q.replace(/(\d)\s+(mm|cm|m)\b/gi,'$1$2');
+  const match=clean.match(/^([\d.]+)\s*(mm|cm|m)\b/i);
+  if(!match)return null;
+  const val=parseFloat(match[1]);
+  const unit=match[2].toLowerCase();
+  let mm;
+  if(unit==='mm')mm=val;
+  else if(unit==='cm')mm=val*10;
+  else if(unit==='m')mm=val*1000;
+  else return null;
+  const variants=[];
+  // mm
+  variants.push(mm+'mm');
+  // cm — only show clean numbers
+  const cm=mm/10;
+  variants.push(cm+'cm');
+  variants.push(cm+' cm');
+  // m
+  const m=mm/1000;
+  variants.push(m+'m');
+  variants.push(m+' m');
+  // also the normalised (no space) versions
+  return [...new Set(variants.map(v=>v.toLowerCase()))];
+}
+
 function partFilter(p,q,cat,brand,volt){
-  const textMatch=!q||(p.name+p.code+(p.mfrno||'')+(p.barcode||'')+(p.mfr||'')+p.loc+p.cat+(p.sup||'')+(p.notes||'')).toLowerCase().includes(q);
+  if(!q&&!cat&&!brand&&!volt)return true;
+  const qn=normalise(q);
+  const haystackRaw=(p.name+' '+p.code+' '+(p.mfrno||'')+' '+(p.barcode||'')+' '+(p.mfr||'')+' '+p.loc+' '+p.cat+' '+(p.sup||'')+' '+(p.notes||'')).toLowerCase();
+  const haystackNorm=normalise(haystackRaw);
+  // Standard match — ignoring spaces/case
+  let textMatch=!q||(haystackNorm.includes(qn)||haystackRaw.includes(q.toLowerCase().trim()));
+  // Unit conversion match — "20cm" also finds "200mm" etc.
+  if(!textMatch&&q){
+    const variants=measurementVariants(q.trim());
+    if(variants){
+      textMatch=variants.some(v=>haystackRaw.includes(v)||haystackNorm.includes(normalise(v)));
+    }
+  }
   return textMatch&&(!cat||p.cat===cat)&&matchesBrand(p,brand)&&matchesVoltage(p,volt);
 }
 
@@ -2271,7 +2323,9 @@ function renderHist(){
     <th style="width:100px">Brand</th>
     <th style="width:110px">Supplier</th>
     <th>Ref / notes</th>
-  </tr></thead><tbody>${allRows.map(r=>{
+    <th style="width:36px"></th>
+  </tr></thead><tbody>${allRows.map((r,rowIdx)=>{
+    const delBtn=`<td><button onclick="deleteHistRow(${rowIdx},${JSON.stringify(allRows)})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`;
     if(r.kind==='stock'){
       const badge=r.qty>0?'b-ok':'b-low';
       const label=r.type||(r.qty>0?'IN':'OUT');
@@ -2285,6 +2339,7 @@ function renderHist(){
         <td style="font-size:12px">${pm.mfr||'—'}</td>
         <td style="font-size:12px">${pm.sup||'—'}</td>
         <td style="font-size:12px">${r.ref||''}</td>
+        ${delBtn}
       </tr>`;
     }else{
       const eb=eventBadge[r.type]||{cls:'b-gray',label:r.type};
@@ -2294,9 +2349,28 @@ function renderHist(){
         <td style="font-weight:500" colspan="3">${r.title}</td>
         <td colspan="2" style="font-size:12px;color:#6b7280">${r.detail||''}</td>
         <td>—</td>
+        ${delBtn}
       </tr>`;
     }
   }).join('')}</tbody></table>`;
+}
+
+async function deleteHistRow(rowIdx, allRows){
+  const r=allRows[rowIdx];
+  if(!r)return;
+  if(!confirm('Delete this history entry?'))return;
+  if(r.kind==='stock'){
+    // find and remove from db.hist by matching ts+code+qty
+    const idx=db.hist.findIndex(h=>h.ts===r.ts&&h.code===r.code&&h.qty===r.qty);
+    if(idx>-1)db.hist.splice(idx,1);
+  }else{
+    // find and remove from db.eventHist by matching ts+title
+    const idx=(db.eventHist||[]).findIndex(e=>e.ts===r.ts&&e.title===r.title);
+    if(idx>-1)db.eventHist.splice(idx,1);
+  }
+  await saveDB();
+  renderHist();
+  toast('History entry deleted');
 }
 
 // Auto-refresh every 25s
