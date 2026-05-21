@@ -1394,18 +1394,10 @@ function findPart(v){
     normalise(p.mfrno||'').startsWith(vn)
   );
   if(prefix)return prefix;
-  // 3. Name/description search with unit conversion
-  // Build all measurement variants e.g. "0.5m" → ["500mm","50cm","0.5m"]
-  const variants=measurementVariants(v.trim());
-  const searchTerms=[vn];
-  if(variants)variants.forEach(mv=>searchTerms.push(normalise(mv)));
-  // Also add the raw query for natural text match
-  const qRaw=v.toLowerCase().trim();
+  // 3. Name/description search with word-boundary unit conversion
   const nameMatch=Object.values(db.parts).find(p=>{
-    const nameN=normalise(p.name);
-    const nameRaw=p.name.toLowerCase();
-    return searchTerms.some(t=>nameN.includes(t)||nameRaw.includes(t))||
-           (variants&&variants.some(mv=>nameRaw.includes(mv)));
+    const hay=partHaystack(p);
+    return wordMatches(v.trim(), hay);
   });
   return nameMatch||null;
 }
@@ -1660,10 +1652,6 @@ function matchesSupplier(p,sup){
   return (p.sup||'').toLowerCase()===sup.toLowerCase();
 }
 // ─── SMART SEARCH ENGINE ──────────────────────────────────────────────────────
-// Handles: any word order, partial words, typos, abbreviations, unit conversion
-// spaces/dashes ignored, upper/lower ignored, all words must match somewhere
-
-// Common abbreviation expansions
 const ABBREVS={
   'psu':['power supply','psu'],
   'mcb':['circuit breaker','mcb','miniature circuit breaker'],
@@ -1690,10 +1678,11 @@ function expandAbbrevs(word){
   return ABBREVS[w]?[w,...ABBREVS[w]]:[w];
 }
 
-// Unit conversion — 0.5m finds 500mm finds 50cm
+// Unit conversion — returns all equivalent measurement strings
 function measurementVariants(q){
-  const clean=q.replace(/(\d)\s+(mm|cm|m)\b/gi,'$1$2');
-  const match=clean.match(/^([\d.]+)\s*(mm|cm|m)\b/i);
+  // Allow space between number and unit: "5 m", "500 mm"
+  const clean=q.trim().replace(/(\d)\s+(mm|cm|m)$/i,'$1$2');
+  const match=clean.match(/^([\d.]+)(mm|cm|m)$/i);
   if(!match)return null;
   const val=parseFloat(match[1]);
   const unit=match[2].toLowerCase();
@@ -1703,26 +1692,27 @@ function measurementVariants(q){
   else if(unit==='m')mm=val*1000;
   else return null;
   const cm=mm/10, m=mm/1000;
+  // Return clean number+unit strings — no trailing zeros for whole numbers
+  function fmt(n){return n%1===0?n.toString():parseFloat(n.toFixed(4)).toString();}
   return [...new Set([
-    mm+'mm', mm+' mm',
-    cm+'cm', cm+' cm',
-    m+'m',   m+' m'
-  ].map(v=>v.toLowerCase()))];
+    fmt(mm)+'mm', fmt(cm)+'cm', fmt(m)+'m'
+  ])];
 }
 
-// Score how well a part matches a single word
-function wordMatches(word, haystack, haystackN){
-  const wn=normalise(word);
-  if(!wn)return true;
-  // Direct match
-  if(haystackN.includes(wn)||haystack.includes(word))return true;
-  // Unit conversion
-  const units=measurementVariants(word);
-  if(units&&units.some(u=>haystack.includes(u)||haystackN.includes(normalise(u))))return true;
-  // Abbreviation expansion
-  const expanded=expandAbbrevs(word);
-  if(expanded.some(e=>haystack.includes(e)||haystackN.includes(normalise(e))))return true;
-  return false;
+// Check if a measurement word matches inside a text using word boundaries
+function measurementWordMatch(word, text){
+  const variants=measurementVariants(word);
+  if(!variants)return false;
+  // Use word-boundary regex so "5m" does NOT match inside "0.5m" or "7.5m"
+  return variants.some(v=>{
+    try{
+      // \b works on word chars — measurements need custom boundary
+      // check that the match is not preceded by a digit or dot
+      const escaped=v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const re=new RegExp('(?<![\\d.])'+escaped+'(?![\\d])', 'i');
+      return re.test(text);
+    }catch{return text.includes(v);}
+  });
 }
 
 // Build full searchable text for a part
@@ -1734,19 +1724,40 @@ function partHaystack(p){
   ].join(' ').toLowerCase();
 }
 
+// Check if a single word matches a part
+function wordMatches(word, haystack){
+  if(!word)return true;
+  const w=word.toLowerCase();
+
+  // 1. Direct substring match (case-insensitive, spaces stripped in word)
+  if(haystack.includes(w))return true;
+
+  // 2. Normalised match — ignore dashes/spaces in both
+  const wn=normalise(w);
+  const hn=normalise(haystack);
+  if(hn.includes(wn))return true;
+
+  // 3. Measurement with proper word boundary
+  if(measurementWordMatch(w, haystack))return true;
+
+  // 4. Abbreviation expansion
+  const expanded=expandAbbrevs(w);
+  if(expanded.length>1&&expanded.some(e=>haystack.includes(e.toLowerCase())))return true;
+
+  return false;
+}
+
 // Main filter — ALL words must match (AND search)
 function partFilter(p, q, cat, brand, volt){
   if(!q&&!cat&&!brand&&!volt)return true;
-  // Category, brand, voltage dropdowns
   if(cat&&p.cat!==cat)return false;
   if(brand&&(p.mfr||'').toLowerCase()!==brand.toLowerCase())return false;
   if(volt){const h=(p.name+' '+(p.notes||'')).toLowerCase();if(!h.includes(volt.toLowerCase()))return false;}
   if(!q)return true;
   const hay=partHaystack(p);
-  const hayN=normalise(hay);
-  // Split query into words — ALL must match somewhere
+  // Split on spaces — every word must match somewhere in the part
   const words=q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return words.every(w=>wordMatches(w, hay, hayN));
+  return words.every(w=>wordMatches(w, hay));
 }
 
 
@@ -2219,9 +2230,31 @@ function promptAddPO(delId){
 }
 
 // ─── ORDER LIST ───────────────────────────────────────────────────────────────
+// Get usage stats for a part from history
+function getPartUsage(code){
+  const hist=[...(db.hist||[])].filter(h=>h.code===code);
+  const outs=hist.filter(h=>h.qty<0);
+  const ins=hist.filter(h=>h.qty>0&&(h.ref||'').toLowerCase().includes('deliver'));
+  // last checked out
+  const lastOut=outs.length?outs[outs.length-1].ts:null;
+  // last ordered (delivery check-in)
+  const lastIn=ins.length?ins[ins.length-1].ts:null;
+  // usage count — how many times checked out
+  const useCount=outs.length;
+  return{lastOut,lastIn,useCount};
+}
+
+// Usage badge — colour by frequency
+function usageBadge(useCount){
+  if(useCount>=10)return{label:'High use',bg:'#dcfce7',col:'#166534',dot:'#22c55e'};
+  if(useCount>=4) return{label:'Regular',bg:'#dbeafe',col:'#1e40af',dot:'#3b82f6'};
+  if(useCount>=1) return{label:'Occasional',bg:'#fef3c7',col:'#92400e',dot:'#f59e0b'};
+  return{label:'Not yet used',bg:'#f3f4f6',col:'#6b7280',dot:'#d1d5db'};
+}
+
 function renderOrder(){
   const el=document.getElementById('order-content');
-  if(!db.order.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">Order list is empty. Generate from a BOM, add low-stock items, or click "+ Add line manually".</div>';return;}
+  if(!db.order.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">Order list is empty. Generate from a BOM, add low-stock items, or click "+ Add line".</div>';return;}
 
   // Group by supplier
   const groups={};
@@ -2236,30 +2269,78 @@ function renderOrder(){
 
   const grandTotal=db.order.reduce((a,o)=>a+((o.cost||0)*(o.qty||1)),0);
 
-  const rowHtml=(o,i)=>`<tr>
-    <td><input value="${o.code||''}" style="font-size:12px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 4px" onchange="db.order[${i}].code=this.value;saveDB()" title="Edit part number"></td>
-    <td><input value="${o.name||''}" style="font-weight:500;width:100%;border:none;background:transparent;padding:2px 4px" onchange="db.order[${i}].name=this.value;saveDB()" title="Edit part name"></td>
-    <td><input type="number" value="${o.qty||1}" min="1" style="width:54px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].qty=parseInt(this.value)||1;saveDB();renderOrder()"></td>
-    <td><input type="number" step="0.01" value="${o.cost||''}" placeholder="0.00" style="width:78px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].cost=parseFloat(this.value)||0;saveDB();renderOrder()"></td>
-    <td style="font-weight:600;padding:8px 6px;font-size:13px">${o.cost&&o.cost>0?'£'+((o.cost)*(o.qty||1)).toFixed(2):'—'}</td>
-    <td><input value="${o.notes||''}" placeholder="Notes…" style="width:100%;border:none;background:transparent;padding:2px 4px;font-size:12px" onchange="db.order[${i}].notes=this.value;saveDB()" title="Notes"></td>
-    <td style="font-size:11px;color:#6b7280;padding:8px 4px">${o.bom||'—'}</td>
-    <td><button onclick="db.order.splice(${i},1);saveDB();renderOrder()" class="btn-red" style="font-size:11px;padding:3px 8px">✕</button></td>
-  </tr>`;
+  const rowHtml=(o,i)=>{
+    const p=db.parts[o.code]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(o.code));
+    const curQty=p?p.qty:null;
+    const minQty=p?p.min:null;
+    const maxQty=p?p.max:null;
+    const reorderQty=p&&maxQty?Math.max(maxQty-( curQty||0),1):o.qty||1;
+    const usage=p?getPartUsage(o.code):null;
+    const badge=usage?usageBadge(usage.useCount):null;
+
+    // Stock info pill
+    const stockPill=curQty!==null
+      ?`<div style="font-size:11px;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span style="background:#f3f4f6;padding:1px 6px;border-radius:8px;color:#374151">Stock: <strong>${curQty}</strong></span>
+          ${minQty!==null?`<span style="background:#fef3c7;padding:1px 6px;border-radius:8px;color:#92400e">Min: ${minQty}</span>`:''}
+          ${maxQty?`<span style="background:#dcfce7;padding:1px 6px;border-radius:8px;color:#166534">Max: ${maxQty}</span>`:''}
+        </div>`:'';
+
+    // Last used / last ordered
+    const activityLine=usage?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">
+      ${usage.lastOut?`Last used: <strong style="color:#6b7280">${usage.lastOut}</strong>`:'Never checked out'}
+      ${usage.lastIn?` &middot; Last ordered: <strong style="color:#6b7280">${usage.lastIn}</strong>`:''}
+    </div>`:'';
+
+    // Usage dot + badge
+    const usagePill=badge?`<div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${badge.dot};flex-shrink:0"></div>
+      <span style="font-size:10px;font-weight:600;color:${badge.col}">${badge.label}</span>
+      ${usage.useCount?`<span style="font-size:10px;color:#9ca3af">(${usage.useCount}×)</span>`:''}
+    </div>`:'';
+
+    return`<tr style="border-left:3px solid ${badge?badge.dot:'#e5e7eb'}">
+      <td style="padding:6px 6px">
+        <input value="${o.code||''}" style="font-size:11px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 3px" onchange="db.order[${i}].code=this.value;saveDB()" title="Edit part number">
+      </td>
+      <td style="padding:6px 6px">
+        <input value="${o.name||''}" style="font-weight:500;width:100%;border:none;background:transparent;padding:2px 3px;font-size:13px" onchange="db.order[${i}].name=this.value;saveDB()" title="Edit part name">
+        ${stockPill}
+        ${activityLine}
+        ${usagePill}
+      </td>
+      <td style="padding:6px 4px">
+        <input type="number" value="${o.qty||1}" min="1" style="width:54px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].qty=parseInt(this.value)||1;saveDB();renderOrder()">
+        ${p&&maxQty?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">Suggest: ${reorderQty}</div>`:''}
+      </td>
+      <td><input type="number" step="0.01" value="${o.cost||''}" placeholder="0.00" style="width:78px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].cost=parseFloat(this.value)||0;saveDB();renderOrder()"></td>
+      <td style="font-weight:600;padding:8px 6px;font-size:13px">${o.cost&&o.cost>0?'£'+((o.cost)*(o.qty||1)).toFixed(2):'—'}</td>
+      <td><input value="${o.notes||''}" placeholder="Notes…" style="width:100%;border:none;background:transparent;padding:2px 4px;font-size:12px" onchange="db.order[${i}].notes=this.value;saveDB()" title="Notes"></td>
+      <td style="font-size:11px;color:#6b7280;padding:8px 4px">${o.bom||'—'}</td>
+      <td><button onclick="db.order.splice(${i},1);saveDB();renderOrder()" class="btn-red" style="font-size:11px;padding:3px 8px">✕</button></td>
+    </tr>`;
+  };
 
   const tableHead=`<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr>
-      <th style="width:14%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Part no.</th>
-      <th style="width:26%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Part name</th>
-      <th style="width:7%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Qty</th>
-      <th style="width:10%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Unit £</th>
-      <th style="width:10%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Total</th>
-      <th style="width:15%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">Notes</th>
-      <th style="width:10%;text-align:left;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase">From BOM</th>
+      <th style="width:13%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part no.</th>
+      <th style="width:32%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part name &amp; stock info</th>
+      <th style="width:9%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Qty</th>
+      <th style="width:9%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Unit £</th>
+      <th style="width:8%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Total</th>
+      <th style="width:14%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Notes</th>
+      <th style="width:9%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">From BOM</th>
       <th style="width:36px;border-bottom:1px solid #e5e7eb"></th>
     </tr></thead>`;
 
-  let html='';
+  // Legend
+  const legend=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">
+    <span style="color:#6b7280;font-weight:600">Usage:</span>
+    ${[{label:'High use (10+)',dot:'#22c55e'},{label:'Regular (4–9)',dot:'#3b82f6'},{label:'Occasional (1–3)',dot:'#f59e0b'},{label:'Not yet used',dot:'#d1d5db'}]
+      .map(b=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${b.dot};display:inline-block"></span>${b.label}</span>`).join('')}
+  </div>`;
+
+  let html=legend;
   Object.entries(groups).forEach(([sup,items])=>{
     const supTotal=items.reduce((a,{o})=>a+((o.cost||0)*(o.qty||1)),0);
     const isReal=!sup.startsWith('—');
@@ -2300,7 +2381,10 @@ async function addLowStock(){
   let n=0;
   for(const p of low){
     if(!db.order.find(o=>o.code===p.code)){
-      db.order.push({code:p.code,name:p.name,qty:Math.max(p.min-p.qty+1,1),sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});n++;
+      // Reorder to max if set, otherwise to min*2
+      const reorderQty=p.max?Math.max(p.max-p.qty,1):Math.max(p.min*2-p.qty,1);
+      db.order.push({code:p.code,name:p.name,qty:reorderQty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
+      n++;
     }
   }
   await saveDB();renderOrder();
