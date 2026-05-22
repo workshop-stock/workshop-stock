@@ -1007,9 +1007,9 @@ function readLocal(){
   return null;
 }
 
-// ─── FIREBASE SAVE — split into sections to avoid 10MB node limit ─────────────
+// ─── FIREBASE SAVE — store as JSON string to avoid key name restrictions ────────
 async function saveDB(){
-  writeLocal(); // always write local instantly
+  writeLocal();
   if(_saveTimer)clearTimeout(_saveTimer);
   _saveTimer=setTimeout(async()=>{
     setStatus('Saving…','#f59e0b');
@@ -1018,76 +1018,47 @@ async function saveDB(){
         const l=readLocal();
         if(l&&Object.keys(l.parts||{}).length>0){console.warn('saveDB blocked');return;}
       }
-      // Write each section separately — avoids hitting size limits
-      const d=JSON.parse(JSON.stringify(db));
-      await Promise.all([
-        DATA_REF.child('parts').set(d.parts||{}),
-        DATA_REF.child('boms').set(d.boms||{}),
-        DATA_REF.child('order').set(d.order||[]),
-        DATA_REF.child('hist').set(d.hist||[]),
-        DATA_REF.child('deliveries').set(d.deliveries||[]),
-        DATA_REF.child('quotes').set(d.quotes||{}),
-        DATA_REF.child('allocations').set(d.allocations||[]),
-        DATA_REF.child('eventHist').set(d.eventHist||[]),
-        DATA_REF.child('categories').set(d.categories||[]),
-        DATA_REF.child('locAreas').set(d.locAreas||[]),
-        DATA_REF.child('locSections').set(d.locSections||[]),
-        DATA_REF.child('locContainers').set(d.locContainers||[]),
-      ]);
+      await DATA_REF.child('data').set(JSON.stringify(db));
       setStatus('Live ✓ — all data shared','#16a34a');
     }catch(e){
-      console.warn('Firebase save error:',e);
+      console.error('Firebase save error:',e);
       setStatus('⚠ Save failed — data safe locally','#f59e0b');
-      toast('Save failed: '+e.message,'err');
+      toast('Save error: '+e.message,'err');
     }
   },1500);
 }
 
 // ─── FIREBASE REAL-TIME LISTENER ──────────────────────────────────────────────
-// Fires whenever ANY user saves — keeps all screens in sync automatically
 function startFirebaseListener(){
   if(_fbListenerActive)return;
   _fbListenerActive=true;
   setStatus('Connecting…','#f59e0b');
 
-  DATA_REF.on('value', snapshot=>{
-    const cloud=snapshot.val();
-    if(cloud&&typeof cloud==='object'){
-      // Reassemble from sections (new format) or use whole object (old format)
-      const assembled={
-        parts:       cloud.parts||{},
-        boms:        cloud.boms||{},
-        order:       cloud.order||[],
-        hist:        cloud.hist||[],
-        deliveries:  cloud.deliveries||[],
-        quotes:      cloud.quotes||{},
-        allocations: cloud.allocations||[],
-        eventHist:   cloud.eventHist||[],
-        categories:  cloud.categories||[],
-        locAreas:    cloud.locAreas||[],
-        locSections: cloud.locSections||[],
-        locContainers:cloud.locContainers||[],
-        freq:        cloud.freq||{},
-        orderGroups: cloud.orderGroups||{},
-      };
-      const cp=Object.keys(assembled.parts).length;
-      const lp=Object.keys(db.parts||{}).length;
-      if(cp>0||lp===0){
-        if(_saveTimer)clearTimeout(_saveTimer);
-        db=assembled;
-        initDefaults();
-        writeLocal();
-        renderAll();
-        populateBrandDropdowns();
-      }
-      setStatus('Live ✓ — all data shared','#16a34a');
-      updateUserCount();
-    }else if(cloud===null||!cloud.parts){
-      // Firebase empty — push local data up
+  DATA_REF.child('data').on('value', snapshot=>{
+    const raw=snapshot.val();
+    if(raw){
+      try{
+        const cloud=typeof raw==='string'?JSON.parse(raw):raw;
+        if(cloud&&typeof cloud==='object'){
+          const cp=Object.keys(cloud.parts||{}).length;
+          const lp=Object.keys(db.parts||{}).length;
+          if(cp>0||lp===0){
+            if(_saveTimer)clearTimeout(_saveTimer);
+            db=cloud;
+            initDefaults();
+            writeLocal();
+            renderAll();
+            populateBrandDropdowns();
+          }
+          setStatus('Live ✓ — all data shared','#16a34a');
+          updateUserCount();
+        }
+      }catch(e){console.warn('Firebase parse error:',e);}
+    }else{
       const local=readLocal();
       if(local&&Object.keys(local.parts||{}).length>0){
         db=local;initDefaults();
-        saveDB();
+        DATA_REF.child('data').set(JSON.stringify(db));
         toast('Uploading your data to Firebase…','info');
         renderAll();populateBrandDropdowns();
       }
@@ -1099,12 +1070,23 @@ function startFirebaseListener(){
   });
 
   fbdb.ref('.info/connected').on('value', snap=>{
-    if(snap.val()===true){
-      setStatus('Live ✓ — all data shared','#16a34a');
-    }else{
-      setStatus('⚠ Offline — changes saved locally','#f59e0b');
-    }
+    if(snap.val()===true){setStatus('Live ✓ — all data shared','#16a34a');}
+    else{setStatus('⚠ Offline — changes saved locally','#f59e0b');}
   });
+}
+
+// ─── MANUAL SAVE ──────────────────────────────────────────────────────────────
+async function manualSave(){
+  if(_saveTimer)clearTimeout(_saveTimer);
+  setStatus('Saving…','#f59e0b');
+  try{
+    await DATA_REF.child('data').set(JSON.stringify(db));
+    setStatus('Live ✓ — all data shared','#16a34a');
+    toast('Saved to Firebase ✓');
+  }catch(e){
+    setStatus('⚠ Save failed','#f59e0b');
+    toast('Save error: '+e.message,'err');
+  }
 }
 
 // ─── ACTIVE USERS — Firebase presence (no polling, no request cost) ───────────
