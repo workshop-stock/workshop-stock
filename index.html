@@ -120,6 +120,8 @@ tr:hover td{background:#f9fafb}
 .company-pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -188,11 +190,11 @@ tr:hover td{background:#f9fafb}
       <!-- Emergency close — always works -->
       <button onclick="forceCloseSetup()" style="font-size:22px;border:none;background:none;cursor:pointer;color:#6b7280;line-height:1;padding:0 4px" title="Close">&times;</button>
     </div>
-    <p>Enter your JSONbin credentials below. Your data is stored safely in JSONbin.</p>
+    <p>Your data is stored in Firebase. No credentials needed — everything is baked in.</p>
 
     <div class="step">
       <div class="step-n">1</div>
-      <div class="step-body"><strong>Log in to JSONbin</strong><p>Go to <a href="https://jsonbin.io" target="_blank">jsonbin.io</a> and sign in.</p></div>
+      <div class="step-body"><strong>Firebase is connected</strong><p>Go to <a href="https://firebase.google.com" target="_blank">firebase.google.com</a> and sign in.</p></div>
     </div>
     <div class="step">
       <div class="step-n">2</div>
@@ -542,6 +544,26 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
     <div style="margin-bottom:14px"><label>Notes</label><input id="ep-notes"></div>
+
+    <!-- PART IMAGE -->
+    <div style="margin-bottom:14px">
+      <label>Part image (drag &amp; drop or click to upload)</label>
+      <div id="ep-img-zone" onclick="document.getElementById('ep-img-file').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
+        ondragleave="this.style.borderColor='#d1d5db'"
+        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImage(event.dataTransfer.files[0],'ep')"
+        style="margin-top:6px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s;background:#fafafa">
+        <img id="ep-img-preview" src="" alt="" style="width:80px;height:80px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;display:none;background:#fff">
+        <div id="ep-img-placeholder" style="flex:1;text-align:center;color:#9ca3af;font-size:13px">
+          <div style="font-size:28px;margin-bottom:4px">📷</div>
+          <div>Drop image here or click to browse</div>
+          <div style="font-size:11px;margin-top:2px">JPG, PNG, WebP — will be resized automatically</div>
+        </div>
+        <button id="ep-img-remove" onclick="event.stopPropagation();removePartImage('ep')" style="display:none;font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5;flex-shrink:0">Remove</button>
+      </div>
+      <input type="file" id="ep-img-file" accept="image/*" style="display:none" onchange="handlePartImage(this.files[0],'ep')">
+    </div>
+
     <div style="display:flex;gap:8px">
       <button class="btn-green" onclick="saveEditPart()" style="flex:1">Save changes</button>
       <button class="btn-red" onclick="deletePartConfirm()">Delete part</button>
@@ -582,9 +604,26 @@ tr:hover td{background:#f9fafb}
       <div><label>Max stock level (reorder target)</label><input type="number" id="ap-max" value="10" min="0"></div>
       <div><label>Supplier</label><input id="ap-sup" placeholder="e.g. RS Components, Farnell"></div>
     </div>
-    <div class="g2" style="margin-bottom:14px">
+    <div class="g2" style="margin-bottom:10px">
       <div><label>Unit cost (£)</label><input type="number" id="ap-cost" step="0.01" placeholder="0.00"></div>
       <div><label>Specification / notes</label><input id="ap-notes" placeholder="Voltage, current rating, datasheet ref…"></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label>Part image — optional (drag &amp; drop or click)</label>
+      <div id="ap-img-zone" onclick="document.getElementById('ap-img-file').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
+        ondragleave="this.style.borderColor='#d1d5db'"
+        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImage(event.dataTransfer.files[0],'ap')"
+        style="margin-top:6px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s;background:#fafafa">
+        <img id="ap-img-preview" src="" alt="" style="width:80px;height:80px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;display:none;background:#fff">
+        <div id="ap-img-placeholder" style="flex:1;text-align:center;color:#9ca3af;font-size:13px">
+          <div style="font-size:28px;margin-bottom:4px">📷</div>
+          <div>Drop image here or click to browse</div>
+          <div style="font-size:11px;margin-top:2px">JPG, PNG, WebP — resized automatically to thumbnail</div>
+        </div>
+        <button id="ap-img-remove" onclick="event.stopPropagation();removePartImage('ap')" style="display:none;font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5;flex-shrink:0">Remove</button>
+      </div>
+      <input type="file" id="ap-img-file" accept="image/*" style="display:none" onchange="handlePartImage(this.files[0],'ap')">
     </div>
     <button class="btn-green" onclick="addPart()">Save part to catalogue</button>
   </div>
@@ -884,7 +923,7 @@ tr:hover td{background:#f9fafb}
         </div>
       </div>
       <div class="card">
-        <div class="sec">JSONbin connection</div>
+        <div class="sec">Firebase connection</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Current Bin ID: <code id="current-bin-display" style="background:#f3f4f6;padding:2px 6px;border-radius:4px">loading…</code></div>
         <div style="margin-bottom:8px"><label>Master API Key</label><input id="s-key" type="password" placeholder="$2b$10$…"></div>
         <div style="margin-bottom:12px"><label>Bin ID</label><input id="s-bin" placeholder="64a3f8c2…"></div>
@@ -910,89 +949,32 @@ tr:hover td{background:#f9fafb}
 
 <script>
 // ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║           WORKSHOP STOCK CONTROL — CONFIGURATION                           ║
-// ║                                                                              ║
-// ║  To connect to your database, edit the TWO lines below.                     ║
-// ║  Open this file in Notepad, press Ctrl+F, search for HARDCODED_API_KEY      ║
-// ║                                                                              ║
-// ║  Line 1 ► HARDCODED_API_KEY  — your JSONbin Master API Key                  ║
-// ║  Line 2 ► HARDCODED_BIN_ID   — your JSONbin Bin ID                          ║
-// ║                                                                              ║
-// ║  Save the file, upload to Netlify or GitHub Pages — done.                   ║
-// ║  Every user who opens the link connects automatically.                       ║
+// ║           WORKSHOP STOCK CONTROL — FIREBASE CONFIGURATION                  ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 
-// ▼▼▼ EDIT THESE TWO LINES ONLY ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+const firebaseConfig = {
+  apiKey: "AIzaSyA419gjuu0wF591zibiikQ8fqOBezedZsk",
+  authDomain: "workshop-stock-4689a.firebaseapp.com",
+  projectId: "workshop-stock-4689a",
+  storageBucket: "workshop-stock-4689a.firebasestorage.app",
+  messagingSenderId: "198436659283",
+  appId: "1:198436659283:web:470d69b5fd6037c835e6a6",
+  databaseURL: "https://workshop-stock-4689a-default-rtdb.europe-west1.firebasedatabase.app"
+};
 
-const HARDCODED_API_KEY = '$2a$10$6w5KIVhv99gj4qHITyNavOF.z/eMEdgLZb/piXaYoY6jqY2ZmhglK';
-//                         ↑ Your JSONbin Master API Key (starts with $2a$ or $2b$)
+firebase.initializeApp(firebaseConfig);
+const fbdb = firebase.database();
+const DATA_REF = fbdb.ref('workshopData');
 
-const HARDCODED_BIN_ID  = '69df3403aaba882197feb0fa';
-//                         ↑ Your JSONbin Bin ID (the long string from the URL)
-
-// ▲▲▲ STOP EDITING HERE ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-// ─── DATA STORAGE KEYS (browser local storage — do not change) ────────────────
-// Data is saved here in the browser as a backup on every save.
-// If the cloud is unreachable the app loads from here automatically.
-// wsc_data_v1 = current save   |   wsc_data_v2 = previous save (rollback)
-
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const CFG_KEY = 'wsc_config_v1';
-
-let cfg = {apiKey:'', binId:''};
-
-function loadCfg(){
-  if(HARDCODED_API_KEY&&HARDCODED_BIN_ID){
-    cfg={apiKey:HARDCODED_API_KEY,binId:HARDCODED_BIN_ID};
-    return;
-  }
-  try{const s=localStorage.getItem(CFG_KEY);if(s)cfg=JSON.parse(s);}catch{}
-}
-function saveCfg(){localStorage.setItem(CFG_KEY,JSON.stringify(cfg));}
-
-function forceCloseSetup(){
-  const ov=document.getElementById('setup-overlay');
-  if(ov){
-    ov.classList.remove('visible');
-    ov.classList.add('hidden');
-    ov.style.display='none';
-  }
-}
-
-function showSetup(){
-  const ov=document.getElementById('setup-overlay');
-  if(ov){
-    ov.classList.remove('hidden');
-    ov.classList.add('visible');
-    ov.style.display='flex';
-  }
-  document.getElementById('setup-key').value=cfg.apiKey||HARDCODED_API_KEY||'';
-  document.getElementById('setup-bin').value=cfg.binId||HARDCODED_BIN_ID||'';
-}
-
-function saveSetup(){
-  const k=(document.getElementById('setup-key').value||'').trim()||
-          (document.getElementById('s-key')?document.getElementById('s-key').value.trim():'');
-  const b=(document.getElementById('setup-bin').value||'').trim()||
-          (document.getElementById('s-bin')?document.getElementById('s-bin').value.trim():'');
-  // If fields empty but we have hardcoded — just close and use those
-  const useKey=k||HARDCODED_API_KEY;
-  const useBin=b||HARDCODED_BIN_ID;
-  if(!useKey||!useBin){alert('Please enter both the API key and Bin ID.');return;}
-  cfg={apiKey:useKey,binId:useBin};
-  saveCfg();
-  forceCloseSetup();
-  toast('Connected — loading data…','info');
-}
-
-// ─── DATABASE ─────────────────────────────────────────────────────────────────
-let db={parts:{},hist:[],boms:{},order:[],deliveries:[]};
-let saving=false,pendingSave=false;
-
+// ─── LOCAL CACHE ──────────────────────────────────────────────────────────────
 const LOCAL_KEY='wsc_data_v1';
 const LOCAL_KEY_2='wsc_data_v2';
 const LOCAL_BACKUP_KEY=LOCAL_KEY;
+
+let db={parts:{},hist:[],boms:{},order:[],deliveries:[]};
+let _fbListenerActive=false;
+let _saving=false;
+let _saveTimer=null;
 
 function initDefaults(){
   if(!db.parts)db.parts={};if(!db.hist)db.hist=[];if(!db.boms)db.boms={};
@@ -1004,6 +986,7 @@ function initDefaults(){
   if(!db.locContainers)db.locContainers=[...DEFAULT_LOC_CONTAINERS];
   if(!db.categories)db.categories=[...DEFAULT_CATS];
 }
+
 function writeLocal(){
   try{
     const json=JSON.stringify(db);
@@ -1012,52 +995,184 @@ function writeLocal(){
     localStorage.setItem(LOCAL_KEY,json);
   }catch(e){console.warn('writeLocal:',e);}
 }
+
 function readLocal(){
   for(const k of[LOCAL_KEY,LOCAL_KEY_2]){
-    try{const s=localStorage.getItem(k);if(!s)continue;const d=JSON.parse(s);if(d&&(Object.keys(d.parts||{}).length>0||Object.keys(d.boms||{}).length>0))return d;}catch{}
+    try{
+      const s=localStorage.getItem(k);if(!s)continue;
+      const d=JSON.parse(s);
+      if(d&&(Object.keys(d.parts||{}).length>0||Object.keys(d.boms||{}).length>0))return d;
+    }catch{}
   }
   return null;
 }
-function saveLocalBackup(){writeLocal();}
-function getLocalBackup(){return readLocal();}
 
-const API='https://api.jsonbin.io/v3/b/';
+// ─── FIREBASE SAVE — debounced 1.5s so rapid changes batch into one write ─────
+async function saveDB(){
+  writeLocal(); // always write local instantly
+  // debounce — wait 1.5s after last change before writing to Firebase
+  if(_saveTimer)clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    setStatus('Saving…','#f59e0b');
+    try{
+      // Safety guard — never write empty data
+      if(Object.keys(db.parts||{}).length===0&&Object.keys(db.boms||{}).length===0){
+        const l=readLocal();
+        if(l&&Object.keys(l.parts||{}).length>0){console.warn('saveDB blocked — db empty but local has data');return;}
+      }
+      await DATA_REF.set(JSON.parse(JSON.stringify(db)));
+      setStatus('Live ✓ — all data shared','#16a34a');
+    }catch(e){
+      console.warn('Firebase save error:',e);
+      setStatus('⚠ Save failed — data safe locally','#f59e0b');
+    }
+  },1500);
+}
 
-async function loadDB(){
-  loadCfg();
-  // Always hide setup overlay
+// ─── FIREBASE REAL-TIME LISTENER ──────────────────────────────────────────────
+// Fires whenever ANY user saves — keeps all screens in sync automatically
+function startFirebaseListener(){
+  if(_fbListenerActive)return;
+  _fbListenerActive=true;
+  setStatus('Connecting…','#f59e0b');
+
+  DATA_REF.on('value', snapshot=>{
+    const cloud=snapshot.val();
+    if(cloud&&typeof cloud==='object'&&cloud.parts!==undefined){
+      // Only update if cloud has more data, or we have nothing loaded yet
+      const cp=Object.keys(cloud.parts||{}).length;
+      const lp=Object.keys(db.parts||{}).length;
+      if(cp>0||lp===0){
+        // Pause saves while we apply incoming update
+        if(_saveTimer)clearTimeout(_saveTimer);
+        db=cloud;
+        initDefaults();
+        writeLocal();
+        renderAll();
+        populateBrandDropdowns();
+      }
+      setStatus('Live ✓ — all data shared','#16a34a');
+      updateUserCount();
+    }else if(cloud===null){
+      // Firebase is empty — push local data up if we have any
+      const local=readLocal();
+      if(local&&Object.keys(local.parts||{}).length>0){
+        db=local;initDefaults();
+        DATA_REF.set(JSON.parse(JSON.stringify(db)));
+        toast('Uploaded local data to Firebase','info');
+        renderAll();populateBrandDropdowns();
+      }
+      setStatus('Live ✓ — ready','#16a34a');
+    }
+  }, err=>{
+    console.warn('Firebase listener error:',err);
+    setStatus('⚠ Firebase offline — local data shown','#f59e0b');
+  });
+
+  // Monitor connection state
+  fbdb.ref('.info/connected').on('value', snap=>{
+    if(snap.val()===true){
+      setStatus('Live ✓ — all data shared','#16a34a');
+    }else{
+      setStatus('⚠ Offline — changes saved locally','#f59e0b');
+    }
+  });
+}
+
+// ─── ACTIVE USERS — Firebase presence (no polling, no request cost) ───────────
+const SESSION_ID='ses_'+Math.random().toString(36).slice(2,8);
+const presenceRef=fbdb.ref('presence/'+SESSION_ID);
+
+function startPresence(){
+  presenceRef.set({online:true,ts:Date.now()});
+  presenceRef.onDisconnect().remove();
+  // Count online users
+  fbdb.ref('presence').on('value',snap=>{
+    const count=snap.numChildren();
+    const badge=document.getElementById('active-users-badge');
+    const dashBadge=document.getElementById('active-users-dash');
+    if(badge){badge.style.display=count>1?'inline-block':'none';badge.textContent=`${count} users online`;}
+    if(dashBadge){dashBadge.textContent=count>1?`${count} users online now`:'';}
+  });
+}
+
+function updateUserCount(){
+  fbdb.ref('presence').once('value',snap=>{
+    const count=snap.numChildren();
+    const badge=document.getElementById('active-users-badge');
+    const dashBadge=document.getElementById('active-users-dash');
+    if(badge){badge.style.display=count>1?'inline-block':'none';badge.textContent=`${count} users online`;}
+    if(dashBadge){dashBadge.textContent=count>1?`${count} users online now`:'';}
+  });
+}
+
+// ─── MANUAL SAVE BUTTON ───────────────────────────────────────────────────────
+async function manualSave(){
+  if(_saveTimer)clearTimeout(_saveTimer);
+  setStatus('Saving…','#f59e0b');
+  try{
+    await DATA_REF.set(JSON.parse(JSON.stringify(db)));
+    setStatus('Live ✓ — all data shared','#16a34a');
+    toast('Saved to Firebase');
+  }catch(e){
+    setStatus('⚠ Save failed','#f59e0b');
+    toast('Save failed — check connection','err');
+  }
+}
+
+// ─── STATUS INDICATOR ─────────────────────────────────────────────────────────
+function setStatus(msg,col){
+  const el=document.getElementById('sync-status');
+  const dot=document.getElementById('save-dot');
+  const btn=document.getElementById('manual-save-btn');
+  if(el){el.textContent=msg;el.style.color=col||'#9ca3af';}
+  if(dot){
+    dot.style.background=col||'#9ca3af';
+    dot.style.boxShadow=col==='#16a34a'?'0 0 6px #22c55e':'none';
+  }
+  if(btn)btn.style.display='inline-block';
+}
+
+// ─── SETUP / SETTINGS OVERLAY — simplified for Firebase ──────────────────────
+let cfg={apiKey:'firebase',binId:'firebase'}; // kept for legacy compat checks
+function loadCfg(){} // no-op — Firebase config is baked in
+function saveCfg(){}
+function forceCloseSetup(){
   const ov=document.getElementById('setup-overlay');
   if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
-  if(!cfg.binId||!cfg.apiKey){setStatus('Not configured','#f59e0b');return;}
-  setStatus('Syncing…','#f59e0b');
-  try{
-    const r=await fetch(API+cfg.binId+'/latest',{headers:{'X-Master-Key':cfg.apiKey,'X-Bin-Meta':'false'}});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const raw=await r.json();
-    // JSONbin v3 wraps in {record:{...}} — unwrap
-    const cloud=(raw&&raw.record!==undefined)?raw.record:raw;
-    if(cloud&&typeof cloud==='object'){
-      const cp=Object.keys(cloud.parts||{}).length,cb=Object.keys(cloud.boms||{}).length;
-      const lp=Object.keys(db.parts||{}).length;
-      if(cp===0&&cb===0&&lp>0){
-        // Cloud empty but we have local data — push it back up
-        await pushToCloud();
-        toast('⚠ Cloud was empty — re-uploaded your local data','info');
-      }else if(cloud.parts!==undefined){
-        db=cloud;initDefaults();writeLocal();renderAll();populateBrandDropdowns();
-      }
-    }
-    setStatus('Live — all data shared','#16a34a');
-  }catch(e){
-    console.warn('loadDB cloud error:',e);
-    setStatus('⚠ Cloud unreachable — local data shown','#f59e0b');
-  }
+}
+function showSetup(){
+  toast('Using Firebase — no credentials needed. Use Settings tab to manage locations & categories.','info');
+}
+function saveSetup(){forceCloseSetup();toast('Firebase is already connected','info');}
+
+// ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
+function backupData(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
+  a.download='workshop-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();toast('Backup downloaded');
+}
+function restoreData(file){
+  if(!file)return;
+  if(!confirm(`Restore from "${file.name}"? This will overwrite ALL current data.`))return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const r=JSON.parse(e.target.result);
+      if(!r.parts){toast('Invalid backup file','err');return;}
+      pushUndo();db=r;await saveDB();renderAll();
+      toast(`Restored from ${file.name}`);
+    }catch{toast('Could not read backup file','err');}
+  };
+  reader.readAsText(file);
+  document.getElementById('restore-input').value='';
 }
 
 function checkLocalBackup(){
   const l=readLocal();const banner=document.getElementById('recovery-banner');
   if(!banner)return;
-  if(l&&(Object.keys(l.parts||{}).length>0||Object.keys(l.boms||{}).length>0)){
+  if(l&&Object.keys(l.parts||{}).length>0){
     const msg=document.getElementById('recovery-msg');
     if(msg)msg.textContent=`Found ${Object.keys(l.parts||{}).length} parts and ${Object.keys(l.boms||{}).length} BOMs saved locally.`;
     banner.style.display='block';
@@ -1065,97 +1180,25 @@ function checkLocalBackup(){
 }
 function recoverFromLocal(){
   const l=readLocal();if(!l){toast('No local data found','err');return;}
-  db=l;initDefaults();
-  forceCloseSetup();
-  renderAll();populateBrandDropdowns();
-  toast(`Recovered ${Object.keys(db.parts).length} parts, ${Object.keys(db.boms).length} BOMs`,'info');
+  db=l;initDefaults();forceCloseSetup();renderAll();populateBrandDropdowns();
+  saveDB();toast(`Recovered ${Object.keys(db.parts).length} parts — uploading to Firebase…`,'info');
 }
 
 // ─── UNDO ─────────────────────────────────────────────────────────────────────
 const undoStack=[];const UNDO_LIMIT=10;
 function pushUndo(){
-  undoStack.push(JSON.stringify(db));if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+  undoStack.push(JSON.stringify(db));
+  if(undoStack.length>UNDO_LIMIT)undoStack.shift();
   const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
 }
 async function undoLast(){
   if(!undoStack.length){toast('Nothing to undo','err');return;}
   if(!confirm('Undo the last action?'))return;
-  db=JSON.parse(undoStack.pop());await saveDB();renderAll();toast('Undone');
-  const btn=document.getElementById('undo-btn');if(btn)btn.style.display=undoStack.length?'inline-block':'none';
+  db=JSON.parse(undoStack.pop());
+  await saveDB();renderAll();toast('Undone');
+  const btn=document.getElementById('undo-btn');
+  if(btn)btn.style.display=undoStack.length?'inline-block':'none';
 }
-
-// ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
-function backupData(){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
-  a.download='workshop-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
-  toast('Backup downloaded');
-}
-function restoreData(file){
-  if(!file)return;
-  if(!confirm(`Restore from "${file.name}"? This will overwrite ALL current data.`))return;
-  const reader=new FileReader();
-  reader.onload=async e=>{
-    try{const r=JSON.parse(e.target.result);if(!r.parts){toast('Invalid backup file','err');return;}
-      pushUndo();db=r;await saveDB();renderAll();toast(`Restored from ${file.name}`);
-    }catch{toast('Could not read backup file','err');}
-  };
-  reader.readAsText(file);document.getElementById('restore-input').value='';
-}
-
-let pushing=false,pendingPush=false;
-async function pushToCloud(){
-  if(!cfg.binId||!cfg.apiKey)return;
-  if(Object.keys(db.parts||{}).length===0&&Object.keys(db.boms||{}).length===0){
-    const l=readLocal();if(l&&(Object.keys(l.parts||{}).length>0||Object.keys(l.boms||{}).length>0)){console.warn('pushToCloud blocked');return;}
-  }
-  if(pushing){pendingPush=true;return;}
-  pushing=true;setStatus('Saving…','#f59e0b');
-  try{
-    await fetch(API+cfg.binId,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':cfg.apiKey},body:JSON.stringify(db)});
-    setStatus('Saved ✓','#16a34a');setTimeout(()=>setStatus('Live — all data shared','#16a34a'),2000);
-  }catch(e){setStatus('⚠ Cloud save failed — safe locally','#f59e0b');console.warn('pushToCloud:',e);}
-  pushing=false;if(pendingPush){pendingPush=false;pushToCloud();}
-}
-async function saveDB(){writeLocal();await pushToCloud();}
-
-function setStatus(msg,col){
-  const el=document.getElementById('sync-status');
-  const dot=document.getElementById('save-dot');
-  const btn=document.getElementById('manual-save-btn');
-  el.textContent=msg;el.style.color=col||'#9ca3af';
-  if(dot){
-    dot.style.background=col||'#9ca3af';
-    if(col==='#16a34a')dot.style.boxShadow='0 0 6px #22c55e';
-    else dot.style.boxShadow='none';
-  }
-  if(btn)btn.style.display=(col==='#16a34a'||col==='#ef4444')?'inline-block':'none';
-}
-
-async function manualSave(){
-  if(!cfg.binId||!cfg.apiKey){toast('Not connected — check Settings','err');return;}
-  setStatus('Saving…','#f59e0b');
-  await saveDB();
-  toast('Manually saved to cloud');
-}
-
-// ─── ACTIVE USERS (heartbeat every 30s) ───────────────────────────────────────
-const SESSION_ID='ses_'+Math.random().toString(36).slice(2,8);
-async function heartbeat(){
-  if(!cfg.binId||!cfg.apiKey)return;
-  if(!db.sessions)db.sessions={};
-  const now=Date.now();
-  db.sessions[SESSION_ID]=now;
-  // remove stale sessions (older than 90s)
-  Object.keys(db.sessions).forEach(k=>{if(now-db.sessions[k]>90000)delete db.sessions[k];});
-  const count=Object.keys(db.sessions).length;
-  const badge=document.getElementById('active-users-badge');
-  const dashBadge=document.getElementById('active-users-dash');
-  if(badge){badge.style.display=count>1?'inline-block':'none';badge.textContent=`${count} users online`;}
-  if(dashBadge){dashBadge.textContent=count>1?`${count} users connected now`:'';}
-  await saveDB();
-}
-setInterval(heartbeat,30000);
 
 // ─── LOCATIONS & CATEGORIES (dynamic, stored in db) ──────────────────────────
 // wsc_local_backup_v1 kept for legacy compat
@@ -1782,9 +1825,11 @@ function doSearch(){
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
   <div style="overflow-x:auto;max-height:600px;overflow-y:auto">
   <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
+    <th style="width:60px"></th>
     <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
   </tr></thead><tbody>${
     res.length?res.map(p=>`<tr>
+      <td style="padding:6px">${partImgHtml(p,48)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}</td>
       <td style="font-weight:500">${p.name}${getAllocTag(p.code)}</td>
@@ -1798,7 +1843,7 @@ function doSearch(){
         <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-blue">Edit</button>
       </td>
     </tr>`).join('')
-    :`<tr><td colspan="9" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
+    :`<tr><td colspan="10" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
   }</tbody></table></div>`;
 }
 function prefillCI(code){go('checkin');document.getElementById('ci-scan').value=code;ciLook();}
@@ -1825,7 +1870,8 @@ async function addPart(){
     max: parseInt(document.getElementById('ap-max').value)||10,
     sup: document.getElementById('ap-sup').value.trim(),
     cost: parseFloat(document.getElementById('ap-cost').value)||0,
-    notes: document.getElementById('ap-notes').value.trim()
+    notes: document.getElementById('ap-notes').value.trim(),
+    img: _pendingImg||''
   };
   await saveDB();
   toast(`Part "${name}" added to catalogue`);
@@ -1836,6 +1882,7 @@ async function addPart(){
   document.getElementById('ap-cost').value='';
   document.getElementById('ap-cat').value='';
   ['ap-loc','ap-loc2','ap-loc3'].forEach(id=>document.getElementById(id).value='');
+  _pendingImg='';removePartImage('ap');
   renderDash();doSearch();
 }
 
@@ -2549,21 +2596,7 @@ async function deleteHistRow(rowIdx, allRows){
   toast('History entry deleted');
 }
 
-// Auto-refresh every 25s
-// Background cloud sync every 60s — never re-shows overlay
-setInterval(async()=>{
-  if(!cfg.binId||!cfg.apiKey)return;
-  try{
-    const r=await fetch(API+cfg.binId+'/latest',{headers:{'X-Master-Key':cfg.apiKey,'X-Bin-Meta':'false'}});
-    if(!r.ok)return;
-    const raw=await r.json();
-    const cloud=(raw&&raw.record!==undefined)?raw.record:raw;
-    if(!cloud||!cloud.parts)return;
-    const cp=Object.keys(cloud.parts||{}).length,lp=Object.keys(db.parts||{}).length;
-    if(cp>lp){db=cloud;initDefaults();writeLocal();renderAll();toast('Updated from cloud','info');}
-    setStatus('Live — all data shared','#16a34a');
-  }catch{}
-},60000);
+// Firebase real-time listener handles all sync — no polling needed
 
 // ─── DEMO DATA ────────────────────────────────────────────────────────────────
 function loadDemoData(){
@@ -2588,7 +2621,7 @@ function loadDemoData(){
     {code:'PS-24V-5A',name:'Phoenix Contact 24VDC PSU',cat:'Power Supplies',qty:1,inStock:4}
   ],created:nowD()};
   document.getElementById('setup-key').value='YOUR-API-KEY-HERE';
-  toast('Demo data loaded — now enter your JSONbin credentials to save','info');
+  toast('Demo data loaded — data is ready — save your BOM to get started','info');
   renderAll();
 }
 
@@ -3103,15 +3136,16 @@ function renderCIBrowse(){
   if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
-    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Stock</th><th></th>
+    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Stock</th><th></th>
   </tr></thead><tbody>${res.length?res.map(p=>`<tr>
+    <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
     <td style="font-weight:700;text-align:center;color:#166534">${p.qty}</td>
     <td><button onclick="browseAddToCheckin('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-green">Check in</button></td>
-  </tr>`).join(''):'<tr><td colspan="6" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="7" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckin(code){
@@ -3136,15 +3170,16 @@ function renderCOBrowse(){
   if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
-    <th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">In stock</th><th></th>
+    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">In stock</th><th></th>
   </tr></thead><tbody>${res.length?res.map(p=>`<tr style="${p.qty<=0?'opacity:.5':''}">
+    <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
     <td style="font-weight:700;text-align:center;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
     <td>${p.qty>0?`<button onclick="browseAddToCheckout('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-amber">Take</button>`:'<span style="font-size:11px;color:#9ca3af">None</span>'}</td>
-  </tr>`).join(''):'<tr><td colspan="6" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="7" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckout(code){
@@ -3284,6 +3319,7 @@ async function slAdj(code,delta){
 let editingCode='';
 function openEditPart(code){
   editingCode=code;const p=db.parts[code];if(!p)return;
+  _pendingImg=p.img||'';
   // populate dynamic dropdowns first
   document.getElementById('ep-loc').innerHTML=`<option value="">Area / unit…</option>`+areaOpts(p.loc).replace('<option value="">Area / unit…</option>','');
   document.getElementById('ep-loc2').innerHTML=`<option value="">Section / shelf…</option>`+sectionOpts(p.loc2).replace('<option value="">Section / shelf…</option>','');
@@ -3302,6 +3338,9 @@ function openEditPart(code){
   document.getElementById('ep-loc').value=p.loc||'';
   document.getElementById('ep-loc2').value=p.loc2||'';
   document.getElementById('ep-loc3').value=p.loc3||'';
+  // Load image
+  if(p.img){showImagePreview('ep',p.img);}
+  else{removePartImage('ep');}
   document.getElementById('edit-part-modal').classList.add('open');
 }
 async function saveEditPart(){
@@ -3321,6 +3360,7 @@ async function saveEditPart(){
   p.loc=document.getElementById('ep-loc').value;
   p.loc2=document.getElementById('ep-loc2').value;
   p.loc3=document.getElementById('ep-loc3').value;
+  if(_pendingImg!==undefined)p.img=_pendingImg;
   if(p.qty!==oldQty)addHist('ADJ',p.name,editingCode,p.qty-oldQty,'Manual edit');
   await saveDB();
   document.getElementById('edit-part-modal').classList.remove('open');
@@ -3335,7 +3375,61 @@ async function deletePartConfirm(){
   toast(`Part deleted — click Undo on dashboard to reverse`);renderDash();doSearch();renderSL();
 }
 
-let impRows=[];   // raw parsed rows (array of objects keyed by column header)
+// ─── PART IMAGE HANDLING ──────────────────────────────────────────────────────
+let _pendingImg = ''; // base64 image waiting to be saved
+
+function handlePartImage(file, prefix){
+  if(!file||!file.type.startsWith('image/'))return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    // Resize to max 300x300 using canvas
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=300;
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){
+        if(w>h){h=Math.round(h*(MAX/w));w=MAX;}
+        else{w=Math.round(w*(MAX/h));h=MAX;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const b64=canvas.toDataURL('image/jpeg',0.82);
+      _pendingImg=b64;
+      showImagePreview(prefix,b64);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function showImagePreview(prefix, src){
+  const preview=document.getElementById(prefix+'-img-preview');
+  const placeholder=document.getElementById(prefix+'-img-placeholder');
+  const removeBtn=document.getElementById(prefix+'-img-remove');
+  if(preview){preview.src=src;preview.style.display='block';}
+  if(placeholder)placeholder.style.display='none';
+  if(removeBtn)removeBtn.style.display='inline-block';
+}
+
+function removePartImage(prefix){
+  _pendingImg='';
+  const preview=document.getElementById(prefix+'-img-preview');
+  const placeholder=document.getElementById(prefix+'-img-placeholder');
+  const removeBtn=document.getElementById(prefix+'-img-remove');
+  if(preview){preview.src='';preview.style.display='none';}
+  if(placeholder)placeholder.style.display='flex';
+  if(removeBtn)removeBtn.style.display='none';
+  // If editing existing part, clear the img field
+  if(prefix==='ep'&&editingCode&&db.parts[editingCode]){
+    db.parts[editingCode].img='';
+  }
+}
+
+function partImgHtml(p, size=48){
+  if(!p||!p.img)return`<div style="width:${size}px;height:${size}px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.45)}px;flex-shrink:0">📦</div>`;
+  return`<img src="${p.img}" alt="${p.name}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;flex-shrink:0">`;
+}
 let impCols=[];   // column headers from file
 let impSrc='gen'; // 'sw' | 'ep' | 'gen'
 
@@ -3509,20 +3603,17 @@ function doImport(){
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// Step 1: Load credentials
-loadCfg();
-
-// Step 2: Hide setup overlay immediately — credentials are baked in
+// Step 1: Hide setup overlay — Firebase config is baked in
 (function(){
   const ov=document.getElementById('setup-overlay');
   if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
 })();
 
-// Step 3: Populate dropdowns with defaults
+// Step 2: Populate dropdowns
 populateCatDropdowns();
 populateLocDropdowns();
 
-// Step 4: Show local data instantly if available
+// Step 3: Show local data instantly while Firebase connects
 const _localOnStart=readLocal();
 if(_localOnStart){
   db=_localOnStart;
@@ -3531,13 +3622,11 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 5: Sync with cloud once in background
-if(cfg.apiKey&&cfg.binId){
-  loadDB().then(()=>{try{heartbeat();}catch{}}).catch(e=>console.warn('Init:',e));
-}else{
-  populateBrandDropdowns();
-  setStatus('Not configured — check Settings','#ef4444');
-}
+// Step 4: Start Firebase real-time listener — this takes over from local cache
+startFirebaseListener();
+
+// Step 5: Start presence tracking (shows users online, no save cost)
+startPresence();
 </script>
 </body>
 </html>
