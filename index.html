@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Workshop Stock Control</title>
+<title>Workshop Stock Control v2.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -1121,26 +1121,12 @@ async function manualSave(){
   if(_saveTimer)clearTimeout(_saveTimer);
   setStatus('Saving…','#f59e0b');
   try{
-    const d=JSON.parse(JSON.stringify(db));
-    await Promise.all([
-      DATA_REF.child('parts').set(d.parts||{}),
-      DATA_REF.child('boms').set(d.boms||{}),
-      DATA_REF.child('order').set(d.order||[]),
-      DATA_REF.child('hist').set(d.hist||[]),
-      DATA_REF.child('deliveries').set(d.deliveries||[]),
-      DATA_REF.child('quotes').set(d.quotes||{}),
-      DATA_REF.child('allocations').set(d.allocations||[]),
-      DATA_REF.child('eventHist').set(d.eventHist||[]),
-      DATA_REF.child('categories').set(d.categories||[]),
-      DATA_REF.child('locAreas').set(d.locAreas||[]),
-      DATA_REF.child('locSections').set(d.locSections||[]),
-      DATA_REF.child('locContainers').set(d.locContainers||[]),
-    ]);
+    await DATA_REF.child('data').set(JSON.stringify(db));
     setStatus('Live ✓ — all data shared','#16a34a');
-    toast('Saved to Firebase');
+    toast('Saved to Firebase ✓');
   }catch(e){
     setStatus('⚠ Save failed','#f59e0b');
-    toast('Save failed: '+e.message,'err');
+    toast('Save error: '+e.message,'err');
   }
 }
 
