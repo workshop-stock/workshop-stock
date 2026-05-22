@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev18</title>
+<title>Workshop Stock Control v2.1 Rev19</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 18 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 19 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1987,15 +1987,31 @@ function checkStock(){
   toast(`Stock checked: ${ok.length} OK, ${short.length} short${unmatched?' — '+unmatched+' not found':''}`,'info');
 }
 async function orderShortfall(){
+  if(!curBOM.length){toast('Add parts to BOM first — then Check stock levels','err');return;}
   const short=curBOM.filter(i=>i.qty>i.inStock);
+  if(!short.length){toast('No shortfall — all parts are in stock','info');return;}
   let n=0;
   for(const item of short){
+    const lookupCode=item.matchedCode||item.code;
+    const p=db.parts[lookupCode]||findPartForBOM(item);
+    const shortQty=item.qty-item.inStock;
     if(!db.order.find(o=>o.code===item.code)){
-      const p=db.parts[item.code];
-      db.order.push({code:item.code,name:item.name,qty:item.qty-item.inStock,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:document.getElementById('bom-name').value||''});n++;
+      db.order.push({
+        code:item.code,
+        name:item.name,
+        qty:shortQty,
+        sup:p?p.sup||'':'',
+        cost:p?p.cost||0:0,
+        added:nowD(),
+        bom:document.getElementById('bom-name').value||''
+      });
+      n++;
     }
   }
-  await saveDB();toast(`${n} shortfall line${n!==1?'s':''} added to order list`);go('orders');
+  if(!n){toast('All shortfall items already on order list','info');return;}
+  await saveDB();
+  toast(`${n} shortfall line${n!==1?'s':''} added to order list`);
+  go('orders');
 }
 function showOrderChoice(){
   if(!curBOM.length){toast('Add parts to BOM first','err');return;}
@@ -2007,9 +2023,19 @@ async function singleOrder(){
   document.getElementById('order-choice').style.display='none';
   let n=0;
   for(const item of curBOM){
+    const lookupCode=item.matchedCode||item.code;
+    const p=db.parts[lookupCode]||findPartForBOM(item);
     if(!db.order.find(o=>o.code===item.code)){
-      const p=db.parts[item.code];
-      db.order.push({code:item.code,name:item.name,qty:item.qty,sup:p?p.sup||'':'',cost:p?p.cost||0:0,added:nowD(),bom:document.getElementById('bom-name').value||''});n++;
+      db.order.push({
+        code:item.code,
+        name:item.name,
+        qty:item.qty,
+        sup:p?p.sup||'':'',
+        cost:p?p.cost||0:0,
+        added:nowD(),
+        bom:document.getElementById('bom-name').value||''
+      });
+      n++;
     }
   }
   await saveDB();toast(`${n} lines added to order list`);go('orders');
