@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 20 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 21 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1282,13 +1282,46 @@ function formatLoc(p){
 
 function masterLocOpts(sel){
   const s=(v)=>sel===v?' selected':'';
+  // Get any custom locations added via Settings
+  const allLocs=new Set([
+    ...DEFAULT_LOC_AREAS,
+    ...(db.locAreas||[]),
+    ...(db.locSections||[]),
+    ...(db.locContainers||[])
+  ]);
+  // Find custom ones not in the hardcoded groups below
+  const hardcoded=new Set([
+    ...Array.from({length:20},(_,i)=>`A${i+1}`),
+    ...Array.from({length:20},(_,i)=>`B${i+1}`),
+    ...Array.from({length:20},(_,i)=>`C${i+1}`),
+    ...Array.from({length:20},(_,i)=>`D${i+1}`),
+    'H1','H2','H3','H4',
+    ...Array.from({length:10},(_,i)=>`CB-${String(i+1).padStart(2,'0')}`),
+    ...['Cabinet Shelf 1','Cabinet Shelf 2','Cabinet Shelf 3','Cabinet Shelf 4','Cabinet Shelf 5'],
+    ...Array.from({length:30},(_,i)=>`Tote ${i+1}`),
+    'D11 - Electrical Bay','Mechanical Rack',
+    'Lab Shelf N','Lab Shelf O','Lab Shelf P',
+    'Project Shelf 1 — Shelf 1','Project Shelf 1 — Shelf 2','Project Shelf 1 — Shelf 3',
+    'Project Shelf 2 — Shelf 1','Project Shelf 2 — Shelf 2','Project Shelf 2 — Shelf 3',
+    'Pallet Rack — Level 1','Pallet Rack — Level 2','Pallet Rack — Level 3',
+    ...Array.from({length:12},(_,i)=>`Box ${i+1}`),
+    ...['Bin 1','Bin 2','Bin 3','Bin 4','Bin 5','Bin 6'],
+    ...['Tray 1','Tray 2','Tray 3','Bag 1','Bag 2','Bag 3'],
+    ...['Compartment A','Compartment B','Compartment C','Compartment D'],
+    ...['Workbench 1','Workbench 2','Tool Box 1','Tool Box 2'],
+    ...['Wall Storage 1','Wall Storage 2','Workshop Floor','Quarantine','Loose']
+  ]);
+  const custom=[...allLocs].filter(l=>!hardcoded.has(l));
+
   return`<option value="">— Select location —</option>
     <optgroup label="Shelf A (A1–A20)">${Array.from({length:20},(_,i)=>`A${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Shelf B (B1–B20)">${Array.from({length:20},(_,i)=>`B${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Shelf C (C1–C20)">${Array.from({length:20},(_,i)=>`C${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Shelf D (D1–D20)">${Array.from({length:20},(_,i)=>`D${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Shelf H (H1–H4)">${['H1','H2','H3','H4'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
-    <optgroup label="Cabinets (CB-01–CB-10)">${Array.from({length:10},(_,i)=>`CB-0${i+1}`.replace('CB-011','CB-10').replace('CB-010','CB-10')).map((_,i)=>`CB-${String(i+1).padStart(2,'0')}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
+    <optgroup label="Cabinets (CB-01–CB-10)">${Array.from({length:10},(_,i)=>`CB-${String(i+1).padStart(2,'0')}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
+    <optgroup label="Cabinet Shelves">${Array.from({length:5},(_,i)=>`Cabinet Shelf ${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
+    <optgroup label="Totes (1–30)">${Array.from({length:30},(_,i)=>`Tote ${i+1}`).map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Storage Bays">${['D11 - Electrical Bay','Mechanical Rack'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Lab Shelves">${['Lab Shelf N','Lab Shelf O','Lab Shelf P'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Project Shelves">${['Project Shelf 1 — Shelf 1','Project Shelf 1 — Shelf 2','Project Shelf 1 — Shelf 3','Project Shelf 2 — Shelf 1','Project Shelf 2 — Shelf 2','Project Shelf 2 — Shelf 3'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
@@ -1297,7 +1330,8 @@ function masterLocOpts(sel){
     <optgroup label="Bins &amp; Trays">${['Bin 1','Bin 2','Bin 3','Bin 4','Bin 5','Bin 6','Tray 1','Tray 2','Tray 3','Bag 1','Bag 2','Bag 3'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Compartments">${['Compartment A','Compartment B','Compartment C','Compartment D'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
     <optgroup label="Workbenches &amp; Tool Boxes">${['Workbench 1','Workbench 2','Tool Box 1','Tool Box 2'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
-    <optgroup label="Wall &amp; Floor">${['Wall Storage 1','Wall Storage 2','Workshop Floor','Quarantine','Loose'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>`;
+    <optgroup label="Wall &amp; Floor">${['Wall Storage 1','Wall Storage 2','Workshop Floor','Quarantine','Loose'].map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>
+    ${custom.length?`<optgroup label="Custom locations">${custom.map(l=>`<option${s(l)}>${l}</option>`).join('')}</optgroup>`:''}`;
 }
 function areaOpts(sel){return masterLocOpts(sel);}
 function sectionOpts(sel){return masterLocOpts(sel);}
