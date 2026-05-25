@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 23 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 24 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2036,55 +2036,113 @@ function renderBOMRows(){
   hdr.style.display='grid';
   el.innerHTML=curBOM.map((item,i)=>{
     const need=item.qty-item.inStock;
-    const st=need>0?`<span class="badge b-low">Need ${need} more</span>`:`<span class="badge b-ok">In stock ✓</span>`;
-    return`<div class="bom-row"><div><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af;margin-top:1px">${item.code}</div></div><span class="chip">${item.cat}</span><input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows()"><div style="font-weight:600;color:${item.inStock>0?'#166534':'#991b1b'}">${item.inStock}</div><div>${st}</div><button onclick="curBOM.splice(${i},1);renderBOMRows()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button></div>`;
+    let st;
+    if(item.matchedCode===null){
+      // Explicitly checked but not found in catalogue
+      st='<span class="badge b-out" title="Part not found in catalogue — stock unknown">⚠ Not in catalogue</span>';
+    }else if(item.inStock===undefined){
+      // Not yet checked
+      st='<span class="badge b-gray">Check stock levels</span>';
+    }else if(need>0){
+      st=`<span class="badge b-low">Need ${need} more</span>`;
+    }else{
+      st='<span class="badge b-ok">In stock ✓</span>';
+    }
+    return`<div class="bom-row" style="${item.matchedCode===null?'background:#fff5f5':''}">
+      <div>
+        <div style="font-weight:600">${item.name}</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:1px">${item.code}${item.matchedCode&&item.matchedCode!==item.code?` <span style="color:#6d28d9">→ matched: ${item.matchedCode}</span>`:''}</div>
+      </div>
+      <span class="chip">${item.cat}</span>
+      <input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows()">
+      <div style="font-weight:600;color:${(item.inStock||0)>0?'#166534':'#991b1b'}">${item.inStock!==undefined?item.inStock:'—'}</div>
+      <div>${st}</div>
+      <button onclick="curBOM.splice(${i},1);renderBOMRows()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button>
+    </div>`;
   }).join('');
 }
-// Smart part lookup for BOM — tries code first, then mfrno, then name match
+// Smart part lookup for BOM — strict matching only, never guesses by name
 function findPartForBOM(item){
+  if(!item.code&&!item.name)return null;
+
   // 1. Exact code match
-  if(db.parts[item.code])return db.parts[item.code];
-  // 2. Normalised code match (ignore dashes/spaces)
-  const nc=normalise(item.code);
-  const byCode=Object.values(db.parts).find(p=>normalise(p.code)===nc||normalise(p.mfrno||'')===nc||normalise(p.barcode||'')===nc);
-  if(byCode)return byCode;
-  // 3. Name match using smart search
-  const byName=Object.values(db.parts).find(p=>partFilter(p,item.name,'','',''));
-  return byName||null;
+  if(item.code&&db.parts[item.code])return db.parts[item.code];
+
+  // 2. Normalised code match (ignore dashes/spaces/dots)
+  const nc=normalise(item.code||'');
+  if(nc){
+    const byCode=Object.values(db.parts).find(p=>
+      normalise(p.code)===nc ||
+      normalise(p.mfrno||'')===nc ||
+      normalise(p.barcode||'')===nc
+    );
+    if(byCode)return byCode;
+  }
+
+  // 3. Prefix match — typed code is start of catalogue code (min 6 chars to avoid false matches)
+  if(nc.length>=6){
+    const byPrefix=Object.values(db.parts).find(p=>
+      normalise(p.code).startsWith(nc)||
+      normalise(p.mfrno||'').startsWith(nc)
+    );
+    if(byPrefix)return byPrefix;
+  }
+
+  // 4. Exact name match only (whole name must match exactly after normalise)
+  // — NO partial/fuzzy name matching to avoid wrong part selection
+  if(item.name){
+    const nn=normalise(item.name);
+    const byExactName=Object.values(db.parts).find(p=>normalise(p.name)===nn);
+    if(byExactName)return byExactName;
+  }
+
+  // Nothing matched — return null, do NOT guess
+  return null;
 }
 
 function checkStock(){
   if(!curBOM.length){toast('Add parts to BOM first','err');return;}
-  let matched=0,unmatched=0;
+  let matched=0,unmatched=[];
   curBOM.forEach(item=>{
     const p=findPartForBOM(item);
     if(p){
       item.inStock=p.qty;
-      // Update the code to the matched part's code so future ops work
       item.matchedCode=p.code;
       matched++;
     }else{
       item.inStock=0;
-      unmatched++;
+      item.matchedCode=null;
+      unmatched.push(item.name||item.code);
     }
   });
   renderBOMRows();
   const short=curBOM.filter(i=>i.qty>i.inStock);
-  const ok=curBOM.filter(i=>i.qty<=i.inStock);
+  const ok=curBOM.filter(i=>i.qty<=i.inStock&&i.matchedCode);
   const btn=document.getElementById('btn-shortfall');
   const sum=document.getElementById('bom-summary');
-  let msg='';
-  if(unmatched)msg=`<div style="font-size:12px;color:#92400e;margin-top:6px">⚠ ${unmatched} part${unmatched!==1?'s':''} not found in catalogue — check part numbers match</div>`;
+  let unmatchedMsg='';
+  if(unmatched.length){
+    unmatchedMsg=`<div style="margin-top:8px;padding:8px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991b1b">
+      <strong>⚠ ${unmatched.length} part${unmatched.length!==1?'s':''} not found in catalogue</strong> — stock shown as 0. 
+      Check part numbers match exactly: <em>${unmatched.slice(0,4).join(', ')}${unmatched.length>4?` +${unmatched.length-4} more`:''}</em>
+    </div>`;
+  }
   if(short.length){
     btn.style.display='inline-block';
     btn.textContent=`Order shortfall only (${short.length} line${short.length!==1?'s':''})`;
     btn.className='btn-amber';
-    sum.innerHTML=`<div style="padding:10px 14px;background:#fefce8;border:1px solid #fcd34d;border-radius:6px;font-size:13px"><span class="badge b-ok" style="margin-right:8px">${ok.length} in stock</span><span class="badge b-low">${short.length} short or out</span></div>${msg}`;
+    sum.innerHTML=`<div style="padding:10px 14px;background:#fefce8;border:1px solid #fcd34d;border-radius:6px;font-size:13px">
+      <span class="badge b-ok" style="margin-right:8px">${ok.length} in stock</span>
+      <span class="badge b-low">${short.length} short or out</span>
+      ${unmatched.length?`<span class="badge b-out" style="margin-left:8px">${unmatched.length} not found in catalogue</span>`:''}
+    </div>${unmatchedMsg}`;
   }else{
     btn.style.display='none';
-    sum.innerHTML=`<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:13px;color:#166534;font-weight:600">All ${ok.length} parts are in stock — nothing to order!</div>${msg}`;
+    sum.innerHTML=`<div style="padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;font-size:13px;color:#166534;font-weight:600">
+      ✓ All ${ok.length} matched parts are in stock — nothing to order!
+    </div>${unmatchedMsg}`;
   }
-  toast(`Stock checked: ${ok.length} OK, ${short.length} short${unmatched?' — '+unmatched+' not found':''}`,'info');
+  toast(`Stock checked: ${ok.length} OK, ${short.length} short, ${unmatched.length} not found in catalogue`,'info');
 }
 async function orderShortfall(){
   if(!curBOM.length){toast('Add parts to BOM first — then Check stock levels','err');return;}
