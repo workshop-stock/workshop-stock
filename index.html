@@ -313,7 +313,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 42 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 43 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2971,14 +2971,14 @@ function findPartForBOM(item){
     if(byPrefix)return byPrefix;
   }
 
-  // Similarity match — catch typos/prefix variations (max 2 char difference on codes ≥7 chars)
-  if(nc.length>=7){
+  // Similarity match — catch typos/prefix variations (max 2 char difference on codes ≥8 chars)
+  if(nc.length>=8){
     const similar=Object.values(db.parts).find(p=>{
       const pc=normalise(stripVendorPrefix(p.code));
       const pm=normalise(stripVendorPrefix(p.mfrno||''));
-      const maxDist=Math.max(1,Math.floor(nc.length*0.18)); // slightly more generous
-      return (pc.length>=5&&levenshtein(nc,pc)<=maxDist)||
-             (pm.length>=5&&levenshtein(nc,pm)<=maxDist);
+      const maxDist=Math.floor(nc.length*0.15); // max 15% difference
+      return (pc.length>=6&&levenshtein(nc,pc)<=maxDist)||
+             (pm.length>=6&&levenshtein(nc,pm)<=maxDist);
     });
     if(similar)return similar;
   }
