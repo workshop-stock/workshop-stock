@@ -230,6 +230,8 @@ tr:hover td{background:#f9fafb}
     <button id="manual-save-btn" onclick="manualSave()" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;display:none">&#128190; Save now</button>
     <div id="active-users-badge" style="display:none;font-size:11px;padding:3px 9px;background:rgba(255,255,255,.15);border-radius:10px;color:#fff"></div>
     <button onclick="showSetup()" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">&#9881; Settings</button>
+    <span id="user-display" style="display:none;font-size:11px;padding:3px 10px;background:rgba(255,255,255,.2);border-radius:10px;color:#fff;font-weight:600"></span>
+    <button id="login-btn" onclick="showLoginModal()" style="font-size:11px;padding:4px 10px;background:#166534;border-color:#15803d;color:#fff;font-weight:600">Login</button>
   </div>
 </header>
 
@@ -272,7 +274,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 30 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 31 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -426,7 +428,8 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
     <div class="scan-bar">
-      <input id="co-scan" placeholder="Scan barcode or type part number, press Enter…" autocomplete="off" onkeydown="if(event.key==='Enter')coLook()">
+      <input id="co-scan" placeholder="Scan barcode or type part number, press Enter…" autocomplete="off" 
+        onkeydown="if(event.key==='Enter'){coLook();if(coMode==='basket')setTimeout(()=>{const f=document.getElementById('co-basket-found');if(f&&f.style.display!=='none')addToBasket();},80)}">
       <button class="btn-blue" onclick="coLook()">Lookup</button>
     </div>
     <!-- QUICK MODE -->
@@ -1570,12 +1573,150 @@ function findPart(v){
   const r=findPartWithType(v);
   return r?r.part:null;
 }
+// ─── SOUND SYSTEM ─────────────────────────────────────────────────────────────
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let _actx=null;
+function getACtx(){if(!_actx)try{_actx=new AudioCtx();}catch{}return _actx;}
+
+function playTone(freq,duration,type='sine',vol=0.3){
+  const ctx=getACtx();if(!ctx)return;
+  if(ctx.state==='suspended')ctx.resume();
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  osc.connect(gain);gain.connect(ctx.destination);
+  osc.type=type;osc.frequency.value=freq;
+  gain.gain.setValueAtTime(vol,ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+duration);
+  osc.start(ctx.currentTime);osc.stop(ctx.currentTime+duration);
+}
+
+function soundOK(){
+  // Two-tone success beep
+  playTone(880,0.1,'sine',0.2);
+  setTimeout(()=>playTone(1100,0.15,'sine',0.2),100);
+}
+function soundNotFound(){
+  // Low error buzz
+  playTone(220,0.4,'sawtooth',0.3);
+  setTimeout(()=>playTone(180,0.3,'sawtooth',0.2),150);
+}
+function soundOutOfStock(){
+  // Triple descending beep
+  playTone(600,0.15,'square',0.25);
+  setTimeout(()=>playTone(450,0.15,'square',0.25),180);
+  setTimeout(()=>playTone(300,0.25,'square',0.25),360);
+}
+function soundBasketAdd(){
+  // Single quick confirm
+  playTone(1000,0.08,'sine',0.15);
+}
+
 function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function nowD(){return new Date().toLocaleDateString('en-GB');}
-function addHist(type,name,code,qty,ref){db.hist.push({ts:nowDT(),type,name,code,qty,ref:ref||''});}
+
+// ─── USER LOGIN SYSTEM ────────────────────────────────────────────────────────
+const ADMIN_PASSWORD='workshop2024'; // Change this in the admin panel
+let currentUser=null;
+
+function loadUserSession(){
+  try{
+    const saved=localStorage.getItem('wsc_user');
+    if(saved){
+      currentUser=JSON.parse(saved);
+      applyUserSession();
+    }
+  }catch{}
+}
+
+function applyUserSession(){
+  const el=document.getElementById('user-display');
+  if(el&&currentUser){
+    el.textContent=`👤 ${currentUser.name}`;
+    el.style.display='inline-block';
+  }
+  const loginBtn=document.getElementById('login-btn');
+  if(loginBtn)loginBtn.textContent=currentUser?'Switch user':'Login';
+  // Show/hide admin features
+  document.querySelectorAll('.admin-only').forEach(el=>{
+    el.style.display=currentUser&&currentUser.isAdmin?'':'none';
+  });
+}
+
+function saveUserSession(){
+  if(currentUser)localStorage.setItem('wsc_user',JSON.stringify(currentUser));
+  else localStorage.removeItem('wsc_user');
+}
+
+function showLoginModal(){
+  const existing=document.getElementById('login-modal');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='login-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:40px;margin-bottom:8px">🔐</div>
+      <h2 style="font-size:18px;font-weight:700;margin:0">Workshop Stock Control</h2>
+      <p style="font-size:13px;color:#6b7280;margin-top:4px">Enter your name to log in</p>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Your name</label>
+      <input id="login-name" placeholder="e.g. John, Paul, Mary…" style="width:100%;font-size:14px;padding:10px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none" 
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Admin password (optional — leave blank for standard access)</label>
+      <input type="password" id="login-pass" placeholder="Admin password…" style="width:100%;font-size:14px;padding:10px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button onclick="doLogin()" style="width:100%;padding:12px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px">Sign in →</button>
+    ${currentUser?`<button onclick="logoutUser()" style="width:100%;padding:10px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;font-size:13px;cursor:pointer">Sign out (${currentUser.name})</button>`:''}
+    <div id="login-err" style="display:none;margin-top:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:13px;color:#991b1b"></div>
+  </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>document.getElementById('login-name').focus(),100);
+}
+
+function doLogin(){
+  const name=(document.getElementById('login-name').value||'').trim();
+  const pass=(document.getElementById('login-pass').value||'').trim();
+  const errEl=document.getElementById('login-err');
+  if(!name){errEl.style.display='block';errEl.textContent='Please enter your name';return;}
+  const isAdmin=pass===ADMIN_PASSWORD;
+  if(pass&&!isAdmin){errEl.style.display='block';errEl.textContent='Incorrect admin password';return;}
+  currentUser={name,isAdmin,loginTime:nowDT()};
+  saveUserSession();
+  document.getElementById('login-modal').remove();
+  applyUserSession();
+  toast(`Welcome, ${name}${isAdmin?' (Admin)':''}!`,'info');
+  addEventHist('LOGIN',`${name} signed in`,isAdmin?'Admin access':'Standard access');
+  saveDB();
+}
+
+function logoutUser(){
+  const name=currentUser?currentUser.name:'';
+  currentUser=null;
+  saveUserSession();
+  document.getElementById('login-modal').remove();
+  applyUserSession();
+  toast(`${name} signed out`,'info');
+  showLoginModal();
+}
+
+function requireLogin(){
+  if(!currentUser){showLoginModal();return false;}
+  return true;
+}
+
+// Updated addHist to include user
+function addHist(type,name,code,qty,ref){
+  const user=currentUser?currentUser.name:'Unknown';
+  db.hist.push({ts:nowDT(),type,name,code,qty,ref:ref||'',user});
+}
 function addEventHist(type,title,detail){
   if(!db.eventHist)db.eventHist=[];
-  db.eventHist.push({ts:nowDT(),type,title,detail:detail||''});
+  const user=currentUser?currentUser.name:'System';
+  db.eventHist.push({ts:nowDT(),type,title,detail:detail||'',user});
 }
 function sb(p){if(p.qty<=0)return'<span class="badge b-out">Out of stock</span>';if(p.qty<=p.min)return'<span class="badge b-low">Low stock</span>';return'<span class="badge b-ok">In stock</span>';}
 function renderAll(){
@@ -1672,7 +1813,12 @@ function ciLook(){
   const result=findPartWithType(v);
   document.getElementById('ci-notfound').style.display='none';
   document.getElementById('ci-result').style.display='none';
-  if(!result){document.getElementById('ci-notfound').style.display='block';return;}
+  if(!result){
+    document.getElementById('ci-notfound').style.display='block';
+    soundNotFound();
+    return;
+  }
+  soundOK();
 
   const p=result.part;
   const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
@@ -1799,9 +1945,14 @@ function coLook(){
   if(coMode==='quick'){
     document.getElementById('co-notfound').style.display='none';
     document.getElementById('co-result').style.display='none';
-    if(!result){document.getElementById('co-notfound').style.display='block';return;}
+    if(!result){
+      document.getElementById('co-notfound').style.display='block';
+      soundNotFound();
+      return;
+    }
     const p=result.part;
-    const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
+    if(p.qty<=0)soundOutOfStock();
+    else soundOK();
     const imgEl=document.getElementById('co-part-image');
     if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
     document.getElementById('co-name').textContent=p.name;
@@ -1897,14 +2048,25 @@ function addToBasket(){
   if(!p)return;
   const ex=basket.find(b=>b.code===code);
   const totalWanted=(ex?ex.qty:0)+qty;
-  if(totalWanted>p.qty){toast(`Only ${p.qty} in stock — basket would need ${totalWanted}`,'err');return;}
+  if(totalWanted>p.qty){
+    soundOutOfStock();
+    toast(`Only ${p.qty} in stock — basket would need ${totalWanted}`,'err');
+    return;
+  }
   if(ex){ex.qty+=qty;}
   else{basket.push({code,name:p.name,qty,loc:p.loc,inStock:p.qty});}
   renderBasket();
   document.getElementById('co-basket-found').style.display='none';
-  document.getElementById('co-scan').value='';
-  toast(`Added ${qty}× ${p.name} to basket`);
-  document.getElementById('co-scan').focus();
+  document.getElementById('co-notfound-b').style.display='none';
+  soundBasketAdd();
+  toast(`✓ ${qty}× ${p.name} added to basket`);
+  // Auto-clear scan bar and refocus for continuous scanning
+  const scanInput=document.getElementById('co-scan');
+  if(scanInput){
+    scanInput.value='';
+    scanInput.focus();
+    scanInput.select();
+  }
 }
 
 function renderBasket(){
@@ -3156,7 +3318,7 @@ function renderHist(){
     <th style="width:100px">Brand</th>
     <th style="width:110px">Supplier</th>
     <th>Ref / notes</th>
-    <th style="width:36px"></th>
+    <th style="width:90px">User</th>
   </tr></thead><tbody>${allRows.map((r,rowIdx)=>{
     const delBtn=`<td><button onclick="deleteHistRow(${rowIdx},${JSON.stringify(allRows)})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`;
     if(r.kind==='stock'){
@@ -3172,6 +3334,7 @@ function renderHist(){
         <td style="font-size:12px">${pm.mfr||'—'}</td>
         <td style="font-size:12px">${pm.sup||'—'}</td>
         <td style="font-size:12px">${r.ref||''}</td>
+        <td style="font-size:11px;color:#6b7280;font-weight:500">${r.user||'—'}</td>
         ${delBtn}
       </tr>`;
     }else{
@@ -4248,11 +4411,17 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 4: Start Firebase real-time listener — this takes over from local cache
+// Step 4: Start Firebase real-time listener
 startFirebaseListener();
 
-// Step 5: Start presence tracking (shows users online, no save cost)
+// Step 5: Start presence tracking
 startPresence();
+
+// Step 6: Load user session or show login prompt
+loadUserSession();
+if(!currentUser){
+  setTimeout(()=>showLoginModal(),900);
+}
 </script>
 </body>
 </html>
