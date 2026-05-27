@@ -272,12 +272,12 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 29 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 30 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="undoLast()" id="undo-btn" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff;display:none" title="Undo last action">&#8630; Undo</button>
+      <button onclick="undoLast()" id="undo-btn" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Undo last action">&#8630; Undo</button>
       <button onclick="backupData()" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Download a backup of all your data">&#128190; Backup</button>
       <button onclick="document.getElementById('restore-input').click()" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Restore from a backup file">&#8657; Restore</button>
       <input type="file" id="restore-input" accept=".json" style="display:none" onchange="restoreData(this.files[0])">
@@ -389,6 +389,7 @@ tr:hover td{background:#f9fafb}
       <div style="margin-bottom:12px"><label>Delivery note / supplier ref (optional)</label><input id="ci-notes" placeholder="e.g. RS order 12345678"></div>
       <button class="btn-green" id="ci-confirm-btn" onclick="doCI()" disabled style="opacity:.4;cursor:not-allowed">&#10003; Confirm check-in</button>
       <button onclick="resetCI()" style="margin-left:8px">Cancel</button>
+      <button onclick="undoLast()" style="margin-left:8px;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px" title="Undo the last check-in action">&#8630; Undo last action</button>
       <div id="ci-tick-warning" style="display:none;font-size:12px;color:#991b1b;margin-top:6px">⚠ Please tick the verification box above first</div>
     </div>
     <div id="ci-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found. <a href="#" onclick="go('addpart');return false" style="color:#991b1b;font-weight:600">Add new part?</a></div>
@@ -461,6 +462,7 @@ tr:hover td{background:#f9fafb}
         </div>
         <button class="btn-amber" id="co-confirm-btn" onclick="doCO()" disabled style="opacity:.4;cursor:not-allowed">&#8595; Confirm check-out</button>
         <button onclick="resetCO()" style="margin-left:8px">Cancel</button>
+        <button onclick="undoLast()" style="margin-left:8px;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px" title="Undo the last check-out action">&#8630; Undo last action</button>
       </div>
       <div id="co-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found.</div>
     </div>
@@ -1250,12 +1252,11 @@ function pushUndo(){
   const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
 }
 async function undoLast(){
-  if(!undoStack.length){toast('Nothing to undo','err');return;}
-  if(!confirm('Undo the last action?'))return;
+  if(!undoStack.length){toast('Nothing to undo yet — actions are saved as you go','err');return;}
+  if(!confirm('Undo the last action? This will reverse the last check-in, check-out, or stock change.'))return;
   db=JSON.parse(undoStack.pop());
-  await saveDB();renderAll();toast('Undone');
-  const btn=document.getElementById('undo-btn');
-  if(btn)btn.style.display=undoStack.length?'inline-block':'none';
+  await saveDB();renderAll();
+  toast('✓ Last action undone successfully');
 }
 
 // ─── LOCATIONS & CATEGORIES (dynamic, stored in db) ──────────────────────────
@@ -2285,18 +2286,23 @@ function renderBOMRows(){
 function confirmBOMMatch(idx, confirmed){
   if(!curBOM[idx])return;
   curBOM[idx].matchConfirmed=confirmed;
-  if(confirmed)curBOM[idx].matchRejected=false;
+  if(confirmed){
+    curBOM[idx].matchRejected=false;
+    // Restore actual stock level from catalogue
+    const p=db.parts[curBOM[idx].matchedCode];
+    if(p)curBOM[idx].inStock=p.qty;
+  }
   renderBOMRows();
-  toast(confirmed?'Match confirmed ✓':'Match unconfirmed','info');
+  toast(confirmed?'Match confirmed ✓ — stock restored':'Match unconfirmed','info');
 }
 
 function rejectBOMMatch(idx){
   if(!curBOM[idx])return;
   curBOM[idx].matchRejected=true;
   curBOM[idx].matchConfirmed=false;
-  curBOM[idx].inStock=0; // treat as not in stock
+  curBOM[idx].inStock=0;
   renderBOMRows();
-  toast('Marked as no match — will appear in shortfall','info');
+  toast('Marked as no match — will appear in shortfall. Tick "Confirm match?" to undo.','info');
 }
 // Strip common vendor/supplier prefixes added by import tools
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
