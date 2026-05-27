@@ -308,7 +308,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 37 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 38 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1832,6 +1832,9 @@ function showUserManager(){
             <div style="font-size:11px;color:#9ca3af">username: <strong>${uname}</strong> · created ${u.created||'—'}</div>
           </div>
           <div style="display:flex;gap:5px">
+            <button onclick="toggleUserAdmin('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isAdmin?'#991b1b':'#166534'};border-color:${u.isAdmin?'#fca5a5':'#86efac'};background:${u.isAdmin?'#fff5f5':'#f0fdf4'}">
+              ${u.isAdmin?'Remove admin':'Make admin'}
+            </button>
             <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#1e40af;border-color:#bfdbfe;background:#eff6ff">Reset password</button>
             ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af">System</span>'}
           </div>
@@ -1890,6 +1893,18 @@ async function deleteUser(uname){
   delete db.users[uname];
   await saveDB();
   toast('Account deleted');
+  showUserManager();
+}
+
+async function toggleUserAdmin(uname){
+  if(!db.users[uname])return;
+  const isAdmin=db.users[uname].isAdmin;
+  if(isAdmin&&uname==='admin'){toast('Cannot remove admin from the system admin account','err');return;}
+  if(isAdmin&&!confirm(`Remove admin rights from "${db.users[uname].name}"? They will become a standard user.`))return;
+  if(!isAdmin&&!confirm(`Give admin rights to "${db.users[uname].name}"? They will be able to see Firebase settings, delete history, and manage all users.`))return;
+  db.users[uname].isAdmin=!isAdmin;
+  await saveDB();
+  toast(`${db.users[uname].name} is now ${db.users[uname].isAdmin?'an admin 🔐':'a standard user'}`);
   showUserManager();
 }
 
