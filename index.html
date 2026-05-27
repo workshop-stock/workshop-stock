@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 24 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 26 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -347,10 +347,31 @@ tr:hover td{background:#f9fafb}
       <button class="btn-blue" onclick="ciLook()">Lookup</button>
     </div>
     <div id="ci-result" style="display:none">
-      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-bottom:14px">
-        <div style="font-weight:600;font-size:14px" id="ci-name"></div>
-        <div style="font-size:12px;color:#6b7280;margin-top:2px" id="ci-info"></div>
+      <!-- VERIFICATION BOX — must tick before confirming -->
+      <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px">
+        <div style="background:#fffbeb;padding:10px 14px;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">🔍</span>
+          <span style="font-weight:700;font-size:14px;color:#92400e">Verify this is the correct part before checking in</span>
+        </div>
+        <div style="padding:14px;background:#fff">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+            <div id="ci-part-image" style="flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:15px;color:#1a1a1a" id="ci-name"></div>
+              <div style="font-size:12px;color:#6b7280;margin-top:4px" id="ci-info"></div>
+              <div id="ci-detail-table" style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px"></div>
+            </div>
+          </div>
+          <!-- TICK TO CONFIRM -->
+          <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px">
+            <input type="checkbox" id="ci-verify-tick" style="width:22px;height:22px;cursor:pointer;accent-color:#166534" onchange="updateCIConfirmBtn()">
+            <label for="ci-verify-tick" style="font-size:13px;font-weight:600;color:#92400e;cursor:pointer">
+              ✓ I confirm this is the correct part — <span id="ci-verify-name" style="text-decoration:underline"></span>
+            </label>
+          </div>
+        </div>
       </div>
+
       <div class="g3" style="margin-bottom:12px">
         <div><label>Current qty in stock</label><div id="ci-qty" style="font-weight:700;font-size:18px;padding:6px 0"></div></div>
         <div><label>Qty adding</label><input type="number" id="ci-addqty" value="1" min="1"></div>
@@ -364,8 +385,9 @@ tr:hover td{background:#f9fafb}
         </div>
       </div>
       <div style="margin-bottom:12px"><label>Delivery note / supplier ref (optional)</label><input id="ci-notes" placeholder="e.g. RS order 12345678"></div>
-      <button class="btn-green" onclick="doCI()">&#10003; Confirm check-in</button>
+      <button class="btn-green" id="ci-confirm-btn" onclick="doCI()" disabled style="opacity:.4;cursor:not-allowed">&#10003; Confirm check-in</button>
       <button onclick="resetCI()" style="margin-left:8px">Cancel</button>
+      <div id="ci-tick-warning" style="display:none;font-size:12px;color:#991b1b;margin-top:6px">⚠ Please tick the verification box above first</div>
     </div>
     <div id="ci-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found. <a href="#" onclick="go('addpart');return false" style="color:#991b1b;font-weight:600">Add new part?</a></div>
 
@@ -407,16 +429,34 @@ tr:hover td{background:#f9fafb}
     <!-- QUICK MODE -->
     <div id="co-quick-panel">
       <div id="co-result" style="display:none">
-        <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-bottom:14px">
-          <div style="font-weight:600;font-size:14px" id="co-name"></div>
-          <div style="font-size:12px;color:#6b7280;margin-top:2px" id="co-info"></div>
+        <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px">
+          <div style="background:#fffbeb;padding:10px 14px;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:10px">
+            <span style="font-size:18px">🔍</span>
+            <span style="font-weight:700;font-size:14px;color:#92400e">Verify this is the correct part before taking</span>
+          </div>
+          <div style="padding:14px;background:#fff">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+              <div id="co-part-image" style="flex-shrink:0"></div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:15px" id="co-name"></div>
+                <div style="font-size:12px;color:#6b7280;margin-top:4px" id="co-info"></div>
+                <div id="co-detail-table" style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px"></div>
+              </div>
+            </div>
+            <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px">
+              <input type="checkbox" id="co-verify-tick" style="width:22px;height:22px;cursor:pointer;accent-color:#92400e" onchange="updateCOConfirmBtn()">
+              <label for="co-verify-tick" style="font-size:13px;font-weight:600;color:#92400e;cursor:pointer">
+                ✓ I confirm this is the correct part — <span id="co-verify-name" style="text-decoration:underline"></span>
+              </label>
+            </div>
+          </div>
         </div>
         <div class="g3" style="margin-bottom:12px">
           <div><label>In stock</label><div id="co-qty" style="font-weight:700;font-size:18px;padding:6px 0"></div></div>
           <div><label>Qty taking</label><input type="number" id="co-take" value="1" min="1"></div>
           <div><label>Job / project ref</label><input id="co-ref" placeholder="e.g. JOB-2024-042"></div>
         </div>
-        <button class="btn-amber" onclick="doCO()">&#8595; Confirm check-out</button>
+        <button class="btn-amber" id="co-confirm-btn" onclick="doCO()" disabled style="opacity:.4;cursor:not-allowed">&#8595; Confirm check-out</button>
         <button onclick="resetCO()" style="margin-left:8px">Cancel</button>
       </div>
       <div id="co-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found.</div>
@@ -1623,16 +1663,66 @@ function ciLook(){
   document.getElementById('ci-notfound').style.display='none';
   document.getElementById('ci-result').style.display='none';
   if(!p){document.getElementById('ci-notfound').style.display='block';return;}
+
+  // Part image
+  const imgEl=document.getElementById('ci-part-image');
+  if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
+
+  // Part name and verify label
   document.getElementById('ci-name').textContent=p.name;
-  document.getElementById('ci-info').textContent=`${p.code}  ·  ${p.cat}  ·  ${p.loc}`;
+  document.getElementById('ci-verify-name').textContent=p.name;
+
+  // Info line
+  const locStr=formatLoc(p)||p.loc||'—';
+  document.getElementById('ci-info').textContent=`${p.code}${p.mfrno?' | Mfr: '+p.mfrno:''} · ${p.cat}`;
+
+  // Detail table
+  const detailEl=document.getElementById('ci-detail-table');
+  if(detailEl){
+    detailEl.innerHTML=[
+      p.mfrno?`<span style="color:#9ca3af">Mfr part no.</span><span style="font-weight:600">${p.mfrno}</span>`:'',
+      `<span style="color:#9ca3af">Location</span><span style="font-weight:600">${locStr}</span>`,
+      p.mfr?`<span style="color:#9ca3af">Brand</span><span>${p.mfr}</span>`:'',
+      p.sup?`<span style="color:#9ca3af">Supplier</span><span>${p.sup}</span>`:'',
+      p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:''
+    ].filter(Boolean).join('');
+  }
+
   document.getElementById('ci-qty').textContent=p.qty;
   document.getElementById('ci-result').dataset.code=p.code;
+
+  // Reset tick — user must re-verify for each lookup
+  const tick=document.getElementById('ci-verify-tick');
+  if(tick){tick.checked=false;}
+  updateCIConfirmBtn();
+
   document.getElementById('ci-result').style.display='block';
   document.getElementById('ci-addqty').value=1;
-  document.getElementById('ci-newloc').value='';
   document.getElementById('ci-notes').value='';
 }
-function resetCI(){document.getElementById('ci-scan').value='';document.getElementById('ci-result').style.display='none';document.getElementById('ci-notfound').style.display='none';}
+
+function updateCIConfirmBtn(){
+  const tick=document.getElementById('ci-verify-tick');
+  const btn=document.getElementById('ci-confirm-btn');
+  const warn=document.getElementById('ci-tick-warning');
+  const verified=tick&&tick.checked;
+  if(btn){
+    btn.disabled=!verified;
+    btn.style.opacity=verified?'1':'0.4';
+    btn.style.cursor=verified?'pointer':'not-allowed';
+    btn.className=verified?'btn-green':'btn-green';
+  }
+  if(warn)warn.style.display='none';
+}
+
+function resetCI(){
+  document.getElementById('ci-scan').value='';
+  document.getElementById('ci-result').style.display='none';
+  document.getElementById('ci-notfound').style.display='none';
+  const tick=document.getElementById('ci-verify-tick');
+  if(tick)tick.checked=false;
+  updateCIConfirmBtn();
+}
 async function doCI(){
   const code=document.getElementById('ci-result').dataset.code;
   const qty=parseInt(document.getElementById('ci-addqty').value)||1;
@@ -1681,10 +1771,31 @@ function coLook(){
     document.getElementById('co-notfound').style.display='none';
     document.getElementById('co-result').style.display='none';
     if(!p){document.getElementById('co-notfound').style.display='block';return;}
+
+    // Populate verification box
+    const imgEl=document.getElementById('co-part-image');
+    if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
     document.getElementById('co-name').textContent=p.name;
-    document.getElementById('co-info').textContent=`${p.code}${p.mfrno?' | Mfr: '+p.mfrno:''} · ${p.cat} · ${p.loc}`;
+    document.getElementById('co-verify-name').textContent=p.name;
+    document.getElementById('co-info').textContent=`${p.code}${p.mfrno?' | Mfr: '+p.mfrno:''} · ${p.cat}`;
+    const detailEl=document.getElementById('co-detail-table');
+    if(detailEl){
+      const locStr=formatLoc(p)||p.loc||'—';
+      detailEl.innerHTML=[
+        p.mfrno?`<span style="color:#9ca3af">Mfr part no.</span><span style="font-weight:600">${p.mfrno}</span>`:'',
+        `<span style="color:#9ca3af">Location</span><span style="font-weight:600">${locStr}</span>`,
+        p.mfr?`<span style="color:#9ca3af">Brand</span><span>${p.mfr}</span>`:'',
+        p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:''
+      ].filter(Boolean).join('');
+    }
     document.getElementById('co-qty').textContent=p.qty;
     document.getElementById('co-result').dataset.code=p.code;
+
+    // Reset tick
+    const tick=document.getElementById('co-verify-tick');
+    if(tick)tick.checked=false;
+    updateCOConfirmBtn();
+
     document.getElementById('co-result').style.display='block';
     document.getElementById('co-take').value=1;
     document.getElementById('co-ref').value='';
@@ -1693,10 +1804,21 @@ function coLook(){
     document.getElementById('co-basket-found').style.display='none';
     if(!p){document.getElementById('co-notfound-b').style.display='block';return;}
     document.getElementById('co-b-name').textContent=p.name;
-    document.getElementById('co-b-info').textContent=`Stock: ${p.qty} · ${p.loc}`;
+    document.getElementById('co-b-info').textContent=`Stock: ${p.qty} · ${formatLoc(p)||p.loc||''}`;
     document.getElementById('co-b-qty').value=1;
     document.getElementById('co-basket-found').style.display='block';
     document.getElementById('co-basket-found').dataset.code=p.code;
+  }
+}
+
+function updateCOConfirmBtn(){
+  const tick=document.getElementById('co-verify-tick');
+  const btn=document.getElementById('co-confirm-btn');
+  const verified=tick&&tick.checked;
+  if(btn){
+    btn.disabled=!verified;
+    btn.style.opacity=verified?'1':'0.4';
+    btn.style.cursor=verified?'pointer':'not-allowed';
   }
 }
 
@@ -1706,6 +1828,9 @@ function resetCO(){
   document.getElementById('co-notfound').style.display='none';
   if(document.getElementById('co-basket-found'))document.getElementById('co-basket-found').style.display='none';
   if(document.getElementById('co-notfound-b'))document.getElementById('co-notfound-b').style.display='none';
+  const tick=document.getElementById('co-verify-tick');
+  if(tick)tick.checked=false;
+  updateCOConfirmBtn();
 }
 
 async function doCO(){
@@ -1967,9 +2092,27 @@ async function addPart(){
   const code=document.getElementById('ap-code').value.trim();
   const name=document.getElementById('ap-name').value.trim();
   const cat=document.getElementById('ap-cat').value;
-  const loc=document.getElementById('ap-loc').value;
+  const mfrno=document.getElementById('ap-mfrno').value.trim();
+  const barcode=document.getElementById('ap-barcode').value.trim();
   if(!code||!name||!cat){toast('Please fill in all required fields (*)','err');return;}
-  if(db.parts[code]){toast('Internal part number already exists','err');return;}
+
+  // ── Duplicate checks ──────────────────────────────────────────────────────
+  const dupCode=db.parts[code];
+  if(dupCode){
+    if(!confirm(`⚠ Part number "${code}" already exists:\n\n"${dupCode.name}"\n\nAre you sure you want to add a second part with this same internal number?`))return;
+  }
+  if(mfrno){
+    const dupMfr=Object.values(db.parts).find(p=>p.mfrno&&normalise(p.mfrno)===normalise(mfrno));
+    if(dupMfr&&dupMfr.code!==code){
+      if(!confirm(`⚠ Manufacturer part number "${mfrno}" already exists on:\n\n"${dupMfr.name}" (${dupMfr.code})\n\nThis may be a duplicate entry. Continue adding?`))return;
+    }
+  }
+  if(barcode){
+    const dupBar=Object.values(db.parts).find(p=>p.barcode&&normalise(p.barcode)===normalise(barcode));
+    if(dupBar&&dupBar.code!==code){
+      if(!confirm(`⚠ Barcode "${barcode}" already exists on:\n\n"${dupBar.name}" (${dupBar.code})\n\nThis may be a duplicate entry. Continue adding?`))return;
+    }
+  }
   pushUndo();
   db.parts[code]={
     code, name, cat,
@@ -2061,42 +2204,69 @@ function renderBOMRows(){
     </div>`;
   }).join('');
 }
-// Smart part lookup for BOM — strict matching only, never guesses by name
+// Strip common vendor/supplier prefixes added by import tools
+// e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
+function stripVendorPrefix(code){
+  if(!code)return'';
+  // Remove known prefixes: OMR. SE. RLC. FES. WAGO. Pfan. ABB. SCH. SIE. PHX. etc
+  return code.replace(/^(OMR|SE|RLC|FES|WAGO|Pfan|ABB|SCH|SIE|PHX|SNY|MIT|YAS|PAN|DAN|LS|IMO|WEG|EUR|AUT)\./i,'').trim();
+}
+
+// Smart part lookup for BOM — strict code matching with vendor prefix stripping
 function findPartForBOM(item){
   if(!item.code&&!item.name)return null;
 
-  // 1. Exact code match
-  if(item.code&&db.parts[item.code])return db.parts[item.code];
+  const rawCode=item.code||'';
+  const strippedCode=stripVendorPrefix(rawCode);
+  const rawMfr=item.mfrno||item.sup||'';
+  const strippedMfr=stripVendorPrefix(rawMfr);
 
-  // 2. Normalised code match (ignore dashes/spaces/dots)
-  const nc=normalise(item.code||'');
-  if(nc){
-    const byCode=Object.values(db.parts).find(p=>
+  // Build list of codes to try (original + stripped versions)
+  const codesToTry=[rawCode,strippedCode,rawMfr,strippedMfr].filter(Boolean);
+
+  for(const tryCode of codesToTry){
+    // 1. Exact catalogue code match
+    if(db.parts[tryCode])return db.parts[tryCode];
+
+    // 2. Normalised match (ignore dashes/spaces/dots)
+    const nc=normalise(tryCode);
+    if(nc.length<3)continue;
+    const found=Object.values(db.parts).find(p=>
       normalise(p.code)===nc ||
       normalise(p.mfrno||'')===nc ||
       normalise(p.barcode||'')===nc
     );
-    if(byCode)return byCode;
+    if(found)return found;
+
+    // 3. Strip prefix from catalogue side too and compare
+    const ncStripped=normalise(stripVendorPrefix(tryCode));
+    if(ncStripped.length>=4){
+      const foundStripped=Object.values(db.parts).find(p=>
+        normalise(stripVendorPrefix(p.code))===ncStripped ||
+        normalise(stripVendorPrefix(p.mfrno||''))===ncStripped
+      );
+      if(foundStripped)return foundStripped;
+    }
   }
 
-  // 3. Prefix match — typed code is start of catalogue code (min 6 chars to avoid false matches)
+  // 4. Prefix match (min 6 chars to avoid false positives)
+  const nc=normalise(strippedCode);
   if(nc.length>=6){
     const byPrefix=Object.values(db.parts).find(p=>
       normalise(p.code).startsWith(nc)||
-      normalise(p.mfrno||'').startsWith(nc)
+      normalise(p.mfrno||'').startsWith(nc)||
+      nc.startsWith(normalise(p.code).substring(0,6))&&normalise(p.code).length>=6&&nc.startsWith(normalise(p.code))
     );
     if(byPrefix)return byPrefix;
   }
 
-  // 4. Exact name match only (whole name must match exactly after normalise)
-  // — NO partial/fuzzy name matching to avoid wrong part selection
+  // 5. Exact full name match only (no fuzzy)
   if(item.name){
     const nn=normalise(item.name);
     const byExactName=Object.values(db.parts).find(p=>normalise(p.name)===nn);
     if(byExactName)return byExactName;
   }
 
-  // Nothing matched — return null, do NOT guess
   return null;
 }
 
