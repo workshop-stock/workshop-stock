@@ -236,6 +236,40 @@ tr:hover td{background:#f9fafb}
 </header>
 
 <div class="app">
+
+<!-- ═══ LOGIN WALL — shown until user authenticates ═══════════════════════ -->
+<div id="login-wall" style="position:fixed;inset:0;background:linear-gradient(135deg,#0f2744 0%,#1e3a5f 60%,#1a4f7a 100%);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:36px 32px;max-width:400px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="width:64px;height:64px;background:#1e3a5f;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:28px">🔐</div>
+      <h1 style="font-size:20px;font-weight:800;color:#1e3a5f;margin:0">Workshop Stock Control</h1>
+      <p style="font-size:13px;color:#6b7280;margin:6px 0 0">Electrical · PLC · HMI · Automation</p>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Username</label>
+      <input id="lw-user" type="text" placeholder="Enter your username…" autocomplete="username"
+        style="width:100%;font-size:15px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;outline:none;box-sizing:border-box;transition:border-color .2s"
+        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#e5e7eb'"
+        onkeydown="if(event.key==='Enter')document.getElementById('lw-pass').focus()">
+    </div>
+    <div style="margin-bottom:22px">
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Password</label>
+      <input id="lw-pass" type="password" placeholder="Enter your password…" autocomplete="current-password"
+        style="width:100%;font-size:15px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;outline:none;box-sizing:border-box;transition:border-color .2s"
+        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#e5e7eb'"
+        onkeydown="if(event.key==='Enter')lwLogin()">
+    </div>
+    <button onclick="lwLogin()"
+      style="width:100%;padding:14px;background:#1e3a5f;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:background .2s"
+      onmouseover="this.style.background='#2a4f7a'" onmouseout="this.style.background='#1e3a5f'">
+      Sign in →
+    </button>
+    <div id="lw-err" style="display:none;margin-top:14px;padding:10px 14px;background:#fee2e2;border-radius:8px;font-size:13px;color:#991b1b;font-weight:600;text-align:center"></div>
+    <div id="lw-wait" style="display:none;margin-top:14px;text-align:center;font-size:12px;color:#9ca3af">Connecting to database…</div>
+    <p style="font-size:11px;color:#d1d5db;text-align:center;margin:18px 0 0">Contact admin if you need an account or forgot your password</p>
+  </div>
+</div>
+
 <div class="tabs">
   <div class="tab active" onclick="go('dash')">Dashboard</div>
   <div class="tab" onclick="go('checkin')">Check In</div>
@@ -274,7 +308,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 36 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 37 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1173,12 +1207,13 @@ async function manualSave(){
 
 // ─── ACTIVE USERS — Firebase presence (no polling, no request cost) ───────────
 const SESSION_ID='ses_'+Math.random().toString(36).slice(2,8);
-const presenceRef=fbdb.ref('presence/'+SESSION_ID);
+let presenceRef=null;
 
 function startPresence(){
+  if(!fbdb)return;
+  presenceRef=fbdb.ref('presence/'+SESSION_ID);
   presenceRef.set({online:true,ts:Date.now()});
   presenceRef.onDisconnect().remove();
-  // Count online users
   fbdb.ref('presence').on('value',snap=>{
     const count=snap.numChildren();
     const badge=document.getElementById('active-users-badge');
@@ -1189,6 +1224,7 @@ function startPresence(){
 }
 
 function updateUserCount(){
+  if(!fbdb)return;
   fbdb.ref('presence').once('value',snap=>{
     const count=snap.numChildren();
     const badge=document.getElementById('active-users-badge');
@@ -1644,7 +1680,47 @@ function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'
 function nowD(){return new Date().toLocaleDateString('en-GB');}
 
 // ─── USER LOGIN SYSTEM ────────────────────────────────────────────────────────
-// ─── USER ACCOUNT SYSTEM ──────────────────────────────────────────────────────
+// ─── LOGIN WALL (static HTML — always works) ──────────────────────────────────
+function lwLogin(){
+  const username=(document.getElementById('lw-user').value||'').trim().toLowerCase();
+  const pass=(document.getElementById('lw-pass').value||'');
+  const errEl=document.getElementById('lw-err');
+  const waitEl=document.getElementById('lw-wait');
+  errEl.style.display='none';
+  if(!username){errEl.style.display='block';errEl.textContent='Please enter your username';return;}
+  if(!pass){errEl.style.display='block';errEl.textContent='Please enter your password';return;}
+  // If db not loaded yet, wait for Firebase
+  if(!db.users||!Object.keys(db.users).length){
+    waitEl.style.display='block';
+    waitEl.textContent='Loading database… please try again in a moment';
+    setTimeout(()=>waitEl.style.display='none',3000);
+    return;
+  }
+  initUsers();
+  const account=db.users[username];
+  if(!account){errEl.style.display='block';errEl.textContent=`No account for "${username}" — ask admin to create one`;soundNotFound();return;}
+  if(account.passHash!==hashPass(pass)){errEl.style.display='block';errEl.textContent='Incorrect password — try again';soundNotFound();return;}
+  // Success
+  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
+  saveUserSession();
+  document.getElementById('login-wall').style.display='none';
+  applyUserSession();
+  soundOK();
+  toast(`Welcome, ${account.name}${account.isAdmin?' 🔐':''}!`,'info');
+  addEventHist('LOGIN',`${account.name} signed in`,account.isAdmin?'Admin':'Standard');
+  saveDB();
+}
+
+function showLoginWall(){
+  const wall=document.getElementById('login-wall');
+  if(wall){
+    wall.style.display='flex';
+    document.getElementById('lw-user').value='';
+    document.getElementById('lw-pass').value='';
+    document.getElementById('lw-err').style.display='none';
+    setTimeout(()=>document.getElementById('lw-user').focus(),100);
+  }
+}
 // db.users = { username: { name, passHash, isAdmin, created, createdBy } }
 // Passwords hashed with simple djb2 — good enough for internal workshop tool
 
@@ -1712,81 +1788,15 @@ function saveUserSession(){
   else localStorage.removeItem('wsc_user');
 }
 
-function showLoginModal(){
-  const existing=document.getElementById('login-modal');
-  if(existing)existing.remove();
-  const div=document.createElement('div');
-  div.id='login-modal';
-  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
-  div.innerHTML=`<div style="background:#fff;border-radius:14px;padding:32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="font-size:44px;margin-bottom:8px">🔐</div>
-      <h2 style="font-size:20px;font-weight:800;margin:0;color:#1e3a5f">Workshop Stock Control</h2>
-      <p style="font-size:13px;color:#6b7280;margin-top:6px">Sign in with your account</p>
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Username</label>
-      <input id="login-user" placeholder="Your username…" autocomplete="username"
-        style="width:100%;font-size:15px;padding:11px 14px;border:2px solid #d1d5db;border-radius:9px;outline:none;transition:border-color .2s"
-        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'"
-        onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
-    </div>
-    <div style="margin-bottom:20px">
-      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Password</label>
-      <input type="password" id="login-pass" placeholder="Your password…" autocomplete="current-password"
-        style="width:100%;font-size:15px;padding:11px 14px;border:2px solid #d1d5db;border-radius:9px;outline:none;transition:border-color .2s"
-        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'"
-        onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button onclick="doLogin()"
-      style="width:100%;padding:13px;background:#1e3a5f;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em">
-      Sign in →
-    </button>
-    ${currentUser?`<button onclick="logoutUser()"
-      style="width:100%;padding:11px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:9px;font-size:13px;cursor:pointer;margin-top:8px">
-      Sign out (${currentUser.name})
-    </button>`:''}
-    <div id="login-err" style="display:none;margin-top:12px;padding:10px 14px;background:#fee2e2;border-radius:8px;font-size:13px;color:#991b1b;font-weight:500"></div>
-    <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:16px;margin-bottom:0">
-      Contact your admin if you need an account or forgot your password
-    </p>
-  </div>`;
-  document.body.appendChild(div);
-  setTimeout(()=>document.getElementById('login-user').focus(),100);
-}
-
-function doLogin(){
-  initUsers();
-  const username=(document.getElementById('login-user').value||'').trim().toLowerCase();
-  const pass=(document.getElementById('login-pass').value||'');
-  const errEl=document.getElementById('login-err');
-  if(!username){errEl.style.display='block';errEl.textContent='Please enter your username';return;}
-  if(!pass){errEl.style.display='block';errEl.textContent='Please enter your password';return;}
-  const account=db.users[username];
-  if(!account){errEl.style.display='block';errEl.textContent=`No account found for "${username}". Ask your admin to create one.`;return;}
-  if(account.passHash!==hashPass(pass)){
-    errEl.style.display='block';errEl.textContent='Incorrect password. Try again or contact admin.';
-    soundNotFound();
-    return;
-  }
-  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
-  saveUserSession();
-  document.getElementById('login-modal').remove();
-  applyUserSession();
-  soundOK();
-  toast(`Welcome back, ${account.name}${account.isAdmin?' 🔐':''}!`,'info');
-  addEventHist('LOGIN',`${account.name} signed in`,account.isAdmin?'Admin':'Standard');
-  saveDB();
-}
+function showLoginModal(){showLoginWall();}
 
 function logoutUser(){
   const name=currentUser?currentUser.name:'';
-  if(document.getElementById('login-modal'))document.getElementById('login-modal').remove();
   currentUser=null;
   saveUserSession();
   applyUserSession();
   toast(`${name} signed out`,'info');
-  showLoginModal();
+  showLoginWall();
 }
 
 function requireLogin(){
@@ -4598,17 +4608,24 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 5: Load user session or show login immediately — don't wait for Firebase
+// Step 5: Load user session — hide wall if already logged in
 loadUserSession();
-if(!currentUser){
-  showLoginModal();
+if(currentUser){
+  const wall=document.getElementById('login-wall');
+  if(wall)wall.style.display='none';
 }
+// Otherwise login wall is visible by default from HTML
 
 // Step 6: Load Firebase config in background
 loadFirebaseConfig().then(ok=>{
   if(ok){
     startFirebaseListener();
     startPresence();
+    // Re-validate session after Firebase loads
+    if(currentUser&&db.users){
+      const acc=db.users[currentUser.username];
+      if(!acc){currentUser=null;saveUserSession();showLoginWall();}
+    }
   }
 });
 </script>
