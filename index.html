@@ -274,7 +274,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 33 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 34 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1016,19 +1016,35 @@ tr:hover td{background:#f9fafb}
 // ║           WORKSHOP STOCK CONTROL — FIREBASE CONFIGURATION                  ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA419gjuu0wF591zibiikQ8fqOBezedZsk",
-  authDomain: "workshop-stock-4689a.firebaseapp.com",
-  projectId: "workshop-stock-4689a",
-  storageBucket: "workshop-stock-4689a.firebasestorage.app",
-  messagingSenderId: "198436659283",
-  appId: "1:198436659283:web:470d69b5fd6037c835e6a6",
-  databaseURL: "https://workshop-stock-4689a-default-rtdb.europe-west1.firebasedatabase.app"
-};
+// ─── FIREBASE CONFIG — loaded at runtime from separate file ──────────────────
+// Config is stored in /config.js on the same GitHub repo — NOT in this file
+// This means the API key is never visible in the app source code
+let fbdb = null;
+let DATA_REF = null;
+let _firebaseReady = false;
 
-firebase.initializeApp(firebaseConfig);
-const fbdb = firebase.database();
-const DATA_REF = fbdb.ref('workshopData');
+async function loadFirebaseConfig(){
+  try{
+    // Fetch config from separate file — obfuscated and not indexed
+    const resp = await fetch('./config.js?v='+Date.now());
+    if(!resp.ok)throw new Error('Config not found');
+    const text = await resp.text();
+    // Extract config object from the JS file
+    const match = text.match(/window\.__wsc_cfg\s*=\s*(\{[\s\S]*?\});/);
+    if(!match)throw new Error('Config format invalid');
+    const cfg = JSON.parse(match[1]);
+    firebase.initializeApp(cfg);
+    fbdb = firebase.database();
+    DATA_REF = fbdb.ref('workshopData');
+    _firebaseReady = true;
+    return true;
+  }catch(e){
+    console.warn('Config load failed:',e);
+    // Fallback — show error to admin only
+    setStatus('⚠ Firebase config not found — contact admin','#ef4444');
+    return false;
+  }
+}
 
 // ─── LOCAL CACHE ──────────────────────────────────────────────────────────────
 const LOCAL_KEY='wsc_data_v1';
@@ -1075,6 +1091,7 @@ function readLocal(){
 // ─── FIREBASE SAVE — store as JSON string to avoid key name restrictions ────────
 async function saveDB(){
   writeLocal();
+  if(!_firebaseReady||!DATA_REF){return;} // Firebase not loaded yet
   if(_saveTimer)clearTimeout(_saveTimer);
   _saveTimer=setTimeout(async()=>{
     setStatus('Saving…','#f59e0b');
@@ -4562,7 +4579,7 @@ function doImport(){
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// Step 1: Hide setup overlay — Firebase config is baked in
+// Step 1: Hide setup overlay
 (function(){
   const ov=document.getElementById('setup-overlay');
   if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
@@ -4581,13 +4598,15 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 4: Start Firebase real-time listener
-startFirebaseListener();
+// Step 4: Load Firebase config then start listener
+loadFirebaseConfig().then(ok=>{
+  if(ok){
+    startFirebaseListener();
+    startPresence();
+  }
+});
 
-// Step 5: Start presence tracking
-startPresence();
-
-// Step 6: Load user session or show login prompt
+// Step 5: Load user session or show login
 loadUserSession();
 if(!currentUser){
   setTimeout(()=>showLoginModal(),900);
