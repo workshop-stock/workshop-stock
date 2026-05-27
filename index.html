@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 27 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 29 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -347,7 +347,9 @@ tr:hover td{background:#f9fafb}
       <button class="btn-blue" onclick="ciLook()">Lookup</button>
     </div>
     <div id="ci-result" style="display:none">
-      <!-- VERIFICATION BOX — must tick before confirming -->
+      <!-- FUZZY MATCH WARNING — shown when match is not exact -->
+      <div id="ci-fuzzy-warn" style="display:none;margin-bottom:10px"></div>
+      <!-- VERIFICATION BOX -->
       <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px">
         <div style="background:#fffbeb;padding:10px 14px;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:10px">
           <span style="font-size:18px">🔍</span>
@@ -434,6 +436,7 @@ tr:hover td{background:#f9fafb}
             <span style="font-size:18px">🔍</span>
             <span style="font-weight:700;font-size:14px;color:#92400e">Verify this is the correct part before taking</span>
           </div>
+          <div id="co-fuzzy-warn" style="display:none;padding:10px 14px;border-bottom:1px solid #fca5a5"></div>
           <div style="padding:14px;background:#fff">
             <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
               <div id="co-part-image" style="flex-shrink:0"></div>
@@ -1537,28 +1540,34 @@ function go(t){
   if(t==='addpart'){populateCatDropdowns();populateLocDropdowns();populateBrandDropdowns();}
 }
 function normalise(s){return(s||'').toLowerCase().replace(/[\s\-_]/g,'');}
-function findPart(v){
+// Returns {part, matchType} where matchType = 'exact'|'fuzzy'|'name'
+function findPartWithType(v){
   const vn=normalise(v);
   if(!vn)return null;
-  // 1. Exact match — code, barcode, mfrno (ignoring spaces/case/dashes)
+  // 1. Exact match — code, barcode, mfrno
   const exact=Object.values(db.parts).find(p=>
     normalise(p.code)===vn ||
     normalise(p.barcode||'')===vn ||
     normalise(p.mfrno||'')===vn
   );
-  if(exact)return exact;
-  // 2. Prefix match — typed value starts a code or mfrno
+  if(exact)return{part:exact,matchType:'exact'};
+  // 2. Prefix/normalised match
   const prefix=Object.values(db.parts).find(p=>
     normalise(p.code).startsWith(vn)||
     normalise(p.mfrno||'').startsWith(vn)
   );
-  if(prefix)return prefix;
-  // 3. Name/description search with word-boundary unit conversion
+  if(prefix)return{part:prefix,matchType:'fuzzy'};
+  // 3. Name search
   const nameMatch=Object.values(db.parts).find(p=>{
     const hay=partHaystack(p);
     return wordMatches(v.trim(), hay);
   });
-  return nameMatch||null;
+  if(nameMatch)return{part:nameMatch,matchType:'name'};
+  return null;
+}
+function findPart(v){
+  const r=findPartWithType(v);
+  return r?r.part:null;
 }
 function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function nowD(){return new Date().toLocaleDateString('en-GB');}
@@ -1659,24 +1668,24 @@ function renderDash(){
 function ciLook(){
   const v=document.getElementById('ci-scan').value;
   if(!v.trim())return;
-  const p=findPart(v);
+  const result=findPartWithType(v);
   document.getElementById('ci-notfound').style.display='none';
   document.getElementById('ci-result').style.display='none';
-  if(!p){document.getElementById('ci-notfound').style.display='block';return;}
+  if(!result){document.getElementById('ci-notfound').style.display='block';return;}
+
+  const p=result.part;
+  const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
 
   // Part image
   const imgEl=document.getElementById('ci-part-image');
   if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
 
-  // Part name and verify label
   document.getElementById('ci-name').textContent=p.name;
   document.getElementById('ci-verify-name').textContent=p.name;
 
-  // Info line
   const locStr=formatLoc(p)||p.loc||'—';
   document.getElementById('ci-info').textContent=`${p.code}${p.mfrno?' | Mfr: '+p.mfrno:''} · ${p.cat}`;
 
-  // Detail table
   const detailEl=document.getElementById('ci-detail-table');
   if(detailEl){
     detailEl.innerHTML=[
@@ -1688,12 +1697,31 @@ function ciLook(){
     ].filter(Boolean).join('');
   }
 
+  // Show fuzzy match warning banner
+  const fuzzyWarn=document.getElementById('ci-fuzzy-warn');
+  if(fuzzyWarn){
+    if(isFuzzy){
+      fuzzyWarn.style.display='block';
+      fuzzyWarn.innerHTML=`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:20px">⚠</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px;color:#991b1b">Fuzzy match — not an exact code match</div>
+          <div style="font-size:12px;color:#7f1d1d;margin-top:2px">You typed: <strong>${v}</strong> → matched to: <strong>${p.code}${p.mfrno?' / '+p.mfrno:''}</strong></div>
+          <div style="font-size:12px;color:#7f1d1d">Check the part details above carefully before confirming.</div>
+        </div>
+        <button onclick="resetCI()" style="font-size:12px;padding:5px 12px;color:#991b1b;border-color:#fca5a5;background:#fff;flex-shrink:0;font-weight:600">✗ Wrong part — search again</button>
+      </div>`;
+    }else{
+      fuzzyWarn.style.display='none';
+      fuzzyWarn.innerHTML='';
+    }
+  }
+
   document.getElementById('ci-qty').textContent=p.qty;
   document.getElementById('ci-result').dataset.code=p.code;
 
-  // Reset tick — user must re-verify for each lookup
   const tick=document.getElementById('ci-verify-tick');
-  if(tick){tick.checked=false;}
+  if(tick)tick.checked=false;
   updateCIConfirmBtn();
 
   document.getElementById('ci-result').style.display='block';
@@ -1766,13 +1794,13 @@ function setCOMode(m){
 function coLook(){
   const v=document.getElementById('co-scan').value;
   if(!v.trim())return;
-  const p=findPart(v);
+  const result=findPartWithType(v);
   if(coMode==='quick'){
     document.getElementById('co-notfound').style.display='none';
     document.getElementById('co-result').style.display='none';
-    if(!p){document.getElementById('co-notfound').style.display='block';return;}
-
-    // Populate verification box
+    if(!result){document.getElementById('co-notfound').style.display='block';return;}
+    const p=result.part;
+    const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
     const imgEl=document.getElementById('co-part-image');
     if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
     document.getElementById('co-name').textContent=p.name;
@@ -1788,20 +1816,30 @@ function coLook(){
         p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:''
       ].filter(Boolean).join('');
     }
+    const fuzzyWarn=document.getElementById('co-fuzzy-warn');
+    if(fuzzyWarn){
+      if(isFuzzy){
+        fuzzyWarn.style.display='block';
+        fuzzyWarn.innerHTML=`<div style="background:#fee2e2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0">
+          <span style="font-size:18px">⚠</span>
+          <div style="flex:1"><div style="font-weight:700;font-size:13px;color:#991b1b">Fuzzy match — not an exact code match</div>
+          <div style="font-size:12px;color:#7f1d1d">You typed: <strong>${v}</strong> → matched to: <strong>${p.code}${p.mfrno?' / '+p.mfrno:''}</strong></div></div>
+          <button onclick="resetCO()" style="font-size:12px;padding:5px 12px;color:#991b1b;border-color:#fca5a5;background:#fff;font-weight:600">✗ Wrong part</button>
+        </div>`;
+      }else{fuzzyWarn.style.display='none';fuzzyWarn.innerHTML='';}
+    }
     document.getElementById('co-qty').textContent=p.qty;
     document.getElementById('co-result').dataset.code=p.code;
-
-    // Reset tick
     const tick=document.getElementById('co-verify-tick');
     if(tick)tick.checked=false;
     updateCOConfirmBtn();
-
     document.getElementById('co-result').style.display='block';
     document.getElementById('co-take').value=1;
     document.getElementById('co-ref').value='';
   } else {
     document.getElementById('co-notfound-b').style.display='none';
     document.getElementById('co-basket-found').style.display='none';
+    const p=result?result.part:null;
     if(!p){document.getElementById('co-notfound-b').style.display='block';return;}
     document.getElementById('co-b-name').textContent=p.name;
     document.getElementById('co-b-info').textContent=`Stock: ${p.qty} · ${formatLoc(p)||p.loc||''}`;
@@ -2197,7 +2235,7 @@ function renderBOMRows(){
     let matchSection='';
     if(item.matchedCode&&item.matchedCode!==item.code&&cataloguePart){
       const confirmed=item.matchConfirmed===true;
-      matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':'#fffbeb'};border:1px solid ${confirmed?'#86efac':'#fcd34d'};border-radius:8px;padding:8px 10px">
+      matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':item.matchRejected?'#fff5f5':'#fffbeb'};border:1px solid ${confirmed?'#86efac':item.matchRejected?'#fca5a5':'#fcd34d'};border-radius:8px;padding:8px 10px">
         <div style="font-size:11px;color:#6b7280;margin-bottom:4px;font-weight:600">CATALOGUE MATCH</div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div style="flex-shrink:0">${partImgHtml(cataloguePart,40)}</div>
@@ -2209,13 +2247,16 @@ function renderBOMRows(){
               · ${formatLoc(cataloguePart)||cataloguePart.loc||'—'}
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap">
             <input type="checkbox" id="match-tick-${i}" ${confirmed?'checked':''} 
               style="width:18px;height:18px;cursor:pointer;accent-color:#166534"
               onchange="confirmBOMMatch(${i},this.checked)">
-            <label for="match-tick-${i}" style="font-size:12px;font-weight:600;color:${confirmed?'#166534':'#92400e'};cursor:pointer">
-              ${confirmed?'✓ Match confirmed':'Confirm match?'}
+            <label for="match-tick-${i}" style="font-size:12px;font-weight:600;color:${confirmed?'#166534':item.matchRejected?'#991b1b':'#92400e'};cursor:pointer">
+              ${confirmed?'✓ Match confirmed':item.matchRejected?'✗ No match':'Confirm match?'}
             </label>
+            ${!confirmed?`<button onclick="rejectBOMMatch(${i})" 
+              style="font-size:11px;padding:2px 8px;color:#991b1b;border-color:#fca5a5;background:${item.matchRejected?'#fee2e2':'#fff'}" 
+              title="Wrong part — mark as not in catalogue">✗ No match</button>`:''}
           </div>
         </div>
       </div>`;
@@ -2242,17 +2283,20 @@ function renderBOMRows(){
 }
 
 function confirmBOMMatch(idx, confirmed){
-  if(curBOM[idx])curBOM[idx].matchConfirmed=confirmed;
-  // Re-render just the status colours without full re-render
-  const tick=document.getElementById(`match-tick-${idx}`);
-  if(tick){
-    const label=tick.nextElementSibling;
-    const box=tick.closest('div[style*="background"]');
-    if(label)label.textContent=confirmed?'✓ Match confirmed':'Confirm match?';
-    if(label)label.style.color=confirmed?'#166534':'#92400e';
-    if(box){box.style.background=confirmed?'#f0fdf4':'#fffbeb';box.style.borderColor=confirmed?'#86efac':'#fcd34d';}
-  }
+  if(!curBOM[idx])return;
+  curBOM[idx].matchConfirmed=confirmed;
+  if(confirmed)curBOM[idx].matchRejected=false;
+  renderBOMRows();
   toast(confirmed?'Match confirmed ✓':'Match unconfirmed','info');
+}
+
+function rejectBOMMatch(idx){
+  if(!curBOM[idx])return;
+  curBOM[idx].matchRejected=true;
+  curBOM[idx].matchConfirmed=false;
+  curBOM[idx].inStock=0; // treat as not in stock
+  renderBOMRows();
+  toast('Marked as no match — will appear in shortfall','info');
 }
 // Strip common vendor/supplier prefixes added by import tools
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
