@@ -274,7 +274,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 35 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 36 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -4598,19 +4598,19 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 4: Load Firebase config then start listener
+// Step 5: Load user session or show login immediately — don't wait for Firebase
+loadUserSession();
+if(!currentUser){
+  showLoginModal();
+}
+
+// Step 6: Load Firebase config in background
 loadFirebaseConfig().then(ok=>{
   if(ok){
     startFirebaseListener();
     startPresence();
   }
 });
-
-// Step 5: Load user session or show login
-loadUserSession();
-if(!currentUser){
-  setTimeout(()=>showLoginModal(),900);
-}
 </script>
 </body>
 </html>
