@@ -272,7 +272,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 26 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 27 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2178,31 +2178,81 @@ function renderBOMRows(){
   if(!curBOM.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">No parts added yet. Search above or scan a barcode.</div>';hdr.style.display='none';return;}
   hdr.style.display='grid';
   el.innerHTML=curBOM.map((item,i)=>{
-    const need=item.qty-item.inStock;
+    const need=item.qty-(item.inStock||0);
+    const cataloguePart=item.matchedCode?db.parts[item.matchedCode]:null;
+
+    // Status badge
     let st;
     if(item.matchedCode===null){
-      // Explicitly checked but not found in catalogue
-      st='<span class="badge b-out" title="Part not found in catalogue — stock unknown">⚠ Not in catalogue</span>';
+      st='<span class="badge b-out" title="Not found in catalogue">⚠ Not in catalogue</span>';
     }else if(item.inStock===undefined){
-      // Not yet checked
-      st='<span class="badge b-gray">Check stock levels</span>';
+      st='<span class="badge b-gray">Click Check stock levels</span>';
     }else if(need>0){
       st=`<span class="badge b-low">Need ${need} more</span>`;
     }else{
       st='<span class="badge b-ok">In stock ✓</span>';
     }
+
+    // Match confirmation section
+    let matchSection='';
+    if(item.matchedCode&&item.matchedCode!==item.code&&cataloguePart){
+      const confirmed=item.matchConfirmed===true;
+      matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':'#fffbeb'};border:1px solid ${confirmed?'#86efac':'#fcd34d'};border-radius:8px;padding:8px 10px">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:4px;font-weight:600">CATALOGUE MATCH</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="flex-shrink:0">${partImgHtml(cataloguePart,40)}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:#1a1a1a">${cataloguePart.name}</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:2px">
+              Internal: <strong>${cataloguePart.code}</strong>
+              ${cataloguePart.mfrno?` · Mfr: <strong>${cataloguePart.mfrno}</strong>`:''}
+              · ${formatLoc(cataloguePart)||cataloguePart.loc||'—'}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <input type="checkbox" id="match-tick-${i}" ${confirmed?'checked':''} 
+              style="width:18px;height:18px;cursor:pointer;accent-color:#166534"
+              onchange="confirmBOMMatch(${i},this.checked)">
+            <label for="match-tick-${i}" style="font-size:12px;font-weight:600;color:${confirmed?'#166534':'#92400e'};cursor:pointer">
+              ${confirmed?'✓ Match confirmed':'Confirm match?'}
+            </label>
+          </div>
+        </div>
+      </div>`;
+    }else if(item.matchedCode&&item.matchedCode===item.code&&cataloguePart){
+      // Exact code match — show catalogue details but no tick needed
+      matchSection=`<div style="margin-top:4px;font-size:11px;color:#166534">
+        ✓ Exact match: ${cataloguePart.name} · ${formatLoc(cataloguePart)||cataloguePart.loc||''}
+      </div>`;
+    }
+
     return`<div class="bom-row" style="${item.matchedCode===null?'background:#fff5f5':''}">
       <div>
         <div style="font-weight:600">${item.name}</div>
-        <div style="font-size:11px;color:#9ca3af;margin-top:1px">${item.code}${item.matchedCode&&item.matchedCode!==item.code?` <span style="color:#6d28d9">→ matched: ${item.matchedCode}</span>`:''}</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:1px">BOM code: ${item.code}</div>
+        ${matchSection}
       </div>
-      <span class="chip">${item.cat}</span>
+      <span class="chip">${item.cat||'—'}</span>
       <input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows()">
       <div style="font-weight:600;color:${(item.inStock||0)>0?'#166534':'#991b1b'}">${item.inStock!==undefined?item.inStock:'—'}</div>
       <div>${st}</div>
       <button onclick="curBOM.splice(${i},1);renderBOMRows()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button>
     </div>`;
   }).join('');
+}
+
+function confirmBOMMatch(idx, confirmed){
+  if(curBOM[idx])curBOM[idx].matchConfirmed=confirmed;
+  // Re-render just the status colours without full re-render
+  const tick=document.getElementById(`match-tick-${idx}`);
+  if(tick){
+    const label=tick.nextElementSibling;
+    const box=tick.closest('div[style*="background"]');
+    if(label)label.textContent=confirmed?'✓ Match confirmed':'Confirm match?';
+    if(label)label.style.color=confirmed?'#166534':'#92400e';
+    if(box){box.style.background=confirmed?'#f0fdf4':'#fffbeb';box.style.borderColor=confirmed?'#86efac':'#fcd34d';}
+  }
+  toast(confirmed?'Match confirmed ✓':'Match unconfirmed','info');
 }
 // Strip common vendor/supplier prefixes added by import tools
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
