@@ -274,7 +274,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 31 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 33 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -927,7 +927,7 @@ tr:hover td{background:#f9fafb}
       <div style="flex:0 0 auto"><label>Supplier</label>
         <select id="h-supplier" onchange="renderHist()" style="width:auto"><option value="">All suppliers</option></select>
       </div>
-      <button class="btn-red" style="flex:0 0 auto" onclick="if(confirm('Clear all history?')){db.hist=[];db.eventHist=[];saveDB();renderHist();renderDash()}">Clear all</button>
+      <button class="btn-red admin-only" style="flex:0 0 auto;display:none" onclick="if(confirm('Clear all history?')){db.hist=[];db.eventHist=[];saveDB();renderHist();renderDash()}">Clear all</button>
     </div>
     <div id="hist-summary" style="margin-bottom:8px"></div>
     <div id="hist-content"></div>
@@ -975,8 +975,13 @@ tr:hover td{background:#f9fafb}
           <button class="btn-green" onclick="addCat()">Add</button>
         </div>
       </div>
-      <div class="card">
-        <div class="sec">Firebase connection</div>
+      <div class="card admin-only" style="display:none">
+        <div class="sec">🔐 User accounts <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;margin-left:6px">Admin only</span></div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Create and manage accounts for your team. Each user gets their own username and password.</div>
+        <button onclick="showUserManager()" class="btn-blue">Manage user accounts</button>
+      </div>
+      <div class="card admin-only" style="display:none">
+        <div class="sec">🔐 Firebase connection <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;margin-left:6px">Admin only</span></div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Current Bin ID: <code id="current-bin-display" style="background:#f3f4f6;padding:2px 6px;border-radius:4px">loading…</code></div>
         <div style="margin-bottom:8px"><label>Master API Key</label><input id="s-key" type="password" placeholder="$2b$10$…"></div>
         <div style="margin-bottom:12px"><label>Bin ID</label><input id="s-bin" placeholder="64a3f8c2…"></div>
@@ -986,11 +991,17 @@ tr:hover td{background:#f9fafb}
           <button onclick="loadDB()" class="btn-green">Force reload from cloud</button>
         </div>
       </div>
-      <div class="card">
-        <div class="sec">Danger zone</div>
+      <div class="card admin-only" style="display:none">
+        <div class="sec">🔐 Danger zone <span style="font-size:11px;background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;margin-left:6px">Admin only</span></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-red" onclick="resetLocations()">Reset all locations</button>
           <button class="btn-red" onclick="if(confirm('Reset categories to default?')){db.categories=[...DEFAULT_CATS];saveDB();renderSettings();populateCatDropdowns();toast('Categories reset')}">Reset categories</button>
+        </div>
+      </div>
+      <div class="card" id="non-admin-settings-msg">
+        <div style="padding:10px;background:#f0fdf4;border-radius:8px;font-size:13px;color:#166534;display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🔐</span>
+          <span>Firebase connection and Danger zone settings are only visible to admin users. Log in with the admin password to access these.</span>
         </div>
       </div>
     </div>
@@ -1038,6 +1049,7 @@ function initDefaults(){
   if(!db.locSections)db.locSections=[...DEFAULT_LOC_SECTIONS];
   if(!db.locContainers)db.locContainers=[...DEFAULT_LOC_CONTAINERS];
   if(!db.categories)db.categories=[...DEFAULT_CATS];
+  if(!db.users)db.users={};
 }
 
 function writeLocal(){
@@ -1615,15 +1627,46 @@ function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'
 function nowD(){return new Date().toLocaleDateString('en-GB');}
 
 // ─── USER LOGIN SYSTEM ────────────────────────────────────────────────────────
-const ADMIN_PASSWORD='workshop2024'; // Change this in the admin panel
+// ─── USER ACCOUNT SYSTEM ──────────────────────────────────────────────────────
+// db.users = { username: { name, passHash, isAdmin, created, createdBy } }
+// Passwords hashed with simple djb2 — good enough for internal workshop tool
+
+function hashPass(str){
+  let h=5381;
+  for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i);
+  return(h>>>0).toString(36);
+}
+
 let currentUser=null;
+
+function initUsers(){
+  if(!db.users)db.users={};
+  // Create default admin if no users exist yet
+  if(!Object.keys(db.users).length){
+    db.users['admin']={
+      name:'Admin',
+      passHash:hashPass('workshop2024'),
+      isAdmin:true,
+      created:nowDT(),
+      createdBy:'system'
+    };
+  }
+}
 
 function loadUserSession(){
   try{
     const saved=localStorage.getItem('wsc_user');
     if(saved){
-      currentUser=JSON.parse(saved);
-      applyUserSession();
+      const s=JSON.parse(saved);
+      // Re-validate against current db.users to ensure account still exists
+      if(db.users&&db.users[s.username]){
+        currentUser=s;
+        applyUserSession();
+      }else{
+        // Account may not be loaded yet — store temporarily and validate after Firebase loads
+        currentUser=s;
+        applyUserSession();
+      }
     }
   }catch{}
 }
@@ -1631,15 +1674,20 @@ function loadUserSession(){
 function applyUserSession(){
   const el=document.getElementById('user-display');
   if(el&&currentUser){
-    el.textContent=`👤 ${currentUser.name}`;
+    el.textContent=`👤 ${currentUser.name}${currentUser.isAdmin?' 🔐':''}`;
+    el.style.display='inline-block';
+  }else if(el){
+    el.textContent='👤 Not logged in';
     el.style.display='inline-block';
   }
   const loginBtn=document.getElementById('login-btn');
   if(loginBtn)loginBtn.textContent=currentUser?'Switch user':'Login';
-  // Show/hide admin features
+  const isAdmin=currentUser&&currentUser.isAdmin;
   document.querySelectorAll('.admin-only').forEach(el=>{
-    el.style.display=currentUser&&currentUser.isAdmin?'':'none';
+    el.style.display=isAdmin?'':'none';
   });
+  const msg=document.getElementById('non-admin-settings-msg');
+  if(msg)msg.style.display=isAdmin?'none':'block';
 }
 
 function saveUserSession(){
@@ -1652,52 +1700,73 @@ function showLoginModal(){
   if(existing)existing.remove();
   const div=document.createElement('div');
   div.id='login-modal';
-  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:40px;margin-bottom:8px">🔐</div>
-      <h2 style="font-size:18px;font-weight:700;margin:0">Workshop Stock Control</h2>
-      <p style="font-size:13px;color:#6b7280;margin-top:4px">Enter your name to log in</p>
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:14px;padding:32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:44px;margin-bottom:8px">🔐</div>
+      <h2 style="font-size:20px;font-weight:800;margin:0;color:#1e3a5f">Workshop Stock Control</h2>
+      <p style="font-size:13px;color:#6b7280;margin-top:6px">Sign in with your account</p>
     </div>
-    <div style="margin-bottom:14px">
-      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Your name</label>
-      <input id="login-name" placeholder="e.g. John, Paul, Mary…" style="width:100%;font-size:14px;padding:10px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none" 
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Username</label>
+      <input id="login-user" placeholder="Your username…" autocomplete="username"
+        style="width:100%;font-size:15px;padding:11px 14px;border:2px solid #d1d5db;border-radius:9px;outline:none;transition:border-color .2s"
+        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Password</label>
+      <input type="password" id="login-pass" placeholder="Your password…" autocomplete="current-password"
+        style="width:100%;font-size:15px;padding:11px 14px;border:2px solid #d1d5db;border-radius:9px;outline:none;transition:border-color .2s"
+        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'"
         onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-    <div style="margin-bottom:16px">
-      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px">Admin password (optional — leave blank for standard access)</label>
-      <input type="password" id="login-pass" placeholder="Admin password…" style="width:100%;font-size:14px;padding:10px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none"
-        onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button onclick="doLogin()" style="width:100%;padding:12px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px">Sign in →</button>
-    ${currentUser?`<button onclick="logoutUser()" style="width:100%;padding:10px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;font-size:13px;cursor:pointer">Sign out (${currentUser.name})</button>`:''}
-    <div id="login-err" style="display:none;margin-top:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:13px;color:#991b1b"></div>
+    <button onclick="doLogin()"
+      style="width:100%;padding:13px;background:#1e3a5f;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em">
+      Sign in →
+    </button>
+    ${currentUser?`<button onclick="logoutUser()"
+      style="width:100%;padding:11px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:9px;font-size:13px;cursor:pointer;margin-top:8px">
+      Sign out (${currentUser.name})
+    </button>`:''}
+    <div id="login-err" style="display:none;margin-top:12px;padding:10px 14px;background:#fee2e2;border-radius:8px;font-size:13px;color:#991b1b;font-weight:500"></div>
+    <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:16px;margin-bottom:0">
+      Contact your admin if you need an account or forgot your password
+    </p>
   </div>`;
   document.body.appendChild(div);
-  setTimeout(()=>document.getElementById('login-name').focus(),100);
+  setTimeout(()=>document.getElementById('login-user').focus(),100);
 }
 
 function doLogin(){
-  const name=(document.getElementById('login-name').value||'').trim();
-  const pass=(document.getElementById('login-pass').value||'').trim();
+  initUsers();
+  const username=(document.getElementById('login-user').value||'').trim().toLowerCase();
+  const pass=(document.getElementById('login-pass').value||'');
   const errEl=document.getElementById('login-err');
-  if(!name){errEl.style.display='block';errEl.textContent='Please enter your name';return;}
-  const isAdmin=pass===ADMIN_PASSWORD;
-  if(pass&&!isAdmin){errEl.style.display='block';errEl.textContent='Incorrect admin password';return;}
-  currentUser={name,isAdmin,loginTime:nowDT()};
+  if(!username){errEl.style.display='block';errEl.textContent='Please enter your username';return;}
+  if(!pass){errEl.style.display='block';errEl.textContent='Please enter your password';return;}
+  const account=db.users[username];
+  if(!account){errEl.style.display='block';errEl.textContent=`No account found for "${username}". Ask your admin to create one.`;return;}
+  if(account.passHash!==hashPass(pass)){
+    errEl.style.display='block';errEl.textContent='Incorrect password. Try again or contact admin.';
+    soundNotFound();
+    return;
+  }
+  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
   saveUserSession();
   document.getElementById('login-modal').remove();
   applyUserSession();
-  toast(`Welcome, ${name}${isAdmin?' (Admin)':''}!`,'info');
-  addEventHist('LOGIN',`${name} signed in`,isAdmin?'Admin access':'Standard access');
+  soundOK();
+  toast(`Welcome back, ${account.name}${account.isAdmin?' 🔐':''}!`,'info');
+  addEventHist('LOGIN',`${account.name} signed in`,account.isAdmin?'Admin':'Standard');
   saveDB();
 }
 
 function logoutUser(){
   const name=currentUser?currentUser.name:'';
+  if(document.getElementById('login-modal'))document.getElementById('login-modal').remove();
   currentUser=null;
   saveUserSession();
-  document.getElementById('login-modal').remove();
   applyUserSession();
   toast(`${name} signed out`,'info');
   showLoginModal();
@@ -1706,6 +1775,105 @@ function logoutUser(){
 function requireLogin(){
   if(!currentUser){showLoginModal();return false;}
   return true;
+}
+
+// ─── USER MANAGEMENT (admin only) ─────────────────────────────────────────────
+function showUserManager(){
+  initUsers();
+  const existing=document.getElementById('user-manager-modal');
+  if(existing)existing.remove();
+  const users=Object.entries(db.users);
+  const div=document.createElement('div');
+  div.id='user-manager-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin:0">🔐 User accounts</h2>
+        <p style="font-size:12px;color:#6b7280;margin:3px 0 0">Create accounts for your team. Each person gets their own username and password.</p>
+      </div>
+      <button onclick="document.getElementById('user-manager-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+
+    <!-- Existing users -->
+    <div style="margin-bottom:16px">
+      ${users.map(([uname,u])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;background:${u.isAdmin?'#f0fdf4':'#fff'}">
+          <div style="width:36px;height:36px;border-radius:50%;background:${u.isAdmin?'#166534':'#1e3a5f'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${u.name.charAt(0).toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">${u.name} ${u.isAdmin?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 6px;border-radius:8px">ADMIN</span>':''}</div>
+            <div style="font-size:11px;color:#9ca3af">username: <strong>${uname}</strong> · created ${u.created||'—'}</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#1e40af;border-color:#bfdbfe;background:#eff6ff">Reset password</button>
+            ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af">System</span>'}
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Add new user -->
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:12px">➕ Add new user</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Full name</label>
+          <input id="new-user-name" placeholder="e.g. John Murphy" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Username (for login)</label>
+          <input id="new-user-uname" placeholder="e.g. john" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Password</label>
+          <input type="password" id="new-user-pass" placeholder="Set a password…" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding-bottom:2px">
+            <input type="checkbox" id="new-user-admin" style="width:16px;height:16px">
+            <span>Admin access 🔐</span>
+          </label>
+        </div>
+      </div>
+      <div id="new-user-err" style="display:none;margin-bottom:8px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b"></div>
+      <button onclick="createUser()" style="background:#1e3a5f;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer">Create account</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+async function createUser(){
+  initUsers();
+  const name=(document.getElementById('new-user-name').value||'').trim();
+  const uname=(document.getElementById('new-user-uname').value||'').trim().toLowerCase();
+  const pass=(document.getElementById('new-user-pass').value||'').trim();
+  const isAdmin=document.getElementById('new-user-admin').checked;
+  const errEl=document.getElementById('new-user-err');
+  if(!name||!uname||!pass){errEl.style.display='block';errEl.textContent='Please fill in all fields';return;}
+  if(!/^[a-z0-9_]+$/.test(uname)){errEl.style.display='block';errEl.textContent='Username can only contain letters, numbers and underscores';return;}
+  if(db.users[uname]){errEl.style.display='block';errEl.textContent=`Username "${uname}" already exists`;return;}
+  if(pass.length<4){errEl.style.display='block';errEl.textContent='Password must be at least 4 characters';return;}
+  db.users[uname]={name,passHash:hashPass(pass),isAdmin,created:nowDT(),createdBy:currentUser?currentUser.name:'admin'};
+  await saveDB();
+  toast(`Account created for ${name} (${uname})`);
+  showUserManager();
+}
+
+async function deleteUser(uname){
+  if(!confirm(`Delete account for "${db.users[uname]?.name}"? They will no longer be able to log in.`))return;
+  delete db.users[uname];
+  await saveDB();
+  toast('Account deleted');
+  showUserManager();
+}
+
+async function resetUserPassword(uname){
+  const newPass=prompt(`Set new password for ${db.users[uname]?.name}:`);
+  if(!newPass||!newPass.trim())return;
+  if(newPass.trim().length<4){toast('Password must be at least 4 characters','err');return;}
+  db.users[uname].passHash=hashPass(newPass.trim());
+  await saveDB();
+  toast(`Password reset for ${db.users[uname].name}`);
+  showUserManager();
 }
 
 // Updated addHist to include user
@@ -3320,7 +3488,9 @@ function renderHist(){
     <th>Ref / notes</th>
     <th style="width:90px">User</th>
   </tr></thead><tbody>${allRows.map((r,rowIdx)=>{
-    const delBtn=`<td><button onclick="deleteHistRow(${rowIdx},${JSON.stringify(allRows)})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`;
+    const delBtn=currentUser&&currentUser.isAdmin
+      ?`<td><button onclick="deleteHistRow(${rowIdx},${JSON.stringify(allRows)})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`
+      :`<td></td>`;
     if(r.kind==='stock'){
       const badge=r.qty>0?'b-ok':'b-low';
       const label=r.type||(r.qty>0?'IN':'OUT');
