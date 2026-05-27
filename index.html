@@ -313,7 +313,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 41 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 42 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1006,14 +1006,25 @@ tr:hover td{background:#f9fafb}
     </div>
     <div>
       <div class="card">
-        <div class="sec">Supplier list</div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Add your regular suppliers here. They appear as dropdown options everywhere you assign a supplier to a part or order.</div>
-        <div id="sup-list" style="margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="sec">Supplier list &amp; brand assignments</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Add your regular suppliers. You can assign a default supplier to a brand — e.g. all Omron parts → ATC.</div>
+        <div id="sup-list" style="margin-bottom:10px;max-height:240px;overflow-y:auto"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <input id="new-sup-name" placeholder="Supplier name…" style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter')addSupplier()">
           <input id="new-sup-email" placeholder="Email (optional)" style="flex:1;min-width:120px">
           <input id="new-sup-phone" placeholder="Phone (optional)" style="flex:1;min-width:100px">
           <button class="btn-green" onclick="addSupplier()">Add</button>
+        </div>
+        <!-- Brand → Supplier assignments -->
+        <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:#374151">Brand → Default supplier assignments</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:8px">When a part has no supplier set, this default will be used automatically for ordering.</div>
+        <div id="brand-sup-list" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="new-brand-name" placeholder="Brand name… (e.g. Omron)" list="dl-brands" style="flex:1">
+          <select id="new-brand-sup" style="flex:1">
+            <option value="">Select supplier…</option>
+          </select>
+          <button class="btn-blue" onclick="addBrandSupplier()">Assign</button>
         </div>
       </div>
       <div class="card">
@@ -2173,6 +2184,11 @@ async function doCI(){
   if(newloc)db.parts[code].loc=newloc;
   if(newloc2)db.parts[code].loc2=newloc2;
   if(newloc3)db.parts[code].loc3=newloc3;
+  // Track purchase history — last 3 suppliers
+  if(!db.parts[code].purchaseHist)db.parts[code].purchaseHist=[];
+  const sup=notes||(db.parts[code].sup||'Unknown');
+  db.parts[code].purchaseHist.unshift({date:nowD(),supplier:sup,qty,ref:notes||''});
+  if(db.parts[code].purchaseHist.length>3)db.parts[code].purchaseHist.length=3;
   // track frequency for smart sorting
   trackFreq('cat',db.parts[code].cat);
   trackFreq('brand',db.parts[code].mfr||'');
@@ -2604,8 +2620,9 @@ function doSearch(){
       <td style="font-size:12px">${formatLoc(p)||'—'}</td>
       <td style="font-weight:600;text-align:center;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
       <td>${sb(p)}</td>
-      <td style="display:flex;gap:4px">
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button onclick="prefillCI('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-green">In</button>
+        <button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:3px 7px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button>
         <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-blue">Edit</button>
       </td>
     </tr>`).join('')
@@ -2613,6 +2630,102 @@ function doSearch(){
   }</tbody></table></div>`;
 }
 function prefillCI(code){go('checkin');document.getElementById('ci-scan').value=code;ciLook();}
+function showPartHistory(code){
+  const p=db.parts[code];if(!p)return;
+
+  // Purchase history (last 3 check-ins)
+  const purchHist=p.purchaseHist||[];
+  const allInHist=[...(db.hist||[])].filter(h=>h.code===code&&h.qty>0).reverse().slice(0,5);
+
+  // Project usage (check-outs with refs + allocations)
+  const outHist=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,8);
+  const allocations=(db.allocations||[]).filter(a=>a.code===code);
+
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="display:flex;gap:12px;align-items:center">
+        ${partImgHtml(p,52)}
+        <div>
+          <div style="font-weight:700;font-size:15px">${p.name}</div>
+          <div style="font-size:12px;color:#6b7280">${p.code}${p.mfrno?' · '+p.mfrno:''} · ${p.cat}</div>
+        </div>
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+
+    <!-- Quick stats -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+      <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#166534">${p.qty}</div>
+        <div style="font-size:11px;color:#6b7280">In stock</div>
+      </div>
+      <div style="background:#fef3c7;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#92400e">${outHist.reduce((s,h)=>s+Math.abs(h.qty),0)}</div>
+        <div style="font-size:11px;color:#6b7280">Total taken (recent)</div>
+      </div>
+      <div style="background:#f5f0ff;border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#6d28d9">${allocations.filter(a=>a.status!=='released').reduce((s,a)=>s+a.qty,0)}</div>
+        <div style="font-size:11px;color:#6b7280">Allocated to projects</div>
+      </div>
+    </div>
+
+    <!-- Last 3 places ordered from -->
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+        📦 Last 3 times ordered from
+      </div>
+      ${allInHist.length?`<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:6px 8px;text-align:left">Date</th>
+          <th style="padding:6px 8px;text-align:left">Supplier / Reference</th>
+          <th style="padding:6px 8px;text-align:center">Qty received</th>
+          <th style="padding:6px 8px;text-align:left">User</th>
+        </tr></thead>
+        <tbody>${allInHist.map(h=>`<tr style="border-bottom:1px solid #f3f4f6">
+          <td style="padding:6px 8px">${h.ts}</td>
+          <td style="padding:6px 8px;font-weight:500">${h.ref||p.sup||'—'}</td>
+          <td style="padding:6px 8px;text-align:center;color:#166534;font-weight:700">+${h.qty}</td>
+          <td style="padding:6px 8px;color:#6b7280">${h.user||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`
+      :'<div style="color:#9ca3af;font-size:12px">No incoming history yet</div>'}
+    </div>
+
+    <!-- Project usage -->
+    <div style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">📋 Used on projects</div>
+      ${outHist.length?`<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:6px 8px;text-align:left">Date</th>
+          <th style="padding:6px 8px;text-align:left">Job / Project ref</th>
+          <th style="padding:6px 8px;text-align:center">Qty taken</th>
+          <th style="padding:6px 8px;text-align:left">User</th>
+        </tr></thead>
+        <tbody>${outHist.map(h=>`<tr style="border-bottom:1px solid #f3f4f6">
+          <td style="padding:6px 8px">${h.ts}</td>
+          <td style="padding:6px 8px;font-weight:500">${h.ref||'No project ref'}</td>
+          <td style="padding:6px 8px;text-align:center;color:#991b1b;font-weight:700">${h.qty}</td>
+          <td style="padding:6px 8px;color:#6b7280">${h.user||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`
+      :'<div style="color:#9ca3af;font-size:12px">No checkout history yet</div>'}
+    </div>
+
+    <!-- Current project allocations -->
+    ${allocations.filter(a=>a.status!=='released').length?`<div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">▣ Currently allocated to</div>
+      ${allocations.filter(a=>a.status!=='released').map(a=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+          <span style="font-weight:600;color:#6d28d9">${a.build}</span>
+          <span style="background:#f5f0ff;color:#6d28d9;padding:1px 7px;border-radius:8px">${a.qty} units</span>
+          <span style="color:#9ca3af">${a.date||'—'} ${a.po?'· PO: '+a.po:''}</span>
+        </div>`).join('')}
+    </div>`:''}
+  </div>`;
+  document.body.appendChild(div);
+}
 
 // ─── ADD PART ─────────────────────────────────────────────────────────────────
 async function addPart(){
@@ -2796,11 +2909,29 @@ function rejectBOMMatch(idx){
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
 function stripVendorPrefix(code){
   if(!code)return'';
-  // Remove known prefixes: OMR. SE. RLC. FES. WAGO. Pfan. ABB. SCH. SIE. PHX. etc
-  return code.replace(/^(OMR|SE|RLC|FES|WAGO|Pfan|ABB|SCH|SIE|PHX|SNY|MIT|YAS|PAN|DAN|LS|IMO|WEG|EUR|AUT)\./i,'').trim();
+  // Remove known prefixes WITH dot: OMR. SE. RLC. FES. etc
+  let stripped=code.replace(/^(OMR|SE|RLC|FES|WAGO|Pfan|ABB|SCH|SIE|PHX|SNY|MIT|YAS|PAN|DAN|LS|IMO|WEG|EUR|AUT|SV|SIE|SNA|FUT|MIT)\./i,'').trim();
+  // Also strip 2-3 char prefixes WITHOUT dot if they look like vendor codes
+  // e.g. SV8VK-S24024 → strip leading letters before a digit run
+  if(stripped===code){
+    // Try stripping 2-4 letter prefix before a digit if rest matches pattern
+    stripped=code.replace(/^[A-Z]{2,4}(?=[0-9])/,'').trim()||code;
+    // Only use this if the result is shorter and still meaningful (>4 chars)
+    if(stripped.length<4)stripped=code;
+  }
+  return stripped;
 }
 
-// Smart part lookup for BOM — strict code matching with vendor prefix stripping
+// Levenshtein distance for similarity matching
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
+    dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+// Smart part lookup for BOM — strict code matching with vendor prefix stripping + similarity fallback
 function findPartForBOM(item){
   if(!item.code&&!item.name)return null;
 
@@ -2809,46 +2940,50 @@ function findPartForBOM(item){
   const rawMfr=item.mfrno||item.sup||'';
   const strippedMfr=stripVendorPrefix(rawMfr);
 
-  // Build list of codes to try (original + stripped versions)
   const codesToTry=[rawCode,strippedCode,rawMfr,strippedMfr].filter(Boolean);
 
   for(const tryCode of codesToTry){
-    // 1. Exact catalogue code match
     if(db.parts[tryCode])return db.parts[tryCode];
-
-    // 2. Normalised match (ignore dashes/spaces/dots)
     const nc=normalise(tryCode);
     if(nc.length<3)continue;
     const found=Object.values(db.parts).find(p=>
-      normalise(p.code)===nc ||
-      normalise(p.mfrno||'')===nc ||
-      normalise(p.barcode||'')===nc
+      normalise(p.code)===nc||normalise(p.mfrno||'')===nc||normalise(p.barcode||'')===nc
     );
     if(found)return found;
-
-    // 3. Strip prefix from catalogue side too and compare
     const ncStripped=normalise(stripVendorPrefix(tryCode));
     if(ncStripped.length>=4){
       const foundStripped=Object.values(db.parts).find(p=>
-        normalise(stripVendorPrefix(p.code))===ncStripped ||
+        normalise(stripVendorPrefix(p.code))===ncStripped||
         normalise(stripVendorPrefix(p.mfrno||''))===ncStripped
       );
       if(foundStripped)return foundStripped;
     }
   }
 
-  // 4. Prefix match (min 6 chars to avoid false positives)
+  // Prefix match (min 6 chars)
   const nc=normalise(strippedCode);
   if(nc.length>=6){
     const byPrefix=Object.values(db.parts).find(p=>
       normalise(p.code).startsWith(nc)||
       normalise(p.mfrno||'').startsWith(nc)||
-      nc.startsWith(normalise(p.code).substring(0,6))&&normalise(p.code).length>=6&&nc.startsWith(normalise(p.code))
+      (normalise(p.code).length>=6&&nc.startsWith(normalise(p.code)))
     );
     if(byPrefix)return byPrefix;
   }
 
-  // 5. Exact full name match only (no fuzzy)
+  // Similarity match — catch typos/prefix variations (max 2 char difference on codes ≥7 chars)
+  if(nc.length>=7){
+    const similar=Object.values(db.parts).find(p=>{
+      const pc=normalise(stripVendorPrefix(p.code));
+      const pm=normalise(stripVendorPrefix(p.mfrno||''));
+      const maxDist=Math.max(1,Math.floor(nc.length*0.18)); // slightly more generous
+      return (pc.length>=5&&levenshtein(nc,pc)<=maxDist)||
+             (pm.length>=5&&levenshtein(nc,pm)<=maxDist);
+    });
+    if(similar)return similar;
+  }
+
+  // Exact full name match
   if(item.name){
     const nn=normalise(item.name);
     const byExactName=Object.values(db.parts).find(p=>normalise(p.name)===nn);
@@ -4398,6 +4533,7 @@ function renderSettings(){
     </div>`).join('');
   // Supplier list
   if(!db.suppliers)db.suppliers=[];
+  if(!db.brandSuppliers)db.brandSuppliers={};
   const supListEl=document.getElementById('sup-list');
   if(supListEl){
     supListEl.innerHTML=db.suppliers.length
@@ -4410,6 +4546,23 @@ function renderSettings(){
           <button onclick="removeSupplier(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
         </div>`).join('')
       :'<div style="color:#9ca3af;font-size:13px">No suppliers yet — add your main suppliers below</div>';
+  }
+  // Brand → Supplier assignments
+  const brandSupEl=document.getElementById('brand-sup-list');
+  if(brandSupEl){
+    const entries=Object.entries(db.brandSuppliers||{});
+    brandSupEl.innerHTML=entries.length
+      ?entries.map(([brand,sup])=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">
+          <span style="flex:1;font-size:13px"><strong>${brand}</strong> → <span style="color:#166534;font-weight:600">${sup}</span></span>
+          <button onclick="removeBrandSupplier('${brand}')" style="font-size:11px;padding:2px 7px;color:#991b1b;border-color:#fca5a5">✕</button>
+        </div>`).join('')
+      :'<div style="color:#9ca3af;font-size:12px;margin-bottom:4px">No brand assignments yet</div>';
+  }
+  // Populate brand supplier select
+  const brandSupSelect=document.getElementById('new-brand-sup');
+  if(brandSupSelect){
+    brandSupSelect.innerHTML='<option value="">Select supplier…</option>'+(db.suppliers||[]).map(s=>`<option>${s.name}</option>`).join('');
   }
 }
 
@@ -4426,7 +4579,6 @@ async function addSupplier(){
   document.getElementById('new-sup-email').value='';
   document.getElementById('new-sup-phone').value='';
   renderSettings();
-  // Update datalists everywhere
   buildDatalist('dl-suppliers',db.suppliers.map(s=>s.name));
   buildDatalist('dl-suppliers-order',db.suppliers.map(s=>s.name));
   toast(`Supplier "${name}" added`);
@@ -4438,6 +4590,32 @@ async function removeSupplier(i){
   await saveDB();
   renderSettings();
   toast('Supplier removed');
+}
+
+async function addBrandSupplier(){
+  if(!db.brandSuppliers)db.brandSuppliers={};
+  const brand=(document.getElementById('new-brand-name').value||'').trim();
+  const sup=(document.getElementById('new-brand-sup').value||'').trim();
+  if(!brand||!sup){toast('Select both a brand and a supplier','err');return;}
+  db.brandSuppliers[brand]=sup;
+  await saveDB();
+  renderSettings();
+  toast(`${brand} → ${sup} assigned`);
+}
+
+async function removeBrandSupplier(brand){
+  if(!db.brandSuppliers)return;
+  delete db.brandSuppliers[brand];
+  await saveDB();
+  renderSettings();
+  toast('Assignment removed');
+}
+
+// Get default supplier for a part (from part.sup or brand assignment)
+function getDefaultSupplier(p){
+  if(p.sup)return p.sup;
+  if(db.brandSuppliers&&p.mfr&&db.brandSuppliers[p.mfr])return db.brandSuppliers[p.mfr];
+  return'';
 }
 function renderLocList(elId,list,type){
   const el=document.getElementById(elId);if(!el)return;
