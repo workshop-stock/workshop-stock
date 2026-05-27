@@ -254,10 +254,15 @@ tr:hover td{background:#f9fafb}
     </div>
     <div style="margin-bottom:22px">
       <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Password</label>
-      <input id="lw-pass" type="password" placeholder="Enter your password…" autocomplete="current-password"
-        style="width:100%;font-size:15px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;outline:none;box-sizing:border-box;transition:border-color .2s"
-        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#e5e7eb'"
-        onkeydown="if(event.key==='Enter')lwLogin()">
+      <div style="position:relative">
+        <input id="lw-pass" type="password" placeholder="Enter your password…" autocomplete="current-password"
+          style="width:100%;font-size:15px;padding:12px 14px;padding-right:48px;border:2px solid #e5e7eb;border-radius:10px;outline:none;box-sizing:border-box;transition:border-color .2s"
+          onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#e5e7eb'"
+          onkeydown="if(event.key==='Enter')lwLogin()">
+        <button type="button" onclick="togglePassVis('lw-pass',this)"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:18px;color:#9ca3af;padding:2px;line-height:1"
+          title="Show / hide password">👁</button>
+      </div>
     </div>
     <button onclick="lwLogin()"
       style="width:100%;padding:14px;background:#1e3a5f;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em;transition:background .2s"
@@ -308,7 +313,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 38 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 41 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1001,6 +1006,17 @@ tr:hover td{background:#f9fafb}
     </div>
     <div>
       <div class="card">
+        <div class="sec">Supplier list</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Add your regular suppliers here. They appear as dropdown options everywhere you assign a supplier to a part or order.</div>
+        <div id="sup-list" style="margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="new-sup-name" placeholder="Supplier name…" style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter')addSupplier()">
+          <input id="new-sup-email" placeholder="Email (optional)" style="flex:1;min-width:120px">
+          <input id="new-sup-phone" placeholder="Phone (optional)" style="flex:1;min-width:100px">
+          <button class="btn-green" onclick="addSupplier()">Add</button>
+        </div>
+      </div>
+      <div class="card">
         <div class="sec">Categories</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Add or rename part categories.</div>
         <div id="cat-list" style="margin-bottom:12px;max-height:220px;overflow-y:auto"></div>
@@ -1100,6 +1116,7 @@ function initDefaults(){
   if(!db.locContainers)db.locContainers=[...DEFAULT_LOC_CONTAINERS];
   if(!db.categories)db.categories=[...DEFAULT_CATS];
   if(!db.users)db.users={};
+  if(!db.suppliers)db.suppliers=[];
 }
 
 function writeLocal(){
@@ -1556,7 +1573,8 @@ function populateBrandDropdowns(){
   // Datalists for manual typing on ap-cat (Add Part) — allows both select and free type
   buildDatalist('dl-brands', brands);
   buildDatalist('dl-cats', cats);
-  buildDatalist('dl-suppliers', suppliers);
+  buildDatalist('dl-suppliers', suppliers.length?suppliers:(db.suppliers||[]).map(s=>s.name));
+  buildDatalist('dl-suppliers-order', (db.suppliers||[]).map(s=>s.name));
 }
 
 function buildDatalist(id, items){
@@ -1681,6 +1699,16 @@ function nowD(){return new Date().toLocaleDateString('en-GB');}
 
 // ─── USER LOGIN SYSTEM ────────────────────────────────────────────────────────
 // ─── LOGIN WALL (static HTML — always works) ──────────────────────────────────
+// Toggle password visibility — eye icon button
+function togglePassVis(inputId, btn){
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  btn.textContent=show?'🙈':'👁';
+  btn.title=show?'Hide password':'Show password';
+}
+
 function lwLogin(){
   const username=(document.getElementById('lw-user').value||'').trim().toLowerCase();
   const pass=(document.getElementById('lw-pass').value||'');
@@ -1701,7 +1729,7 @@ function lwLogin(){
   if(!account){errEl.style.display='block';errEl.textContent=`No account for "${username}" — ask admin to create one`;soundNotFound();return;}
   if(account.passHash!==hashPass(pass)){errEl.style.display='block';errEl.textContent='Incorrect password — try again';soundNotFound();return;}
   // Success
-  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
+  currentUser={username,name:account.name,isAdmin:account.isAdmin,isManager:account.isManager||false,loginTime:nowDT()};
   saveUserSession();
   document.getElementById('login-wall').style.display='none';
   applyUserSession();
@@ -1767,7 +1795,8 @@ function loadUserSession(){
 function applyUserSession(){
   const el=document.getElementById('user-display');
   if(el&&currentUser){
-    el.textContent=`👤 ${currentUser.name}${currentUser.isAdmin?' 🔐':''}`;
+    const badge=currentUser.isAdmin?'🔐':currentUser.isManager?'📋':'';
+    el.textContent=`👤 ${currentUser.name}${badge?' '+badge:''}`;
     el.style.display='inline-block';
   }else if(el){
     el.textContent='👤 Not logged in';
@@ -1776,8 +1805,12 @@ function applyUserSession(){
   const loginBtn=document.getElementById('login-btn');
   if(loginBtn)loginBtn.textContent=currentUser?'Switch user':'Login';
   const isAdmin=currentUser&&currentUser.isAdmin;
+  const isManager=currentUser&&(currentUser.isAdmin||currentUser.isManager);
   document.querySelectorAll('.admin-only').forEach(el=>{
     el.style.display=isAdmin?'':'none';
+  });
+  document.querySelectorAll('.manager-only').forEach(el=>{
+    el.style.display=isManager?'':'none';
   });
   const msg=document.getElementById('non-admin-settings-msg');
   if(msg)msg.style.display=isAdmin?'none':'block';
@@ -1831,11 +1864,14 @@ function showUserManager(){
             <div style="font-weight:600;font-size:13px">${u.name} ${u.isAdmin?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 6px;border-radius:8px">ADMIN</span>':''}</div>
             <div style="font-size:11px;color:#9ca3af">username: <strong>${uname}</strong> · created ${u.created||'—'}</div>
           </div>
-          <div style="display:flex;gap:5px">
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
             <button onclick="toggleUserAdmin('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isAdmin?'#991b1b':'#166534'};border-color:${u.isAdmin?'#fca5a5':'#86efac'};background:${u.isAdmin?'#fff5f5':'#f0fdf4'}">
               ${u.isAdmin?'Remove admin':'Make admin'}
             </button>
-            <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#1e40af;border-color:#bfdbfe;background:#eff6ff">Reset password</button>
+            ${!u.isAdmin?`<button onclick="toggleUserManager('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isManager?'#92400e':'#1e40af'};border-color:${u.isManager?'#fcd34d':'#bfdbfe'};background:${u.isManager?'#fffbeb':'#eff6ff'}">
+              ${u.isManager?'Remove manager':'Make manager 📋'}
+            </button>`:''}
+            <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#6b7280;border-color:#d1d5db">Reset pwd</button>
             ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af">System</span>'}
           </div>
         </div>`).join('')}
@@ -1855,7 +1891,12 @@ function showUserManager(){
         </div>
         <div>
           <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Password</label>
-          <input type="password" id="new-user-pass" placeholder="Set a password…" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+          <div style="position:relative">
+            <input type="password" id="new-user-pass" placeholder="Set a password…" style="width:100%;font-size:13px;padding:8px 10px;padding-right:36px;border:1px solid #d1d5db;border-radius:7px">
+            <button type="button" onclick="togglePassVis('new-user-pass',this)"
+              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:15px;color:#9ca3af;padding:0;line-height:1"
+              title="Show/hide">👁</button>
+          </div>
         </div>
         <div style="display:flex;align-items:flex-end">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding-bottom:2px">
@@ -1893,6 +1934,17 @@ async function deleteUser(uname){
   delete db.users[uname];
   await saveDB();
   toast('Account deleted');
+  showUserManager();
+}
+
+async function toggleUserManager(uname){
+  if(!db.users[uname])return;
+  const isMgr=db.users[uname].isManager;
+  if(!isMgr&&!confirm(`Give manager access to "${db.users[uname].name}"? They will see stock stats, reports, and delivery info but cannot change settings.`))return;
+  if(isMgr&&!confirm(`Remove manager access from "${db.users[uname].name}"?`))return;
+  db.users[uname].isManager=!isMgr;
+  await saveDB();
+  toast(`${db.users[uname].name} is now ${db.users[uname].isManager?'a manager 📋':'a standard user'}`);
   showUserManager();
 }
 
@@ -1938,7 +1990,8 @@ function renderDash(){
   const all=Object.values(db.parts);
   const low=all.filter(p=>p.qty>0&&p.qty<=p.min);
   const out=all.filter(p=>p.qty<=0);
-  document.getElementById('m-tot').textContent=all.length;
+  const totalUnits=all.reduce((s,p)=>s+(p.qty||0),0);
+  document.getElementById('m-tot').innerHTML=`${all.length}<div style="font-size:11px;font-weight:400;color:#6b7280;margin-top:2px">${totalUnits.toLocaleString()} total units</div>`;
   document.getElementById('m-low').textContent=low.length;
   document.getElementById('m-out').textContent=out.length;
   document.getElementById('m-boms').textContent=Object.keys(db.boms).length;
@@ -2323,11 +2376,74 @@ function clearBasket(){basket=[];renderBasket();document.getElementById('co-bask
 // ─── SEARCH ───────────────────────────────────────────────────────────────────
 function getAllocTag(code){
   if(!db.allocations||!db.allocations.length)return'';
-  const allocs=db.allocations.filter(a=>a.code===code);
+  const allocs=db.allocations.filter(a=>a.code===code&&a.status!=='released');
   if(!allocs.length)return'';
   const total=allocs.reduce((s,a)=>s+a.qty,0);
-  const builds=[...new Set(allocs.map(a=>a.build))].join(', ');
-  return`<div style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:6px;margin-top:2px;display:inline-block">&#128196; ${total} allocated: ${builds}</div>`;
+  const builds=[...new Set(allocs.map(a=>a.build))];
+  const buildList=builds.map(b=>`<span style="background:#f5f0ff;color:#6d28d9;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;cursor:pointer" onclick="showAllocDetail('${code}')" title="Click to see allocation details">▣ ${b}</span>`).join(' ');
+  return`<div style="margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+    <span style="font-size:10px;color:#6d28d9;font-weight:600">${total} allocated to:</span>
+    ${buildList}
+    <span style="font-size:10px;color:#9ca3af;cursor:pointer" onclick="showAllocDetail('${code}')">(click for details)</span>
+  </div>`;
+}
+
+function showAllocDetail(code){
+  const allocs=(db.allocations||[]).filter(a=>a.code===code);
+  if(!allocs.length){toast('No allocations found for this part','info');return;}
+  const p=db.parts[code];
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="font-weight:700;font-size:15px">▣ Project allocations</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:2px">${p?p.name:code} (${code})</div>
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    <div style="background:#f9fafb;border-radius:8px;padding:12px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div><div style="font-size:18px;font-weight:700">${p?p.qty:0}</div><div style="font-size:11px;color:#6b7280">In general stock</div></div>
+      <div><div style="font-size:18px;font-weight:700;color:#6d28d9">${allocs.filter(a=>a.status!=='released').reduce((s,a)=>s+a.qty,0)}</div><div style="font-size:11px;color:#6b7280">Held for projects</div></div>
+      <div><div style="font-size:18px;font-weight:700;color:#166534">${(p?p.qty:0)+allocs.filter(a=>a.status!=='released').reduce((s,a)=>s+a.qty,0)}</div><div style="font-size:11px;color:#6b7280">Total available</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f5f0ff">
+        <th style="padding:7px 8px;text-align:left;color:#6d28d9">Project / Build</th>
+        <th style="padding:7px 8px;text-align:center;color:#6d28d9">Qty held</th>
+        <th style="padding:7px 8px;text-align:left;color:#6d28d9">PO</th>
+        <th style="padding:7px 8px;text-align:left;color:#6d28d9">Date</th>
+        <th style="padding:7px 8px;color:#6d28d9">Status</th>
+        <th style="padding:7px 8px"></th>
+      </tr></thead>
+      <tbody>${allocs.map((a,ai)=>`<tr style="border-bottom:1px solid #f3f4f6">
+        <td style="padding:7px 8px;font-weight:600">${a.build}</td>
+        <td style="padding:7px 8px;text-align:center;font-weight:700;color:#6d28d9">${a.qty}</td>
+        <td style="padding:7px 8px;font-size:12px">${a.po||'—'}</td>
+        <td style="padding:7px 8px;font-size:12px">${a.date||'—'}</td>
+        <td style="padding:7px 8px"><span class="badge" style="background:${a.status==='released'?'#dcfce7':'#f5f0ff'};color:${a.status==='released'?'#166534':'#6d28d9'}">${a.status==='released'?'Released to stock':'Held'}</span></td>
+        <td style="padding:7px 8px">${a.status!=='released'?`<button onclick="releaseAllocation('${code}',${ai},this)" style="font-size:11px;padding:2px 8px;color:#166534;border-color:#86efac">Release to stock</button>`:''}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div style="font-size:12px;color:#6b7280;margin-top:10px">Use "Release to stock" if a project is cancelled or parts are no longer needed for that build.</div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+async function releaseAllocation(code,allocIdx,btn){
+  const allocs=(db.allocations||[]).filter(a=>a.code===code);
+  const alloc=allocs[allocIdx];
+  if(!alloc)return;
+  if(!confirm(`Release ${alloc.qty}× ${alloc.name} from "${alloc.build}" into general stock?`))return;
+  // Add qty back to general stock
+  if(db.parts[code])db.parts[code].qty+=alloc.qty;
+  alloc.status='released';
+  addHist('IN',alloc.name,code,alloc.qty,`Released from project: ${alloc.build}`);
+  await saveDB();
+  btn.closest('div[style*=fixed]').remove();
+  showAllocDetail(code);
+  toast(`${alloc.qty}× released to general stock`);
+  doSearch();renderDash();
 }
 
 // ─── FILTER HELPER ────────────────────────────────────────────────────────────
@@ -2963,23 +3079,27 @@ async function updateDelStatus(delId,val){
   if(!del)return;
   del.status=val;await saveDB();renderDash();renderDelHist();
 }
+// Updated del-row grid to fit new columns
 function renderDelRows(del){
   const dIdx=db.deliveries.findIndex(d=>d.id===del.id);
   if(dIdx<0)return;
-  const pending=del.items.filter(i=>!i.done).length;
   const done=del.items.filter(i=>i.done).length;
   document.getElementById('del-prog').textContent=`${done} / ${del.items.length} received`;
   document.getElementById('del-rows').innerHTML=del.items.map((item,i)=>{
     const remaining=item.expected-(item.alreadyReceived||0);
+    const receiving=item.receiving!==undefined?item.receiving:remaining;
+    const forProject=item.forProject!==undefined?item.forProject:receiving;
+    const forStock=Math.max(0,receiving-forProject);
     if(item.done){
-      // locked row — already fully received
-      return`<div class="del-row" style="background:#f0fdf4;opacity:.75">
-        <div style="color:#166534;font-size:16px">&#10003;</div>
-        <div><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af">${item.code}</div></div>
+      return`<div class="del-row" style="background:#f0fdf4;opacity:.75;grid-template-columns:28px 2fr 70px 80px 1fr 90px">
+        <div style="color:#166534;font-size:16px">✓</div>
+        <div><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af">${item.code}</div>
+          ${item.stockQty?`<div style="font-size:11px;color:#3b82f6">+${item.stockQty} to stock</div>`:''}
+          ${item.projectQty?`<div style="font-size:11px;color:#6d28d9">+${item.projectQty} kept for project</div>`:''}
+        </div>
         <div style="font-weight:600">${item.expected}</div>
         <div style="font-weight:600;color:#166534">${item.alreadyReceived||0}</div>
         <div style="color:#9ca3af;font-size:12px">—</div>
-        <div style="font-size:12px;color:#6b7280">${item.loc||'—'}</div>
         <span class="badge b-done">Complete</span>
       </div>`;
     }
@@ -2993,14 +3113,56 @@ function renderDelRows(del){
       </div>
       <div style="font-weight:600">${item.expected}</div>
       <div style="color:#6b7280;font-size:13px">${item.alreadyReceived||0}</div>
-      <input type="number" value="${item.receiving!==undefined?item.receiving:remaining}" min="0" max="${remaining}" style="width:72px"
-        onchange="db.deliveries[${dIdx}].items[${i}].receiving=parseInt(this.value)||0;saveDB()">
+
+      <!-- Split: Receiving / For Project / For Stock -->
+      <div style="display:grid;grid-template-columns:1fr;gap:4px">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <label style="font-size:11px;color:#6b7280;white-space:nowrap">Receiving:</label>
+          <input type="number" id="recv-${dIdx}-${i}" value="${receiving}" min="0" max="${remaining}" style="width:54px;font-size:12px"
+            onchange="delUpdateReceiving(${dIdx},${i},parseInt(this.value)||0)">
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <label style="font-size:11px;color:#6d28d9;white-space:nowrap">▣ For project:</label>
+          <input type="number" id="proj-${dIdx}-${i}" value="${forProject}" min="0" style="width:54px;font-size:12px;border-color:#c4b5fd"
+            onchange="delUpdateProject(${dIdx},${i},parseInt(this.value)||0)">
+        </div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <label style="font-size:11px;color:#1d4ed8;white-space:nowrap">📦 To stock:</label>
+          <span id="stock-${dIdx}-${i}" style="font-size:12px;font-weight:700;color:#1d4ed8">${forStock}</span>
+        </div>
+      </div>
+
       <select onchange="db.deliveries[${dIdx}].items[${i}].loc=this.value;saveDB()" style="font-size:12px">
         <option value="">Choose location…</option>${locOpts(item.loc)}
       </select>
       <span class="badge ${item.alreadyReceived>0?'b-part':'b-gray'}">${item.alreadyReceived>0?'Partial':'Pending'}</span>
     </div>`;
   }).join('');
+}
+
+function delUpdateReceiving(dIdx,itemIdx,val){
+  const item=db.deliveries[dIdx].items[itemIdx];
+  item.receiving=val;
+  // Adjust forProject if it exceeds new receiving qty
+  if((item.forProject||0)>val)item.forProject=val;
+  else if(item.forProject===undefined)item.forProject=val; // default all to project
+  saveDB();
+  // Update stock display
+  const stockEl=document.getElementById(`stock-${dIdx}-${itemIdx}`);
+  if(stockEl)stockEl.textContent=Math.max(0,val-(item.forProject||0));
+  const projEl=document.getElementById(`proj-${dIdx}-${itemIdx}`);
+  if(projEl)projEl.value=item.forProject||0;
+}
+
+function delUpdateProject(dIdx,itemIdx,val){
+  const item=db.deliveries[dIdx].items[itemIdx];
+  const recv=item.receiving!==undefined?item.receiving:(item.expected-(item.alreadyReceived||0));
+  item.forProject=Math.min(val,recv);
+  saveDB();
+  const stockEl=document.getElementById(`stock-${dIdx}-${itemIdx}`);
+  if(stockEl)stockEl.textContent=Math.max(0,recv-item.forProject);
+  const projEl=document.getElementById(`proj-${dIdx}-${itemIdx}`);
+  if(projEl)projEl.value=item.forProject;
 }
 async function confirmDelivery(){
   const del=db.deliveries.find(d=>d.id===document.getElementById('del-title').dataset.delId||(d.status!=='complete'&&document.getElementById('del-active').style.display!=='none'));
@@ -3017,26 +3179,39 @@ async function confirmDelivery(){
   for(const item of chk){
     const qty=item.receiving||0;
     if(qty<=0){toast(`Set a received quantity > 0 for ${item.name}`,'err');return;}
-    // update stock
+    const forProject=Math.min(item.forProject!==undefined?item.forProject:qty, qty);
+    const forStock=Math.max(0,qty-forProject);
+
+    // Add to general stock
     if(db.parts[item.code]){
-      db.parts[item.code].qty+=qty;
+      db.parts[item.code].qty+=forStock; // only stock portion goes to general stock
       if(item.loc)db.parts[item.code].loc=item.loc;
     }
     const note=`Delivery: ${activeDel.bomName}${activeDel.po?' PO:'+activeDel.po:''}${activeDel.assignTo?' → '+activeDel.assignTo:''}`;
-    addHist('IN',item.name,item.code,qty,note);
-    // record allocation — this part is held for the build
-    if(activeDel.assignTo){
+    if(forStock>0)addHist('IN',item.name,item.code,forStock,note+' (to stock)');
+
+    // Record project allocation for the project portion
+    if(!db.allocations)db.allocations=[];
+    if(forProject>0){
       db.allocations.push({
-        code:item.code,name:item.name,qty,
-        build:activeDel.assignTo,po:activeDel.po||'',
-        deliveryId:activeDel.id,date:nowD()
+        code:item.code,name:item.name,qty:forProject,
+        build:activeDel.assignTo||activeDel.bomName,
+        po:activeDel.po||'',
+        deliveryId:activeDel.id,date:nowD(),
+        status:'allocated' // held for project, not in general stock
       });
+      addHist('IN',item.name,item.code,forProject,note+' (for project)');
     }
+
+    // Track split on item for display
+    item.stockQty=(item.stockQty||0)+forStock;
+    item.projectQty=(item.projectQty||0)+forProject;
+
     // update item tracking
     item.alreadyReceived=(item.alreadyReceived||0)+qty;
     item.checked=false;
     item.receiving=Math.max(0,item.expected-item.alreadyReceived);
-    // mark as fully done if all received
+    item.forProject=undefined; // reset for next batch
     if(item.alreadyReceived>=item.expected)item.done=true;
   }
   const allDone=activeDel.items.every(i=>i.done);
@@ -3327,6 +3502,7 @@ function renderOrder(){
     </div>`:'';
 
     return`<tr style="border-left:3px solid ${badge?badge.dot:'#e5e7eb'}">
+      <td style="padding:4px 6px;width:50px">${p?partImgHtml(p,40):'<div style="width:40px;height:40px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>'}</td>
       <td style="padding:6px 6px">
         <input value="${o.code||''}" style="font-size:11px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 3px" onchange="db.order[${i}].code=this.value;saveDB()" title="Edit part number">
       </td>
@@ -3342,7 +3518,12 @@ function renderOrder(){
       </td>
       <td><input type="number" step="0.01" value="${o.cost||''}" placeholder="0.00" style="width:78px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].cost=parseFloat(this.value)||0;saveDB();renderOrder()"></td>
       <td style="font-weight:600;padding:8px 6px;font-size:13px">${o.cost&&o.cost>0?'£'+((o.cost)*(o.qty||1)).toFixed(2):'—'}</td>
-      <td><input value="${o.sup||''}" placeholder="Supplier…" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:12px;${!o.sup?'background:#fffbeb;':'background:#fff;'}" onchange="db.order[${i}].sup=this.value.trim();saveDB();renderOrder()" title="Change supplier — moves item to that supplier group"></td>
+      <td>
+        <div style="display:flex;gap:4px;flex-direction:column">
+          <input value="${o.sup||''}" placeholder="Type or select…" list="dl-suppliers-order" style="width:100%;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:12px;${!o.sup?'background:#fffbeb;':'background:#fff;'}" onchange="db.order[${i}].sup=this.value.trim();saveDB();renderOrder()" title="Supplier">
+          <datalist id="dl-suppliers-order">${(db.suppliers||[]).map(s=>`<option value="${s.name}">`).join('')}</datalist>
+        </div>
+      </td>
       <td><input value="${o.notes||''}" placeholder="Notes…" style="width:100%;border:none;background:transparent;padding:2px 4px;font-size:12px" onchange="db.order[${i}].notes=this.value;saveDB()" title="Notes"></td>
       <td style="font-size:11px;color:#6b7280;padding:8px 4px">${o.bom||'—'}</td>
       <td><button onclick="db.order.splice(${i},1);saveDB();renderOrder()" class="btn-red" style="font-size:11px;padding:3px 8px">✕</button></td>
@@ -3351,13 +3532,14 @@ function renderOrder(){
 
   const tableHead=`<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr>
-      <th style="width:12%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part no.</th>
-      <th style="width:28%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part name &amp; stock info</th>
+      <th style="width:50px;border-bottom:1px solid #e5e7eb"></th>
+      <th style="width:11%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part no.</th>
+      <th style="width:26%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Part name &amp; stock info</th>
       <th style="width:7%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Qty</th>
       <th style="width:8%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Unit £</th>
       <th style="width:7%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Total</th>
       <th style="width:13%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Supplier ✎</th>
-      <th style="width:12%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Notes</th>
+      <th style="width:11%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">Notes</th>
       <th style="width:7%;padding:7px 6px;font-size:11px;color:#6b7280;border-bottom:1px solid #e5e7eb;text-transform:uppercase;text-align:left">From BOM</th>
       <th style="width:36px;border-bottom:1px solid #e5e7eb"></th>
     </tr></thead>`;
@@ -3520,6 +3702,7 @@ function renderHist(){
   };
 
   el.innerHTML=`<table><thead><tr>
+    <th style="width:52px"></th>
     <th style="width:105px">Date/time</th>
     <th style="width:80px">Type</th>
     <th>Part name</th>
@@ -3538,6 +3721,7 @@ function renderHist(){
       const label=r.type||(r.qty>0?'IN':'OUT');
       const pm=partMeta(r.code);
       return`<tr>
+        <td style="padding:4px 6px">${pm?partImgHtml(pm,40):''}</td>
         <td style="font-size:11px">${r.ts}</td>
         <td><span class="badge ${badge}">${label}</span></td>
         <td style="font-weight:500">${r.name}</td>
@@ -3552,6 +3736,7 @@ function renderHist(){
     }else{
       const eb=eventBadge[r.type]||{cls:'b-gray',label:r.type};
       return`<tr style="background:#fafaf8">
+        <td></td>
         <td style="font-size:11px">${r.ts}</td>
         <td><span class="badge ${eb.cls||''}" style="${eb.style||''}">${eb.label}</span></td>
         <td style="font-weight:500" colspan="3">${r.title}</td>
@@ -4211,6 +4396,48 @@ function renderSettings(){
       <input value="${c}" style="flex:1;font-size:13px" onchange="editCat(${i},this.value)">
       <button onclick="removeCat(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
     </div>`).join('');
+  // Supplier list
+  if(!db.suppliers)db.suppliers=[];
+  const supListEl=document.getElementById('sup-list');
+  if(supListEl){
+    supListEl.innerHTML=db.suppliers.length
+      ?db.suppliers.map((s,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px">
+            <div style="font-weight:600;font-size:13px">${s.name}</div>
+            <div style="font-size:11px;color:#9ca3af">${[s.email,s.phone].filter(Boolean).join(' · ')||'No contact info'}</div>
+          </div>
+          <button onclick="removeSupplier(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
+        </div>`).join('')
+      :'<div style="color:#9ca3af;font-size:13px">No suppliers yet — add your main suppliers below</div>';
+  }
+}
+
+async function addSupplier(){
+  if(!db.suppliers)db.suppliers=[];
+  const name=(document.getElementById('new-sup-name').value||'').trim();
+  if(!name){toast('Enter supplier name','err');return;}
+  if(db.suppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){toast('Supplier already exists','err');return;}
+  const email=(document.getElementById('new-sup-email').value||'').trim();
+  const phone=(document.getElementById('new-sup-phone').value||'').trim();
+  db.suppliers.push({name,email,phone});
+  await saveDB();
+  document.getElementById('new-sup-name').value='';
+  document.getElementById('new-sup-email').value='';
+  document.getElementById('new-sup-phone').value='';
+  renderSettings();
+  // Update datalists everywhere
+  buildDatalist('dl-suppliers',db.suppliers.map(s=>s.name));
+  buildDatalist('dl-suppliers-order',db.suppliers.map(s=>s.name));
+  toast(`Supplier "${name}" added`);
+}
+
+async function removeSupplier(i){
+  if(!confirm(`Remove "${db.suppliers[i].name}" from supplier list?`))return;
+  db.suppliers.splice(i,1);
+  await saveDB();
+  renderSettings();
+  toast('Supplier removed');
 }
 function renderLocList(elId,list,type){
   const el=document.getElementById(elId);if(!el)return;
@@ -4284,10 +4511,11 @@ function renderSL(){
   if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts found</div>';return;}
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th>Internal no.</th><th>Part name</th><th>Location</th>
+      <th style="width:56px"></th><th>Internal no.</th><th>Part name</th><th>Location</th>
       <th title="Edit directly">Current qty</th><th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
       <th>Status</th><th>Quick adj.</th>
     </tr></thead><tbody>${res.map(p=>`<tr>
+      <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#9ca3af">${p.mfrno||''}</span></td>
       <td style="font-weight:500">${p.name}</td>
       <td style="font-size:12px">${formatLoc(p)||'—'}</td>
