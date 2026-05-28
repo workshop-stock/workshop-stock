@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 58 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 61 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1176,11 +1176,10 @@ function readLocal(){
 }
 
 // ─── FIREBASE SAVE — store as JSON string to avoid key name restrictions ────────
-async function saveDB(immediate){
+async function saveDB(){
   writeLocal();
   if(!_firebaseReady||!DATA_REF){return;}
   if(_saveTimer)clearTimeout(_saveTimer);
-  const delay=immediate?0:1500;
   _saveTimer=setTimeout(async()=>{
     _saveTimer=null;
     setStatus('Saving…','#f59e0b');
@@ -1213,9 +1212,8 @@ function startFirebaseListener(){
         if(cloud&&typeof cloud==='object'){
           const cp=Object.keys(cloud.parts||{}).length;
           const lp=Object.keys(db.parts||{}).length;
-          // Only accept cloud data if we are NOT in the middle of saving
-          // AND cloud has more recent or equal data
-          if((cp>0||lp===0)&&!_saveTimer){
+          if(cp>0||lp===0){
+            if(_saveTimer)clearTimeout(_saveTimer);
             db=cloud;
             initDefaults();
             writeLocal();
@@ -2343,23 +2341,32 @@ function coLook(){
     document.getElementById('co-take').value=1;
     document.getElementById('co-ref').value='';
   } else {
+    // ── BASKET MODE ──
     document.getElementById('co-notfound-b').style.display='none';
     document.getElementById('co-basket-found').style.display='none';
     const p=result?result.part:null;
-    if(!p){document.getElementById('co-notfound-b').style.display='block';return;}
-    const allocQtyB=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+    if(!p){document.getElementById('co-notfound-b').style.display='block';soundNotFound();return;}
+
+    // Check allocations FIRST — show full blocking modal before they can add
+    const activeAllocsB=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
+    const allocQtyB=activeAllocsB.reduce((s,a)=>s+a.qty,0);
     const freeQtyB=Math.max(0,p.qty-allocQtyB);
-    const allocBuildsB=[...new Set((db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').map(a=>a.build))];
-    const allocWarnB=allocQtyB>0
-      ?`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:5px 10px;margin-top:5px;font-size:12px;color:#991b1b;font-weight:600">⚠ ${allocQtyB} held for: ${allocBuildsB.join(', ')} — only ${freeQtyB} free</div>`
-      :'';
-    document.getElementById('co-b-name').innerHTML=`${p.name}${allocWarnB}`;
-    document.getElementById('co-b-info').textContent=`Total stock: ${p.qty} · Free: ${freeQtyB} · ${formatLoc(p)||p.loc||''}`;
+
+    if(allocQtyB>0){
+      soundOutOfStock();
+      // Show the full blocking modal immediately
+      showAllocCheckoutWarning(p.code,1,'',freeQtyB,allocQtyB,activeAllocsB,true);
+      return;
+    }
+
+    // No allocations — show normal basket add UI
+    document.getElementById('co-b-name').innerHTML=p.name;
+    document.getElementById('co-b-info').textContent=`In stock: ${p.qty} · ${formatLoc(p)||p.loc||''}`;
     document.getElementById('co-b-qty').value=1;
-    document.getElementById('co-b-qty').max=p.qty; // allow over allocated but warn on add
+    document.getElementById('co-b-qty').max=p.qty;
     document.getElementById('co-basket-found').style.display='block';
     document.getElementById('co-basket-found').dataset.code=p.code;
-    if(allocQtyB>0)soundOutOfStock(); // play warning sound when allocated part scanned
+    soundOK();
   }
 }
 
@@ -2528,22 +2535,32 @@ function checkAllocProceedBtn(){
 
 async function confirmAllocBasket(code,qty){
   const dateEl=document.getElementById('alloc-replace-date');
+  const poEl=document.getElementById('alloc-replace-po');
   const errEl=document.getElementById('alloc-warn-err');
-  if(!dateEl||!dateEl.value){
-    errEl.style.display='block';
-    errEl.textContent='You must set a replacement date before proceeding';
-    return;
-  }
+  if(!dateEl||!dateEl.value){errEl.style.display='block';errEl.textContent='Enter a replacement date before proceeding';return;}
+  if(!poEl||!poEl.value.trim()){errEl.style.display='block';errEl.textContent='Enter a PO or replacement reference before proceeding';return;}
+  const replaceDate=dateEl.value;
+  const replacePO=poEl.value.trim();
   document.getElementById('alloc-warn-modal').remove();
   const p=db.parts[code];
+  if(!p)return;
+  // Get actual qty from basket qty input — user may want more than 1
+  const realQty=parseInt(document.getElementById('co-b-qty')?.value)||qty;
   const ex=basket.find(b=>b.code===code);
-  if(ex){ex.qty+=qty;ex.replaceDate=dateEl.value;}
-  else{basket.push({code,name:p.name,qty,loc:p.loc,inStock:p.qty,replaceDate:dateEl.value});}
+  if(ex){ex.qty+=realQty;ex.replaceDate=replaceDate;ex.replacePO=replacePO;}
+  else{basket.push({code,name:p.name,qty:realQty,loc:p.loc,inStock:p.qty,replaceDate,replacePO});}
   renderBasket();
+  document.getElementById('co-basket-found').style.display='none';
+  // Log the override against the allocation
+  (db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').forEach(a=>{
+    if(!a.overrides)a.overrides=[];
+    a.overrides.push({by:currentUser?currentUser.name:'Unknown',qty:realQty,replaceDate,replacePO,date:nowDT()});
+  });
+  await saveDB();
   const scanInput=document.getElementById('co-scan');
   if(scanInput){scanInput.value='';scanInput.focus();}
   soundBasketAdd();
-  toast(`⚠ ${qty}× ${p.name} added — must replace by ${dateEl.value}`,'info');
+  toast(`⚠ ${realQty}× ${p.name} in basket — replace by ${replaceDate}. PO: ${replacePO}`,'info');
 }
 
 async function confirmAllocCheckout(code,qty,ref,freeQty,dipping){
@@ -2645,8 +2662,19 @@ function renderBasket(){
 async function checkoutBasket(){
   if(!basket.length){toast('Basket is empty','err');return;}
   const ref=document.getElementById('co-basket-ref').value.trim();
+  // Check stock AND allocations for every item
   for(const item of basket){
-    if(db.parts[item.code].qty<item.qty){toast(`Not enough stock for ${item.name} — only ${db.parts[item.code].qty} left`,'err');return;}
+    const p=db.parts[item.code];
+    if(!p||p.qty<item.qty){toast(`Not enough stock for ${item.name} — only ${p?p.qty:0} left`,'err');return;}
+    const activeAllocs=(db.allocations||[]).filter(a=>a.code===item.code&&a.status!=='released');
+    const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
+    if(allocQty>0){
+      const builds=[...new Set(activeAllocs.map(a=>a.build))].join(', ');
+      const freeQty=Math.max(0,p.qty-allocQty);
+      toast(`⚠ ${item.name} is allocated to: ${builds}. Use Quick Checkout to proceed with replacement commitment.`,'err');
+      soundOutOfStock();
+      return;
+    }
   }
   pushUndo();
   for(const item of basket){
@@ -3642,7 +3670,7 @@ async function confirmDelivery(){
     toast(`${chk.length} item${chk.length!==1?'s':''} checked in. ${remaining} still outstanding — delivery stays open.`,'info');
     showDelivery(activeDel); // refresh rows
   }
-  await saveDB(true); // immediate — allocations must be in Firebase before checkout
+  await saveDB(); // immediate — allocations must be in Firebase before checkout
   renderDash();renderDelHist();
 }
 
@@ -4078,7 +4106,7 @@ async function doManualAlloc(){
     status:'allocated'
   });
   addEventHist('ALLOC',`${qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
-  await saveDB(true); // save immediately so checkout blocking works straight away
+  await saveDB(); // save immediately so checkout blocking works straight away
   document.getElementById('alloc-modal').remove();
   renderAllocations();
   renderDash();
@@ -5147,6 +5175,14 @@ function renderCOBrowse(){
 function browseAddToCheckout(code){
   const p=db.parts[code];if(!p||p.qty<=0)return;
   if(coMode==='basket'){
+    // Check allocations first
+    const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
+    const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
+    if(allocQty>0){
+      // Put in scan bar and use coLook so the warning shows properly
+      document.getElementById('co-scan').value=code;coLook();
+      return;
+    }
     const ex=basket.find(b=>b.code===code);
     const already=(ex?ex.qty:0);
     if(already>=p.qty){toast(`Already have all ${p.qty} in basket`,'err');return;}
