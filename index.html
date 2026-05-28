@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 47 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 48 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -4037,7 +4037,6 @@ function renderOrder(){
   const grandTotal=db.order.reduce((a,o)=>a+((o.cost||0)*(o.qty||1)),0);
 
   const rowHtml=(o,i)=>{
-    // Try multiple ways to find the part for image and stock info
     const p=db.parts[o.code]||
       Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(o.code))||
       Object.values(db.parts).find(pt=>pt.mfrno&&normalise(pt.mfrno)===normalise(o.code))||
@@ -4045,30 +4044,80 @@ function renderOrder(){
     const curQty=p?p.qty:null;
     const minQty=p?p.min:null;
     const maxQty=p?p.max:null;
-    const reorderQty=p&&maxQty?Math.max(maxQty-( curQty||0),1):o.qty||1;
+    const reorderQty=p&&maxQty?Math.max(maxQty-(curQty||0),1):o.qty||1;
     const usage=p?getPartUsage(o.code):null;
     const badge=usage?usageBadge(usage.useCount):null;
 
+    // Allocation info — is it held for projects?
+    const code=p?p.code:o.code;
+    const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
+    const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
+    const freeQty=curQty!==null?Math.max(0,curQty-allocQty):null;
+    const allocBuilds=[...new Set(activeAllocs.map(a=>a.build))];
+
+    // Last 3 times this was received (ordered from)
+    const last3in=[...(db.hist||[])].filter(h=>h.code===code&&h.qty>0).reverse().slice(0,3);
+
+    // Last 3 times checked out (who used it)
+    const last3out=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,3);
+
     // Stock info pill
     const stockPill=curQty!==null
-      ?`<div style="font-size:11px;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <span style="background:#f3f4f6;padding:1px 6px;border-radius:8px;color:#374151">Stock: <strong>${curQty}</strong></span>
+      ?`<div style="font-size:11px;margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <span style="background:#f3f4f6;padding:1px 7px;border-radius:8px;color:#374151">Stock: <strong>${curQty}</strong></span>
+          ${allocQty>0?`<span style="background:#fee2e2;padding:1px 7px;border-radius:8px;color:#991b1b;font-weight:600">⚠ ${allocQty} allocated</span>`:''}
+          ${freeQty!==null?`<span style="background:${freeQty>0?'#dcfce7':'#fee2e2'};padding:1px 7px;border-radius:8px;color:${freeQty>0?'#166534':'#991b1b'};font-weight:600">${freeQty} free</span>`:''}
           ${minQty!==null?`<span style="background:#fef3c7;padding:1px 6px;border-radius:8px;color:#92400e">Min: ${minQty}</span>`:''}
           ${maxQty?`<span style="background:#dcfce7;padding:1px 6px;border-radius:8px;color:#166534">Max: ${maxQty}</span>`:''}
         </div>`:'';
 
-    // Last used / last ordered
-    const activityLine=usage?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">
-      ${usage.lastOut?`Last used: <strong style="color:#6b7280">${usage.lastOut}</strong>`:'Never checked out'}
-      ${usage.lastIn?` &middot; Last ordered: <strong style="color:#6b7280">${usage.lastIn}</strong>`:''}
+    // Allocation detail — which projects
+    const allocLine=allocQty>0?`<div style="margin-top:4px;padding:5px 8px;background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;font-size:11px">
+      <span style="color:#991b1b;font-weight:600">▣ Held for:</span>
+      ${allocBuilds.map(b=>`<span style="background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:8px;margin-left:4px;font-weight:600">${b}</span>`).join('')}
+      <span style="color:#9ca3af;margin-left:6px">— consider if reorder is still needed</span>
     </div>`:'';
 
-    // Usage dot + badge
-    const usagePill=badge?`<div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+    // Last 3 ordered from
+    const last3inHtml=last3in.length?`<div style="margin-top:5px">
+      <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Last ordered from:</div>
+      ${last3in.map(h=>`<div style="font-size:11px;display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:1px solid #f9fafb">
+        <span style="color:#166534;font-weight:600">+${h.qty}</span>
+        <span style="color:#374151;font-weight:500">${h.ref||p?.sup||'Unknown supplier'}</span>
+        <span style="color:#9ca3af">${h.ts}</span>
+        ${h.user?`<span style="color:#9ca3af">· ${h.user}</span>`:''}
+      </div>`).join('')}
+    </div>`:'<div style="font-size:11px;color:#9ca3af;margin-top:4px">No order history yet</div>';
+
+    // Last 3 used by
+    const last3outHtml=last3out.length?`<div style="margin-top:5px">
+      <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Last taken by:</div>
+      ${last3out.map(h=>`<div style="font-size:11px;display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:1px solid #f9fafb">
+        <span style="color:#991b1b;font-weight:600">${h.qty}</span>
+        <span style="color:#374151;font-weight:500">${h.user||'Unknown'}</span>
+        ${h.ref?`<span style="color:#6b7280">· ${h.ref}</span>`:''}
+        <span style="color:#9ca3af">${h.ts}</span>
+      </div>`).join('')}
+    </div>`:'';
+
+    // Usage dot
+    const usagePill=badge?`<div style="display:flex;align-items:center;gap:4px;margin-top:4px">
       <div style="width:8px;height:8px;border-radius:50%;background:${badge.dot};flex-shrink:0"></div>
       <span style="font-size:10px;font-weight:600;color:${badge.col}">${badge.label}</span>
-      ${usage.useCount?`<span style="font-size:10px;color:#9ca3af">(${usage.useCount}×)</span>`:''}
+      ${usage.useCount?`<span style="font-size:10px;color:#9ca3af">(${usage.useCount}× checked out)</span>`:''}
     </div>`:'';
+
+    // Collapsible history section
+    const histId=`ord-hist-${i}`;
+    const histSection=`<div style="margin-top:5px">
+      <button onclick="toggleOrderHist('${histId}')" style="font-size:10px;padding:1px 8px;color:#6b7280;border-color:#e5e7eb;background:#f9fafb">
+        📋 Show purchase &amp; usage history
+      </button>
+      <div id="${histId}" style="display:none;margin-top:6px;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px">
+        ${last3inHtml}
+        ${last3outHtml}
+      </div>
+    </div>`;
 
     return`<tr style="border-left:3px solid ${badge?badge.dot:'#e5e7eb'}">
       <td style="padding:4px 6px;width:28px"><input type="checkbox" class="order-row-chk" data-idx="${i}" style="width:15px;height:15px;cursor:pointer"></td>
@@ -4079,8 +4128,9 @@ function renderOrder(){
       <td style="padding:6px 6px">
         <input value="${o.name||''}" style="font-weight:500;width:100%;border:none;background:transparent;padding:2px 3px;font-size:13px" onchange="db.order[${i}].name=this.value;saveDB()" title="Edit part name">
         ${stockPill}
-        ${activityLine}
+        ${allocLine}
         ${usagePill}
+        ${histSection}
       </td>
       <td style="padding:6px 4px">
         <input type="number" value="${o.qty||1}" min="1" style="width:54px;border:1px solid #d1d5db;border-radius:4px;padding:3px 5px;font-size:13px" onchange="db.order[${i}].qty=parseInt(this.value)||1;saveDB();renderOrder()">
@@ -4099,6 +4149,11 @@ function renderOrder(){
       <td><button onclick="db.order.splice(${i},1);saveDB();renderOrder()" class="btn-red" style="font-size:11px;padding:3px 8px">✕</button></td>
     </tr>`;
   };
+
+  function toggleOrderHist(id){
+    const el=document.getElementById(id);
+    if(el)el.style.display=el.style.display==='none'?'block':'none';
+  }
 
   const tableHead=`<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr>
