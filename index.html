@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 54 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 56 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2278,6 +2278,7 @@ function coLook(){
       return;
     }
     const p=result.part;
+    const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
     if(p.qty<=0)soundOutOfStock();
     else soundOK();
     const imgEl=document.getElementById('co-part-image');
@@ -2314,8 +2315,6 @@ function coLook(){
       return a.code===p.code||normalise(a.code)===normalise(p.code)||
         normalise(stripVendorPrefix(a.code))===normalise(p.code);
     }).reduce((s,a)=>s+a.qty,0);
-    // DEBUG — remove after testing
-    toast(`Debug: code=${p.code} allocations found=${allocQty} total db.allocs=${(db.allocations||[]).length}`,'info');
     const freeQty=Math.max(0,p.qty-allocQty);
     const coQtyEl=document.getElementById('co-qty');
     const allocWarnBar=document.getElementById('co-alloc-warn-bar');
@@ -2394,7 +2393,7 @@ async function doCO(){
   const freeQty=Math.max(0,p.qty-allocQty);
 
   // ALWAYS show debug info before proceeding — remove after fix confirmed
-  alert(`DEBUG CHECKOUT\nCode: ${code}\nTotal db.allocations: ${allAllocs.length}\nMatching this code: ${matchingAllocs.length}\nActive (not released): ${activeAllocs.length}\nAllocQty: ${allocQty}\nFreeQty: ${freeQty}\nStatuses: ${matchingAllocs.map(a=>a.status||'undefined').join(', ')||'none'}`);
+  // alert removed — allocation check confirmed working
 
   if(allocQty>0&&qty>freeQty){
     showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs,false);
