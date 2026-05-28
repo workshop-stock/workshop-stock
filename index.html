@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 56 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 57 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2385,24 +2385,24 @@ async function doCO(){
   if(!p){toast('Part not found','err');return;}
   if(p.qty<qty){toast(`Only ${p.qty} in stock — cannot take ${qty}`,'err');return;}
 
-  // DEBUG — show exactly what's in allocations for this part
+  // ── Broad allocation search — match by code OR normalised code ──
   const allAllocs=db.allocations||[];
-  const matchingAllocs=allAllocs.filter(a=>a.code===code);
-  const activeAllocs=allAllocs.filter(a=>a.code===code&&a.status!=='released');
+  const activeAllocs=allAllocs.filter(a=>{
+    if(a.status==='released')return false;
+    const ac=normalise(a.code);
+    const pc=normalise(code);
+    const pm=normalise(p.mfrno||'');
+    return ac===pc||ac===pm||normalise(stripVendorPrefix(a.code))===pc||normalise(stripVendorPrefix(a.code))===pm;
+  });
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
 
-  // ALWAYS show debug info before proceeding — remove after fix confirmed
-  // alert removed — allocation check confirmed working
-
-  if(allocQty>0&&qty>freeQty){
+  // ── If ANY allocation exists, always show the warning modal ──
+  if(allocQty>0){
     showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs,false);
     return;
   }
-  if(allocQty>0){
-    const builds=[...new Set(activeAllocs.map(a=>a.build))].join(', ');
-    if(!confirm(`⚠ ${allocQty} units held for: ${builds}\nFree stock: ${freeQty}\nYou are taking ${qty}. Continue?`))return;
-  }
+
   await commitCheckout(code,qty,ref,null);
 }
 
@@ -2410,65 +2410,117 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
   const existing=document.getElementById('alloc-warn-modal');
   if(existing)existing.remove();
   const p=db.parts[code];
-  const builds=[...new Set(allocs.map(a=>a.build))];
-  const dipping=qty-freeQty; // how many they're taking from allocated
+  const builds=[...new Set(allocs.map(a=>a.build))].join(', ');
+  const dipping=Math.max(0,qty-freeQty);
+  const recent=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,3);
 
   const div=document.createElement('div');
   div.id='alloc-warn-modal';
-  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px';
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
-    <div style="background:#fee2e2;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
-      <span style="font-size:24px;flex-shrink:0">⚠</span>
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px';
+  div.innerHTML=`
+  <div style="background:#fff;border-radius:14px;padding:0;max-width:520px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden">
+
+    <!-- Red header -->
+    <div style="background:#991b1b;padding:16px 20px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:28px">🚫</span>
       <div>
-        <div style="font-weight:800;font-size:14px;color:#991b1b">Taking project-allocated stock</div>
-        <div style="font-size:13px;color:#7f1d1d;margin-top:4px">
-          You are taking <strong>${qty}</strong> but only <strong>${freeQty}</strong> are free.<br>
-          <strong>${dipping}</strong> will come from parts held for: <strong>${builds.join(', ')}</strong>
-        </div>
+        <div style="font-weight:800;font-size:16px;color:#fff">HOLD ON — This part is allocated to a project</div>
+        <div style="font-size:13px;color:#fca5a5;margin-top:3px">${p.name} · ${code}</div>
       </div>
     </div>
 
-    <!-- Allocation detail -->
-    <div style="margin-bottom:14px;border:1px solid #fca5a5;border-radius:8px;overflow:hidden">
-      ${allocs.map(a=>`<div style="padding:8px 12px;border-bottom:1px solid #fee2e2;display:flex;justify-content:space-between;font-size:12px;background:#fff5f5">
-        <span>▣ <strong>${a.build}</strong>${a.po?' · PO: '+a.po:''}</span>
-        <span style="font-weight:700;color:#991b1b">${a.qty} units held</span>
-      </div>`).join('')}
+    <!-- Stock summary -->
+    <div style="padding:14px 20px;background:#fff5f5;border-bottom:1px solid #fca5a5">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+        <div style="background:#fff;border-radius:8px;padding:10px;border:1px solid #fca5a5">
+          <div style="font-size:22px;font-weight:800;color:#1a1a1a">${p.qty}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px">In stock total</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:10px;border:2px solid #991b1b">
+          <div style="font-size:22px;font-weight:800;color:#991b1b">${allocQty}</div>
+          <div style="font-size:11px;color:#991b1b;margin-top:2px;font-weight:600">Held for projects</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:10px;border:1px solid ${freeQty>0?'#86efac':'#fca5a5'}">
+          <div style="font-size:22px;font-weight:800;color:${freeQty>0?'#166534':'#991b1b'}">${freeQty}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px">Free to take</div>
+        </div>
+      </div>
+      <!-- Which projects -->
+      <div style="margin-top:10px;font-size:13px">
+        <span style="font-weight:700;color:#991b1b">Allocated to:</span>
+        ${allocs.map(a=>`<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:8px;margin:2px 4px;font-weight:600;font-size:12px">▣ ${a.build} — ${a.qty} units</span>`).join('')}
+      </div>
     </div>
 
-    <!-- History of recent checkouts for this part -->
-    ${(()=>{
-      const recent=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,3);
-      return recent.length?`<div style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:6px;text-transform:uppercase">Recent checkouts of this part</div>
-        ${recent.map(h=>`<div style="font-size:12px;padding:5px 0;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between">
-          <span>${h.ts} · <strong>${h.user||'Unknown'}</strong>${h.ref?' · '+h.ref:''}</span>
-          <span style="color:#991b1b;font-weight:600">${h.qty}</span>
+    <!-- Body -->
+    <div style="padding:16px 20px">
+
+      <!-- Recent checkouts -->
+      ${recent.length?`<div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recent checkouts of this part</div>
+        ${recent.map(h=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #f3f4f6">
+          <span><strong>${h.user||'Unknown'}</strong>${h.ref?' · '+h.ref:''}</span>
+          <span style="color:#6b7280">${h.ts} &nbsp;<strong style="color:#991b1b">${h.qty}</strong></span>
         </div>`).join('')}
-      </div>`:'';
-    })()}
+      </div>`:''}
 
-    <!-- Replacement date required -->
-    <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:16px">
-      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:6px">📅 Replacement commitment required</div>
-      <div style="font-size:12px;color:#92400e;margin-bottom:8px">You must provide a date by which you will return or replace the ${dipping} allocated unit${dipping!==1?'s':''} taken from project stock.</div>
-      <label style="font-size:12px;color:#374151;display:block;margin-bottom:4px;font-weight:600">Replace by date *</label>
-      <input type="date" id="alloc-replace-date" min="${new Date().toISOString().split('T')[0]}"
-        style="width:100%;font-size:13px;padding:8px 10px;border:2px solid #f59e0b;border-radius:7px;outline:none"
-        onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#f59e0b'">
-    </div>
+      <!-- Required fields -->
+      <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:10px">📋 To proceed you must answer both questions:</div>
 
-    <div id="alloc-warn-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b"></div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">
+            1. When will you replace or return ${dipping>0?dipping:qty} unit${(dipping>0?dipping:qty)!==1?'s':''}? *
+          </label>
+          <input type="date" id="alloc-replace-date"
+            min="${new Date().toISOString().split('T')[0]}"
+            style="width:100%;font-size:14px;padding:9px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none"
+            oninput="checkAllocProceedBtn()"
+            onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
 
-    <div style="display:flex;gap:8px">
-      <button onclick="${isBasket?`confirmAllocBasket('${code}',${qty})`:`confirmAllocCheckout('${code}',${qty},'${ref.replace(/'/g,"\\'")}',${freeQty},${dipping})`}"
-        class="btn-amber" style="flex:1;font-weight:700">
-        ⚠ Proceed — I will replace by stated date
-      </button>
-      <button onclick="document.getElementById('alloc-warn-modal').remove()" style="flex:0 0 auto">Cancel</button>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">
+            2. Do you have a PO or replacement order reference? *
+          </label>
+          <input type="text" id="alloc-replace-po" placeholder="e.g. PO-2024-042, RS order pending, TBC 01/07…"
+            style="width:100%;font-size:14px;padding:9px 12px;border:2px solid #d1d5db;border-radius:8px;outline:none"
+            oninput="checkAllocProceedBtn()"
+            onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+      </div>
+
+      <div id="alloc-warn-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600"></div>
+
+      <div style="display:flex;gap:8px">
+        <button id="alloc-proceed-btn"
+          onclick="${isBasket?`confirmAllocBasket('${code}',${qty})`:`confirmAllocCheckout('${code}',${qty},'${(ref||'').replace(/'/g,"\\'")}',${freeQty},${dipping})`}"
+          disabled
+          style="flex:1;padding:11px;background:#d1d5db;color:#6b7280;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:not-allowed;transition:all .2s">
+          ⚠ Proceed — I accept responsibility
+        </button>
+        <button onclick="document.getElementById('alloc-warn-modal').remove()"
+          style="padding:11px 20px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">
+          Cancel
+        </button>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px;text-align:center">Both fields required before you can proceed</div>
     </div>
   </div>`;
   document.body.appendChild(div);
+  soundOutOfStock();
+}
+
+function checkAllocProceedBtn(){
+  const date=document.getElementById('alloc-replace-date');
+  const po=document.getElementById('alloc-replace-po');
+  const btn=document.getElementById('alloc-proceed-btn');
+  if(!date||!po||!btn)return;
+  const ready=date.value&&po.value.trim().length>2;
+  btn.disabled=!ready;
+  btn.style.background=ready?'#92400e':'#d1d5db';
+  btn.style.color=ready?'#fff':'#6b7280';
+  btn.style.cursor=ready?'pointer':'not-allowed';
 }
 
 async function confirmAllocBasket(code,qty){
@@ -2493,28 +2545,27 @@ async function confirmAllocBasket(code,qty){
 
 async function confirmAllocCheckout(code,qty,ref,freeQty,dipping){
   const dateEl=document.getElementById('alloc-replace-date');
+  const poEl=document.getElementById('alloc-replace-po');
   const errEl=document.getElementById('alloc-warn-err');
-  if(!dateEl||!dateEl.value){
-    errEl.style.display='block';
-    errEl.textContent='You must set a replacement date before proceeding';
-    return;
-  }
+  if(!dateEl||!dateEl.value){errEl.style.display='block';errEl.textContent='Enter a replacement date before proceeding';return;}
+  if(!poEl||!poEl.value.trim()){errEl.style.display='block';errEl.textContent='Enter a PO or replacement reference before proceeding';return;}
   const replaceDate=dateEl.value;
+  const replacePO=poEl.value.trim();
   document.getElementById('alloc-warn-modal').remove();
-  await commitCheckout(code,qty,ref,replaceDate);
+  await commitCheckout(code,qty,ref,replaceDate,replacePO);
 }
 
-async function commitCheckout(code,qty,ref,replaceDate){
+async function commitCheckout(code,qty,ref,replaceDate,replacePO){
   pushUndo();
   db.parts[code].qty-=qty;
   trackFreq('cat',db.parts[code].cat);
   trackFreq('brand',db.parts[code].mfr||'');
-  const noteStr=ref+(replaceDate?' [TOOK ALLOCATED STOCK — replace by '+replaceDate+']':'');
+  const noteStr=ref+(replaceDate?' [ALLOCATED STOCK TAKEN — replace by '+replaceDate+(replacePO?' · PO: '+replacePO:'')+']':'');
   addHist('OUT',db.parts[code].name,code,-qty,noteStr);
   if(replaceDate){
     (db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').forEach(a=>{
       if(!a.overrides)a.overrides=[];
-      a.overrides.push({by:currentUser?currentUser.name:'Unknown',qty,ref,replaceDate,date:nowDT()});
+      a.overrides.push({by:currentUser?currentUser.name:'Unknown',qty,ref,replaceDate,replacePO:replacePO||'',date:nowDT()});
     });
   }
   await saveDB();
