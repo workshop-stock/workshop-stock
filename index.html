@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 57 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 58 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1176,11 +1176,13 @@ function readLocal(){
 }
 
 // ─── FIREBASE SAVE — store as JSON string to avoid key name restrictions ────────
-async function saveDB(){
+async function saveDB(immediate){
   writeLocal();
-  if(!_firebaseReady||!DATA_REF){return;} // Firebase not loaded yet
+  if(!_firebaseReady||!DATA_REF){return;}
   if(_saveTimer)clearTimeout(_saveTimer);
+  const delay=immediate?0:1500;
   _saveTimer=setTimeout(async()=>{
+    _saveTimer=null;
     setStatus('Saving…','#f59e0b');
     try{
       if(Object.keys(db.parts||{}).length===0&&Object.keys(db.boms||{}).length===0){
@@ -1211,8 +1213,9 @@ function startFirebaseListener(){
         if(cloud&&typeof cloud==='object'){
           const cp=Object.keys(cloud.parts||{}).length;
           const lp=Object.keys(db.parts||{}).length;
-          if(cp>0||lp===0){
-            if(_saveTimer)clearTimeout(_saveTimer);
+          // Only accept cloud data if we are NOT in the middle of saving
+          // AND cloud has more recent or equal data
+          if((cp>0||lp===0)&&!_saveTimer){
             db=cloud;
             initDefaults();
             writeLocal();
@@ -3639,7 +3642,7 @@ async function confirmDelivery(){
     toast(`${chk.length} item${chk.length!==1?'s':''} checked in. ${remaining} still outstanding — delivery stays open.`,'info');
     showDelivery(activeDel); // refresh rows
   }
-  await saveDB();
+  await saveDB(true); // immediate — allocations must be in Firebase before checkout
   renderDash();renderDelHist();
 }
 
@@ -4075,7 +4078,7 @@ async function doManualAlloc(){
     status:'allocated'
   });
   addEventHist('ALLOC',`${qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
-  await saveDB();
+  await saveDB(true); // save immediately so checkout blocking works straight away
   document.getElementById('alloc-modal').remove();
   renderAllocations();
   renderDash();
