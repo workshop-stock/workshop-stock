@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 49 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 50 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2330,11 +2330,19 @@ function coLook(){
     document.getElementById('co-basket-found').style.display='none';
     const p=result?result.part:null;
     if(!p){document.getElementById('co-notfound-b').style.display='block';return;}
-    document.getElementById('co-b-name').textContent=p.name;
-    document.getElementById('co-b-info').textContent=`Stock: ${p.qty} · ${formatLoc(p)||p.loc||''}`;
+    const allocQtyB=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+    const freeQtyB=Math.max(0,p.qty-allocQtyB);
+    const allocBuildsB=[...new Set((db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').map(a=>a.build))];
+    const allocWarnB=allocQtyB>0
+      ?`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:5px 10px;margin-top:5px;font-size:12px;color:#991b1b;font-weight:600">⚠ ${allocQtyB} held for: ${allocBuildsB.join(', ')} — only ${freeQtyB} free</div>`
+      :'';
+    document.getElementById('co-b-name').innerHTML=`${p.name}${allocWarnB}`;
+    document.getElementById('co-b-info').textContent=`Total stock: ${p.qty} · Free: ${freeQtyB} · ${formatLoc(p)||p.loc||''}`;
     document.getElementById('co-b-qty').value=1;
+    document.getElementById('co-b-qty').max=p.qty; // allow over allocated but warn on add
     document.getElementById('co-basket-found').style.display='block';
     document.getElementById('co-basket-found').dataset.code=p.code;
+    if(allocQtyB>0)soundOutOfStock(); // play warning sound when allocated part scanned
   }
 }
 
@@ -2382,7 +2390,7 @@ async function doCO(){
   await commitCheckout(code,qty,ref,null);
 }
 
-function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs){
+function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=false){
   const existing=document.getElementById('alloc-warn-modal');
   if(existing)existing.remove();
   const p=db.parts[code];
@@ -2437,7 +2445,7 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs){
     <div id="alloc-warn-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b"></div>
 
     <div style="display:flex;gap:8px">
-      <button onclick="confirmAllocCheckout('${code}',${qty},'${ref.replace(/'/g,"\\'")}',${freeQty},${dipping})" 
+      <button onclick="${isBasket?`confirmAllocBasket('${code}',${qty})`:`confirmAllocCheckout('${code}',${qty},'${ref.replace(/'/g,"\\'")}',${freeQty},${dipping})`}"
         class="btn-amber" style="flex:1;font-weight:700">
         ⚠ Proceed — I will replace by stated date
       </button>
@@ -2445,6 +2453,26 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs){
     </div>
   </div>`;
   document.body.appendChild(div);
+}
+
+async function confirmAllocBasket(code,qty){
+  const dateEl=document.getElementById('alloc-replace-date');
+  const errEl=document.getElementById('alloc-warn-err');
+  if(!dateEl||!dateEl.value){
+    errEl.style.display='block';
+    errEl.textContent='You must set a replacement date before proceeding';
+    return;
+  }
+  document.getElementById('alloc-warn-modal').remove();
+  const p=db.parts[code];
+  const ex=basket.find(b=>b.code===code);
+  if(ex){ex.qty+=qty;ex.replaceDate=dateEl.value;}
+  else{basket.push({code,name:p.name,qty,loc:p.loc,inStock:p.qty,replaceDate:dateEl.value});}
+  renderBasket();
+  const scanInput=document.getElementById('co-scan');
+  if(scanInput){scanInput.value='';scanInput.focus();}
+  soundBasketAdd();
+  toast(`⚠ ${qty}× ${p.name} added — must replace by ${dateEl.value}`,'info');
 }
 
 async function confirmAllocCheckout(code,qty,ref,freeQty,dipping){
@@ -2494,10 +2522,20 @@ function addToBasket(){
   const p=db.parts[code];
   if(!p)return;
   const ex=basket.find(b=>b.code===code);
-  const totalWanted=(ex?ex.qty:0)+qty;
+  const alreadyInBasket=(ex?ex.qty:0);
+  const totalWanted=alreadyInBasket+qty;
   if(totalWanted>p.qty){
     soundOutOfStock();
     toast(`Only ${p.qty} in stock — basket would need ${totalWanted}`,'err');
+    return;
+  }
+  // Check allocations — warn if taking into allocated stock
+  const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
+  const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
+  const freeQty=Math.max(0,p.qty-allocQty);
+  if(totalWanted>freeQty&&allocQty>0){
+    // Show blocking modal — same as quick checkout
+    showAllocCheckoutWarning(code,qty,'',freeQty-alreadyInBasket,allocQty,activeAllocs,true);
     return;
   }
   if(ex){ex.qty+=qty;}
@@ -2507,13 +2545,8 @@ function addToBasket(){
   document.getElementById('co-notfound-b').style.display='none';
   soundBasketAdd();
   toast(`✓ ${qty}× ${p.name} added to basket`);
-  // Auto-clear scan bar and refocus for continuous scanning
   const scanInput=document.getElementById('co-scan');
-  if(scanInput){
-    scanInput.value='';
-    scanInput.focus();
-    scanInput.select();
-  }
+  if(scanInput){scanInput.value='';scanInput.focus();scanInput.select();}
 }
 
 function renderBasket(){
@@ -5226,7 +5259,10 @@ function renderSL(){
   if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts found</div>';return;}
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th style="width:56px"></th><th>Internal no.<br><span style="font-weight:400;color:#9ca3af;font-size:10px;text-transform:none">Mfr part no.</span></th><th>Part name</th><th>Location</th>
+      <th style="width:56px"></th>
+      <th style="min-width:110px">Internal no.</th>
+      <th style="min-width:140px">Mfr part no.</th>
+      <th>Part name</th><th>Location</th>
       <th title="Edit directly">Current qty</th>
       <th title="Held for projects — click to see details" style="color:#6d28d9">Allocated ▣</th>
       <th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
@@ -5236,7 +5272,8 @@ function renderSL(){
       const allocQty=allocs.reduce((s,a)=>s+a.qty,0);
       return`<tr>
         <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
-        <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#6b7280;font-size:11px">${p.mfrno||''}</span></td>
+        <td style="font-size:12px;font-family:monospace;font-weight:600">${p.code}</td>
+        <td style="font-size:12px;color:#374151">${p.mfrno||'—'}</td>
         <td style="font-weight:500">${p.name}</td>
         <td style="font-size:12px">${formatLoc(p)||'—'}</td>
         <td><input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)"></td>
