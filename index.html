@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 50 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 51 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -475,11 +475,12 @@ tr:hover td{background:#f9fafb}
     <!-- QUICK MODE -->
     <div id="co-quick-panel">
       <div id="co-result" style="display:none">
-        <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px">
+        <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px" id="co-verify-box">
           <div style="background:#fffbeb;padding:10px 14px;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:10px">
             <span style="font-size:18px">🔍</span>
             <span style="font-weight:700;font-size:14px;color:#92400e">Verify this is the correct part before taking</span>
           </div>
+          <div id="co-alloc-warn-bar" style="display:none;background:#991b1b;padding:10px 14px;color:#fff;font-size:13px;font-weight:700;border-bottom:2px solid #7f1d1d"></div>
           <div id="co-fuzzy-warn" style="display:none;padding:10px 14px;border-bottom:1px solid #fca5a5"></div>
           <div style="padding:14px;background:#fff">
             <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
@@ -2308,15 +2309,20 @@ function coLook(){
     const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
     const freeQty=Math.max(0,p.qty-allocQty);
     const coQtyEl=document.getElementById('co-qty');
+    const allocWarnBar=document.getElementById('co-alloc-warn-bar');
+    const verifyBox=document.getElementById('co-verify-box');
     if(allocQty>0){
       const builds=[...new Set((db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').map(a=>a.build))].join(', ');
-      coQtyEl.innerHTML=`<span style="color:#166534">${freeQty} free</span>
-        <div style="font-size:12px;background:#fee2e2;color:#991b1b;padding:5px 10px;border-radius:6px;margin-top:4px;border:1px solid #fca5a5;font-weight:600">
-          ⚠ ${allocQty} held for: ${builds}
-        </div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px">${p.qty} total in stock</div>`;
+      coQtyEl.innerHTML=`<span style="color:${freeQty>0?'#166534':'#991b1b'};font-size:20px;font-weight:700">${freeQty} free</span><div style="font-size:12px;color:#6b7280;margin-top:2px">${p.qty} total · ${allocQty} allocated</div>`;
+      if(allocWarnBar){
+        allocWarnBar.style.display='block';
+        allocWarnBar.innerHTML=`🚫 ${allocQty} UNIT${allocQty!==1?'S':''} HELD FOR PROJECT: ${builds} — FREE STOCK: ${freeQty}`;
+      }
+      if(verifyBox){verifyBox.style.borderColor='#991b1b';}
     }else{
       coQtyEl.textContent=p.qty;
+      if(allocWarnBar)allocWarnBar.style.display='none';
+      if(verifyBox)verifyBox.style.borderColor='#f59e0b';
     }
     document.getElementById('co-result').dataset.code=p.code;
     const tick=document.getElementById('co-verify-tick');
@@ -2373,20 +2379,25 @@ async function doCO(){
   const qty=parseInt(document.getElementById('co-take').value)||1;
   const ref=document.getElementById('co-ref').value.trim();
   const p=db.parts[code];
+  if(!p){toast('Part not found','err');return;}
   if(p.qty<qty){toast(`Only ${p.qty} in stock — cannot take ${qty}`,'err');return;}
 
-  // Check allocations
+  // Always check allocations
   const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
 
-  // If taking more than the free (unallocated) qty — show blocking modal
-  if(qty>freeQty&&allocQty>0){
-    showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs);
+  // Block if ANY allocation exists and taking into it
+  if(allocQty>0&&qty>freeQty){
+    showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs,false);
     return;
   }
 
-  // Safe to proceed
+  // Also warn even if freeQty covers it but allocations exist — they should know
+  if(allocQty>0&&qty<=freeQty){
+    if(!confirm(`⚠ Note: ${allocQty} units of this part are held for: ${[...new Set(activeAllocs.map(a=>a.build))].join(', ')}\n\nYou are taking ${qty} from the free stock (${freeQty} available).\n\nContinue?`))return;
+  }
+
   await commitCheckout(code,qty,ref,null);
 }
 
@@ -2529,14 +2540,16 @@ function addToBasket(){
     toast(`Only ${p.qty} in stock — basket would need ${totalWanted}`,'err');
     return;
   }
-  // Check allocations — warn if taking into allocated stock
+  // Always check allocations
   const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
-  if(totalWanted>freeQty&&allocQty>0){
-    // Show blocking modal — same as quick checkout
-    showAllocCheckoutWarning(code,qty,'',freeQty-alreadyInBasket,allocQty,activeAllocs,true);
+  if(allocQty>0&&totalWanted>freeQty){
+    showAllocCheckoutWarning(code,qty,'',Math.max(0,freeQty-alreadyInBasket),allocQty,activeAllocs,true);
     return;
+  }
+  if(allocQty>0&&totalWanted<=freeQty){
+    if(!confirm(`⚠ ${allocQty} units of ${p.name} are allocated to projects.\nYou are taking from free stock (${freeQty} available). Continue?`))return;
   }
   if(ex){ex.qty+=qty;}
   else{basket.push({code,name:p.name,qty,loc:p.loc,inStock:p.qty});}
