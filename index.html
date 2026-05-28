@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 52 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 53 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2388,35 +2388,23 @@ async function doCO(){
   if(!p){toast('Part not found','err');return;}
   if(p.qty<qty){toast(`Only ${p.qty} in stock — cannot take ${qty}`,'err');return;}
 
-  // Check allocations — match by catalogue code AND by any variant
+  // DEBUG — show exactly what's in allocations for this part
   const allAllocs=db.allocations||[];
-  console.log('All allocations:',JSON.stringify(allAllocs.map(a=>({code:a.code,status:a.status,build:a.build}))));
-  console.log('Looking for code:',code,'normalised:',normalise(code));
-
-  // Broad match — check code, normalised code, mfrno
-  const activeAllocs=allAllocs.filter(a=>{
-    if(a.status==='released')return false;
-    return a.code===code||
-      normalise(a.code)===normalise(code)||
-      a.code===p.mfrno||
-      normalise(a.code)===normalise(p.mfrno||'')||
-      normalise(stripVendorPrefix(a.code))===normalise(code)||
-      normalise(stripVendorPrefix(a.code))===normalise(stripVendorPrefix(code));
-  });
-  console.log('Active allocs found:',activeAllocs.length);
-
+  const matchingAllocs=allAllocs.filter(a=>a.code===code);
+  const activeAllocs=allAllocs.filter(a=>a.code===code&&a.status!=='released');
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
 
-  console.log('allocQty:',allocQty,'freeQty:',freeQty,'qty taking:',qty);
+  // ALWAYS show debug info before proceeding — remove after fix confirmed
+  alert(`DEBUG CHECKOUT\nCode: ${code}\nTotal db.allocations: ${allAllocs.length}\nMatching this code: ${matchingAllocs.length}\nActive (not released): ${activeAllocs.length}\nAllocQty: ${allocQty}\nFreeQty: ${freeQty}\nStatuses: ${matchingAllocs.map(a=>a.status||'undefined').join(', ')||'none'}`);
 
   if(allocQty>0&&qty>freeQty){
     showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs,false);
     return;
   }
-  if(allocQty>0&&qty<=freeQty){
+  if(allocQty>0){
     const builds=[...new Set(activeAllocs.map(a=>a.build))].join(', ');
-    if(!confirm(`⚠ Note: ${allocQty} units of this part are held for: ${builds}\n\nYou are taking ${qty} from the free stock (${freeQty} available).\n\nContinue?`))return;
+    if(!confirm(`⚠ ${allocQty} units held for: ${builds}\nFree stock: ${freeQty}\nYou are taking ${qty}. Continue?`))return;
   }
   await commitCheckout(code,qty,ref,null);
 }
