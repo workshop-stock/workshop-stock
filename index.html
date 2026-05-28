@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 53 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 54 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -504,7 +504,7 @@ tr:hover td{background:#f9fafb}
           <div><label>Qty taking</label><input type="number" id="co-take" value="1" min="1"></div>
           <div><label>Job / project ref</label><input id="co-ref" placeholder="e.g. JOB-2024-042"></div>
         </div>
-        <button class="btn-amber" id="co-confirm-btn" onclick="doCO()" disabled style="opacity:.4;cursor:not-allowed">&#8595; Confirm check-out</button>
+        <button class="btn-amber" id="co-confirm-btn" onclick="doCO()" style="opacity:1">&#8595; Confirm check-out</button>
         <button onclick="resetCO()" style="margin-left:8px">Cancel</button>
         <button onclick="undoLast()" style="margin-left:8px;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px" title="Undo the last check-out action">&#8630; Undo last action</button>
       </div>
@@ -2240,12 +2240,15 @@ async function doCI(){
   addHist('IN',db.parts[code].name,code,qty,notes);
   await saveDB();
   const locStr=formatLoc(db.parts[code]);
-  toast(`Checked in ${qty}× ${db.parts[code].name}${locStr?' → '+locStr:''}`);
-  document.getElementById('ci-qty').textContent=db.parts[code].qty;
-  document.getElementById('ci-info').textContent=`${code} · ${db.parts[code].cat} · ${locStr}`;
-  document.getElementById('ci-addqty').value=1;
-  document.getElementById('ci-notes').value='';
-  ['ci-newloc','ci-newloc2','ci-newloc3'].forEach(id=>document.getElementById(id).value='');
+  // ── Fully clear and reset check-in form ──
+  resetCI();
+  document.getElementById('ci-scan').value='';
+  // Show success with undo option
+  const toastEl=document.getElementById('toast');
+  toastEl.innerHTML=`✓ Checked in ${qty}× ${db.parts[code].name}${locStr?' → '+locStr:''} &nbsp;<button onclick="undoLast()" style="background:rgba(255,255,255,.3);border:none;color:inherit;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">↺ Undo</button>`;
+  toastEl.className='toast t-ok show';
+  clearTimeout(toastEl._tid);
+  toastEl._tid=setTimeout(()=>toastEl.classList.remove('show'),5000);
   renderDash();
 }
 
@@ -2359,14 +2362,9 @@ function coLook(){
 }
 
 function updateCOConfirmBtn(){
-  const tick=document.getElementById('co-verify-tick');
+  // Tick is for visual confirmation only — button always enabled
   const btn=document.getElementById('co-confirm-btn');
-  const verified=tick&&tick.checked;
-  if(btn){
-    btn.disabled=!verified;
-    btn.style.opacity=verified?'1':'0.4';
-    btn.style.cursor=verified?'pointer':'not-allowed';
-  }
+  if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
 }
 
 function resetCO(){
@@ -2514,7 +2512,6 @@ async function commitCheckout(code,qty,ref,replaceDate){
   trackFreq('brand',db.parts[code].mfr||'');
   const noteStr=ref+(replaceDate?' [TOOK ALLOCATED STOCK — replace by '+replaceDate+']':'');
   addHist('OUT',db.parts[code].name,code,-qty,noteStr);
-  // Flag on the allocation if they dipped into it
   if(replaceDate){
     (db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').forEach(a=>{
       if(!a.overrides)a.overrides=[];
@@ -2522,16 +2519,16 @@ async function commitCheckout(code,qty,ref,replaceDate){
     });
   }
   await saveDB();
-  toast(`Checked out ${qty}× ${db.parts[code].name}${replaceDate?' — must replace by '+replaceDate:''}`, replaceDate?'info':'ok');
-  const coQty=document.getElementById('co-qty');
-  if(coQty)coQty.textContent=db.parts[code].qty;
-  const coTake=document.getElementById('co-take');
-  if(coTake)coTake.value=1;
-  const coRef=document.getElementById('co-ref');
-  if(coRef)coRef.value='';
-  // Reset verify tick
-  const tick=document.getElementById('co-verify-tick');
-  if(tick){tick.checked=false;updateCOConfirmBtn();}
+  const partName=db.parts[code].name;
+  // ── Fully clear and reset check-out form ──
+  resetCO();
+  document.getElementById('co-scan').value='';
+  // Show success confirmation with undo option
+  const toastEl=document.getElementById('toast');
+  toastEl.innerHTML=`✓ Checked out ${qty}× ${partName}${replaceDate?' — replace by '+replaceDate:''} &nbsp;<button onclick="undoLast()" style="background:rgba(255,255,255,.3);border:none;color:inherit;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">↺ Undo</button>`;
+  toastEl.className='toast t-ok show';
+  clearTimeout(toastEl._tid);
+  toastEl._tid=setTimeout(()=>toastEl.classList.remove('show'),5000);
   renderDash();
 }
 
