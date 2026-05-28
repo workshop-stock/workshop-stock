@@ -313,7 +313,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 43 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 45 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1036,10 +1036,10 @@ tr:hover td{background:#f9fafb}
           <button class="btn-green" onclick="addCat()">Add</button>
         </div>
       </div>
-      <div class="card admin-only" style="display:none">
-        <div class="sec">🔐 User accounts <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;margin-left:6px">Admin only</span></div>
-        <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Create and manage accounts for your team. Each user gets their own username and password.</div>
-        <button onclick="showUserManager()" class="btn-blue">Manage user accounts</button>
+      <div class="card">
+        <div class="sec">👥 User accounts</div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:10px">View your team or manage accounts. Standard users can see who is admin.</div>
+        <button onclick="showUserManager()" class="btn-blue">View team / Manage accounts</button>
       </div>
       <div class="card admin-only" style="display:none">
         <div class="sec">🔐 Firebase connection <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;margin-left:6px">Admin only</span></div>
@@ -1740,7 +1740,7 @@ function lwLogin(){
   if(!account){errEl.style.display='block';errEl.textContent=`No account for "${username}" — ask admin to create one`;soundNotFound();return;}
   if(account.passHash!==hashPass(pass)){errEl.style.display='block';errEl.textContent='Incorrect password — try again';soundNotFound();return;}
   // Success
-  currentUser={username,name:account.name,isAdmin:account.isAdmin,isManager:account.isManager||false,loginTime:nowDT()};
+  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
   saveUserSession();
   document.getElementById('login-wall').style.display='none';
   applyUserSession();
@@ -1806,8 +1806,7 @@ function loadUserSession(){
 function applyUserSession(){
   const el=document.getElementById('user-display');
   if(el&&currentUser){
-    const badge=currentUser.isAdmin?'🔐':currentUser.isManager?'📋':'';
-    el.textContent=`👤 ${currentUser.name}${badge?' '+badge:''}`;
+    el.textContent=`👤 ${currentUser.name}${currentUser.isAdmin?' 🔐':''}`;
     el.style.display='inline-block';
   }else if(el){
     el.textContent='👤 Not logged in';
@@ -1816,12 +1815,8 @@ function applyUserSession(){
   const loginBtn=document.getElementById('login-btn');
   if(loginBtn)loginBtn.textContent=currentUser?'Switch user':'Login';
   const isAdmin=currentUser&&currentUser.isAdmin;
-  const isManager=currentUser&&(currentUser.isAdmin||currentUser.isManager);
   document.querySelectorAll('.admin-only').forEach(el=>{
     el.style.display=isAdmin?'':'none';
-  });
-  document.querySelectorAll('.manager-only').forEach(el=>{
-    el.style.display=isManager?'':'none';
   });
   const msg=document.getElementById('non-admin-settings-msg');
   if(msg)msg.style.display=isAdmin?'none':'block';
@@ -1854,43 +1849,67 @@ function showUserManager(){
   const existing=document.getElementById('user-manager-modal');
   if(existing)existing.remove();
   const users=Object.entries(db.users);
+  const isAdmin=currentUser&&currentUser.isAdmin;
   const div=document.createElement('div');
   div.id='user-manager-modal';
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+
+  // Standard users: read-only team list showing who is who + who is admin
+  const teamView=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
-        <h2 style="font-size:16px;font-weight:700;margin:0">🔐 User accounts</h2>
-        <p style="font-size:12px;color:#6b7280;margin:3px 0 0">Create accounts for your team. Each person gets their own username and password.</p>
+        <h2 style="font-size:16px;font-weight:700;margin:0">👥 Your team</h2>
+        <p style="font-size:12px;color:#6b7280;margin:3px 0 0">Contact a 🔐 admin to reset your password or create new accounts.</p>
       </div>
       <button onclick="document.getElementById('user-manager-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
+    ${users.map(([uname,u])=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;background:${u.isAdmin?'#f0fdf4':'#fff'}">
+        <div style="width:36px;height:36px;border-radius:50%;background:${u.isAdmin?'#166534':'#1e3a5f'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${u.name.charAt(0).toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${u.name}
+            ${u.isAdmin
+              ?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px;font-weight:700">🔐 ADMIN</span>'
+              :'<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px">Standard</span>'}
+          </div>
+          <div style="font-size:11px;color:#9ca3af">@${uname}</div>
+        </div>
+        ${uname===currentUser?.username?'<span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-weight:600">You</span>':''}
+      </div>`).join('')}
+  </div>`;
 
-    <!-- Existing users -->
+  // Admin: full management panel
+  const adminView=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:620px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin:0">🔐 Manage user accounts</h2>
+        <p style="font-size:12px;color:#6b7280;margin:3px 0 0">Two roles: <strong>Admin</strong> (full access) and <strong>Standard</strong> (normal use). Only admins can reset passwords.</p>
+      </div>
+      <button onclick="document.getElementById('user-manager-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
     <div style="margin-bottom:16px">
       ${users.map(([uname,u])=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;background:${u.isAdmin?'#f0fdf4':'#fff'}">
           <div style="width:36px;height:36px;border-radius:50%;background:${u.isAdmin?'#166534':'#1e3a5f'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${u.name.charAt(0).toUpperCase()}</div>
           <div style="flex:1">
-            <div style="font-weight:600;font-size:13px">${u.name} ${u.isAdmin?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 6px;border-radius:8px">ADMIN</span>':''}</div>
-            <div style="font-size:11px;color:#9ca3af">username: <strong>${uname}</strong> · created ${u.created||'—'}</div>
+            <div style="font-weight:600;font-size:13px">${u.name}
+              ${u.isAdmin
+                ?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px;font-weight:700">🔐 ADMIN</span>'
+                :'<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px">Standard</span>'}
+            </div>
+            <div style="font-size:11px;color:#9ca3af">@${uname} · created ${u.created||'—'}</div>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button onclick="toggleUserAdmin('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isAdmin?'#991b1b':'#166534'};border-color:${u.isAdmin?'#fca5a5':'#86efac'};background:${u.isAdmin?'#fff5f5':'#f0fdf4'}">
-              ${u.isAdmin?'Remove admin':'Make admin'}
+            <button onclick="toggleUserAdmin('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isAdmin?'#991b1b':'#166534'};border-color:${u.isAdmin?'#fca5a5':'#86efac'};background:${u.isAdmin?'#fff5f5':'#f0fdf4'};font-weight:600">
+              ${u.isAdmin?'Remove admin':'Make admin 🔐'}
             </button>
-            ${!u.isAdmin?`<button onclick="toggleUserManager('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isManager?'#92400e':'#1e40af'};border-color:${u.isManager?'#fcd34d':'#bfdbfe'};background:${u.isManager?'#fffbeb':'#eff6ff'}">
-              ${u.isManager?'Remove manager':'Make manager 📋'}
-            </button>`:''}
-            <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#6b7280;border-color:#d1d5db">Reset pwd</button>
-            ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af">System</span>'}
+            <button onclick="resetUserPassword('${uname}')" style="font-size:11px;padding:3px 9px;color:#6b7280;border-color:#d1d5db">Reset password</button>
+            ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af;padding:3px 6px">System account</span>'}
           </div>
         </div>`).join('')}
     </div>
-
-    <!-- Add new user -->
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
-      <div style="font-weight:600;font-size:13px;margin-bottom:12px">➕ Add new user</div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:12px">➕ Create new account</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div>
           <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Full name</label>
@@ -1904,15 +1923,13 @@ function showUserManager(){
           <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Password</label>
           <div style="position:relative">
             <input type="password" id="new-user-pass" placeholder="Set a password…" style="width:100%;font-size:13px;padding:8px 10px;padding-right:36px;border:1px solid #d1d5db;border-radius:7px">
-            <button type="button" onclick="togglePassVis('new-user-pass',this)"
-              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:15px;color:#9ca3af;padding:0;line-height:1"
-              title="Show/hide">👁</button>
+            <button type="button" onclick="togglePassVis('new-user-pass',this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:15px;color:#9ca3af;padding:0;line-height:1">👁</button>
           </div>
         </div>
         <div style="display:flex;align-items:flex-end">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding-bottom:2px">
             <input type="checkbox" id="new-user-admin" style="width:16px;height:16px">
-            <span>Admin access 🔐</span>
+            <span>Give admin access 🔐</span>
           </label>
         </div>
       </div>
@@ -1920,6 +1937,8 @@ function showUserManager(){
       <button onclick="createUser()" style="background:#1e3a5f;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer">Create account</button>
     </div>
   </div>`;
+
+  div.innerHTML=isAdmin?adminView:teamView;
   document.body.appendChild(div);
 }
 
@@ -3097,7 +3116,8 @@ async function saveBOM(){
   if(!name){toast('Enter a machine / project name first','err');return;}
   if(!curBOM.length){toast('Add parts before saving','err');return;}
   const id='bom_'+Date.now();
-  db.boms[id]={name,ref:document.getElementById('bom-ref').value.trim(),parts:JSON.parse(JSON.stringify(curBOM)),created:nowD()};
+  db.boms[id]={name,ref:document.getElementById('bom-ref').value.trim(),parts:JSON.parse(JSON.stringify(curBOM)),created:nowD(),createdBy:currentUser?currentUser.name:'Unknown'};
+  addEventHist('BOM_SAVE',`BOM saved: ${name}`,`${curBOM.length} parts · ref: ${document.getElementById('bom-ref').value.trim()||'none'}`);
   await saveDB();
   toast(`BOM "${name}" saved`);
   renderSavedBoms();renderDelSel();renderDash();
@@ -3115,7 +3135,7 @@ function renderSavedBoms(){
   if(!all.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No BOMs saved yet</div>';return;}
   el.innerHTML=all.reverse().map(([id,b])=>`<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-      <div><div style="font-weight:600">${b.name}</div><div style="font-size:12px;color:#6b7280">${b.ref||''} &middot; ${b.created} &middot; ${b.parts.length} parts</div></div>
+      <div><div style="font-weight:600">${b.name}</div><div style="font-size:12px;color:#6b7280">${b.ref||''} &middot; ${b.created} &middot; ${b.parts.length} parts${b.createdBy?' &middot; by <strong>'+b.createdBy+'</strong>':''}</div></div>
       <div style="display:flex;gap:5px;flex-shrink:0">
         <button onclick="loadBOM('${id}')" class="btn-blue" style="font-size:11px;padding:4px 9px">Edit</button>
         <button onclick="bomToDelivery('${id}')" class="btn-green" style="font-size:11px;padding:4px 9px">Delivery</button>
@@ -3593,21 +3613,42 @@ function renderOrder(){
   const el=document.getElementById('order-content');
   if(!db.order.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">Order list is empty. Generate from a BOM, add low-stock items, or click "+ Add line".</div>';return;}
 
-  // Group by supplier
-  const groups={};
-  const noSup=[];
-  db.order.forEach((o,i)=>{
+  // Split order into BOM/project items and low-stock replenishment items
+  const bomItems=db.order.filter(o=>o.bom);
+  const lowItems=db.order.filter(o=>!o.bom);
+
+  // Group BOM items by supplier
+  const bomGroups={};
+  const bomNoSup=[];
+  bomItems.forEach((o,idx)=>{
+    const realIdx=db.order.indexOf(o);
     const sup=o.sup||'';
-    if(!sup){noSup.push({o,i});return;}
-    if(!groups[sup])groups[sup]=[];
-    groups[sup].push({o,i});
+    if(!sup){bomNoSup.push({o,i:realIdx});return;}
+    if(!bomGroups[sup])bomGroups[sup]=[];
+    bomGroups[sup].push({o,i:realIdx});
   });
-  if(noSup.length)groups['— No supplier assigned —']=noSup;
+  if(bomNoSup.length)bomGroups['— No supplier assigned —']=bomNoSup;
+
+  // Group low-stock items by supplier
+  const lowGroups={};
+  const lowNoSup=[];
+  lowItems.forEach((o,idx)=>{
+    const realIdx=db.order.indexOf(o);
+    const sup=o.sup||'';
+    if(!sup){lowNoSup.push({o,i:realIdx});return;}
+    if(!lowGroups[sup])lowGroups[sup]=[];
+    lowGroups[sup].push({o,i:realIdx});
+  });
+  if(lowNoSup.length)lowGroups['— No supplier assigned —']=lowNoSup;
 
   const grandTotal=db.order.reduce((a,o)=>a+((o.cost||0)*(o.qty||1)),0);
 
   const rowHtml=(o,i)=>{
-    const p=db.parts[o.code]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(o.code));
+    // Try multiple ways to find the part for image and stock info
+    const p=db.parts[o.code]||
+      Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(o.code))||
+      Object.values(db.parts).find(pt=>pt.mfrno&&normalise(pt.mfrno)===normalise(o.code))||
+      Object.values(db.parts).find(pt=>normalise(pt.name)===normalise(o.name));
     const curQty=p?p.qty:null;
     const minQty=p?p.min:null;
     const maxQty=p?p.max:null;
@@ -3637,6 +3678,7 @@ function renderOrder(){
     </div>`:'';
 
     return`<tr style="border-left:3px solid ${badge?badge.dot:'#e5e7eb'}">
+      <td style="padding:4px 6px;width:28px"><input type="checkbox" class="order-row-chk" data-idx="${i}" style="width:15px;height:15px;cursor:pointer"></td>
       <td style="padding:4px 6px;width:50px">${p?partImgHtml(p,40):'<div style="width:40px;height:40px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>'}</td>
       <td style="padding:6px 6px">
         <input value="${o.code||''}" style="font-size:11px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 3px" onchange="db.order[${i}].code=this.value;saveDB()" title="Edit part number">
@@ -3686,24 +3728,58 @@ function renderOrder(){
       .map(b=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${b.dot};display:inline-block"></span>${b.label}</span>`).join('')}
   </div>`;
 
-  let html=legend;
-  Object.entries(groups).forEach(([sup,items])=>{
+  // Helper to render a supplier group with tick-select
+  function renderSupGroup(sup,items,sectionId){
     const supTotal=items.reduce((a,{o})=>a+((o.cost||0)*(o.qty||1)),0);
     const isReal=!sup.startsWith('—');
-    html+=`<div style="margin-bottom:14px">
+    const groupId=`grp-${sectionId}-${normalise(sup)}`;
+    return`<div style="margin-bottom:14px" id="${groupId}">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:${isReal?'#1e3a5f':'#f3f4f6'};border-radius:6px 6px 0 0;flex-wrap:wrap;gap:6px">
         <div style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="chk-all-${groupId}" style="width:16px;height:16px;cursor:pointer"
+            onchange="toggleGroupSelect('${groupId}',this.checked)">
           <span style="font-weight:700;font-size:13px;color:${isReal?'#fff':'#6b7280'}">${sup}</span>
           <span style="font-size:12px;color:${isReal?'#93c5fd':'#9ca3af'}">${items.length} line${items.length!==1?'s':''}</span>
         </div>
-        <div style="display:flex;gap:6px;align-items:center">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           ${supTotal>0?`<span style="font-size:13px;font-weight:700;color:${isReal?'#86efac':'#166534'}">£${supTotal.toFixed(2)}</span>`:''}
-          ${isReal?`<button onclick="sendSupplierEmail('${sup.replace(/'/g,"\\'")}',${JSON.stringify(items.map(x=>x.i))})" style="font-size:11px;padding:3px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">&#9993; Email</button>`:''}
+          <button onclick="addTickedToOrder('${groupId}')" style="font-size:11px;padding:3px 10px;background:${isReal?'rgba(255,255,255,.15)':'#e5e7eb'};border-color:${isReal?'rgba(255,255,255,.3)':'#d1d5db'};color:${isReal?'#fff':'#374151'}">✓ Add ticked to list</button>
+          ${isReal?`<button onclick="sendSupplierEmail('${sup.replace(/'/g,"\\'")}',${JSON.stringify(items.map(x=>x.i))})" style="font-size:11px;padding:3px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">✉ Email</button>`:''}
         </div>
       </div>
       ${tableHead}<tbody>${items.map(({o,i})=>rowHtml(o,i)).join('')}</tbody></table>
     </div>`;
-  });
+  }
+
+  let html=legend;
+
+  // Section 1: BOM / Project items
+  if(bomItems.length){
+    html+=`<div style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f5f0ff;border-radius:8px;margin-bottom:10px;border-left:4px solid #6d28d9">
+        <span style="font-size:16px">▣</span>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#6d28d9">BOM / Project parts (${bomItems.length} lines)</div>
+          <div style="font-size:12px;color:#6b7280">Parts needed for specific projects — grouped by supplier</div>
+        </div>
+      </div>
+      ${Object.entries(bomGroups).map(([sup,items])=>renderSupGroup(sup,items,'bom')).join('')}
+    </div>`;
+  }
+
+  // Section 2: Low stock replenishment
+  if(lowItems.length){
+    html+=`<div style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:10px;border-left:4px solid #f59e0b">
+        <span style="font-size:16px">📦</span>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#92400e">Low stock replenishment (${lowItems.length} lines)</div>
+          <div style="font-size:12px;color:#6b7280">General stock top-up — tick items then "Add ticked to list" to create a smaller order</div>
+        </div>
+      </div>
+      ${Object.entries(lowGroups).map(([sup,items])=>renderSupGroup(sup,items,'low')).join('')}
+    </div>`;
+  }
 
   html+=`<div style="padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;display:flex;justify-content:space-between;font-size:13px;margin-top:4px">
     <span style="color:#6b7280">${db.order.length} total lines · Click any cell to edit</span>
@@ -3711,6 +3787,16 @@ function renderOrder(){
   </div>`;
 
   el.innerHTML=html;
+}
+
+function toggleGroupSelect(groupId,checked){
+  document.querySelectorAll(`#${groupId} .order-row-chk`).forEach(cb=>cb.checked=checked);
+}
+
+function addTickedToOrder(groupId){
+  const checked=[...document.querySelectorAll(`#${groupId} .order-row-chk:checked`)].map(cb=>cb.dataset.idx);
+  if(!checked.length){toast('Tick at least one item first','err');return;}
+  toast(`${checked.length} item${checked.length!==1?'s':''} selected — use Email button to send to supplier`,'info');
 }
 
 function sendSupplierEmail(sup,indices){
@@ -3831,9 +3917,11 @@ function renderHist(){
 
   const eventBadge={
     BOM_LOAD:{cls:'b-blue',label:'BOM Load'},
+    BOM_SAVE:{cls:'b-blue',label:'BOM Saved'},
     QUOTE_ACCEPT:{cls:'b-ok',label:'Quote Accepted'},
     EMAIL:{cls:'',style:'background:#f5f0ff;color:#6d28d9',label:'Email'},
-    JOB_CLOSE:{cls:'b-gray',label:'Job Closed'}
+    JOB_CLOSE:{cls:'b-gray',label:'Job Closed'},
+    LOGIN:{cls:'b-gray',label:'Login'}
   };
 
   el.innerHTML=`<table><thead><tr>
@@ -4690,23 +4778,38 @@ function renderSL(){
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
       <th style="width:56px"></th><th>Internal no.</th><th>Part name</th><th>Location</th>
-      <th title="Edit directly">Current qty</th><th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
+      <th title="Edit directly">Current qty</th>
+      <th title="Held for projects — click to see details" style="color:#6d28d9">Allocated ▣</th>
+      <th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
       <th>Status</th><th>Quick adj.</th>
-    </tr></thead><tbody>${res.map(p=>`<tr>
-      <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
-      <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#9ca3af">${p.mfrno||''}</span></td>
-      <td style="font-weight:500">${p.name}</td>
-      <td style="font-size:12px">${formatLoc(p)||'—'}</td>
-      <td><input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)"></td>
-      <td><input type="number" value="${p.min}" min="0" style="width:60px;border-color:#fcd34d" onchange="updateSLField('${p.code}','min',parseInt(this.value)||0)"></td>
-      <td><input type="number" value="${p.max||''}" min="0" placeholder="—" style="width:60px;border-color:#86efac" onchange="updateSLField('${p.code}','max',parseInt(this.value)||0)"></td>
-      <td>${sb(p)}</td>
-      <td style="display:flex;gap:4px;flex-wrap:wrap">
-        <button onclick="slAdj('${p.code}',1)" style="font-size:14px;padding:2px 9px;color:#166534;border-color:#86efac;font-weight:700">+</button>
-        <button onclick="slAdj('${p.code}',-1)" style="font-size:14px;padding:2px 9px;color:#991b1b;border-color:#fca5a5;font-weight:700">−</button>
-        <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 8px" class="btn-blue">Edit</button>
-      </td>
-    </tr>`).join('')}</tbody></table></div>`;
+    </tr></thead><tbody>${res.map(p=>{
+      const allocs=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
+      const allocQty=allocs.reduce((s,a)=>s+a.qty,0);
+      return`<tr>
+        <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
+        <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#9ca3af">${p.mfrno||''}</span></td>
+        <td style="font-weight:500">${p.name}</td>
+        <td style="font-size:12px">${formatLoc(p)||'—'}</td>
+        <td><input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)"></td>
+        <td style="text-align:center">
+          ${allocQty>0
+            ?`<button onclick="showAllocDetail('${p.code}')"
+                style="background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd;font-weight:700;font-size:13px;padding:3px 10px;border-radius:6px"
+                title="Click to see which projects these are held for">
+                ▣ ${allocQty}
+              </button>`
+            :`<span style="color:#d1d5db;font-size:12px">—</span>`}
+        </td>
+        <td><input type="number" value="${p.min}" min="0" style="width:60px;border-color:#fcd34d" onchange="updateSLField('${p.code}','min',parseInt(this.value)||0)"></td>
+        <td><input type="number" value="${p.max||''}" min="0" placeholder="—" style="width:60px;border-color:#86efac" onchange="updateSLField('${p.code}','max',parseInt(this.value)||0)"></td>
+        <td>${sb(p)}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          <button onclick="slAdj('${p.code}',1)" style="font-size:14px;padding:2px 9px;color:#166534;border-color:#86efac;font-weight:700">+</button>
+          <button onclick="slAdj('${p.code}',-1)" style="font-size:14px;padding:2px 9px;color:#991b1b;border-color:#fca5a5;font-weight:700">−</button>
+          <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 8px" class="btn-blue">Edit</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
 }
 async function updateSLField(code,field,val){
   pushUndo();
