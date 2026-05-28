@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 48 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 49 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -5226,7 +5226,7 @@ function renderSL(){
   if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts found</div>';return;}
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th style="width:56px"></th><th>Internal no.</th><th>Part name</th><th>Location</th>
+      <th style="width:56px"></th><th>Internal no.<br><span style="font-weight:400;color:#9ca3af;font-size:10px;text-transform:none">Mfr part no.</span></th><th>Part name</th><th>Location</th>
       <th title="Edit directly">Current qty</th>
       <th title="Held for projects — click to see details" style="color:#6d28d9">Allocated ▣</th>
       <th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
@@ -5236,7 +5236,7 @@ function renderSL(){
       const allocQty=allocs.reduce((s,a)=>s+a.qty,0);
       return`<tr>
         <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
-        <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#9ca3af">${p.mfrno||''}</span></td>
+        <td style="font-size:12px;font-family:monospace">${p.code}<br><span style="color:#6b7280;font-size:11px">${p.mfrno||''}</span></td>
         <td style="font-weight:500">${p.name}</td>
         <td style="font-size:12px">${formatLoc(p)||'—'}</td>
         <td><input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)"></td>
