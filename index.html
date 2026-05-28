@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 61 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 62 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -945,6 +945,7 @@ tr:hover td{background:#f9fafb}
         <div style="font-size:12px;color:#6b7280;margin-top:2px">Parts held for specific projects — these are reserved and not counted as general stock.</div>
       </div>
       <button onclick="showManualAllocModal()" class="btn-blue">+ Allocate parts to project</button>
+      <button onclick="clearReleasedAllocs()" class="admin-only" style="display:none;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px">🗑 Clear released history</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <input id="alloc-search" placeholder="Search by part, project, PO…" oninput="renderAllocations()" style="flex:1;min-width:160px">
@@ -3971,7 +3972,8 @@ function renderAllocations(){
               <td style="padding:8px 10px;text-align:right">
                 ${!isReleased
                   ?`<button onclick="releaseSingleAlloc(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#f0fdf4;color:#166534;border-color:#86efac;font-weight:600">Release to stock</button>`
-                  :`<span style="font-size:11px;color:#9ca3af">Released ${a.releaseDate||''}</span>`}
+                  :`<span style="font-size:11px;color:#9ca3af">Released ${a.releaseDate||''}</span>
+                    ${currentUser&&currentUser.isAdmin?`<button onclick="deleteAlloc(${globalIdx})" style="font-size:11px;padding:2px 7px;color:#991b1b;border-color:#fca5a5;background:#fff;margin-left:6px" title="Delete this allocation record">✕</button>`:''}`}
               </td>
             </tr>`;
           }).join('')}</tbody>
@@ -3986,6 +3988,31 @@ async function updateAllocQty(idx,qty){
   db.allocations[idx].qty=qty;
   await saveDB();
   toast('Allocation updated','info');
+}
+
+async function deleteAlloc(idx){
+  const a=db.allocations[idx];
+  if(!a)return;
+  if(a.status!=='released'){
+    toast('Must be released to stock before it can be deleted — click "Release to stock" first','err');
+    return;
+  }
+  if(!confirm(`Delete this allocation record?\n\n${a.name} · ${a.build} · ${a.qty} units · Released ${a.releaseDate||''}\n\nThis only removes the record — stock has already been returned.`))return;
+  db.allocations.splice(idx,1);
+  await saveDB();
+  renderAllocations();
+  toast('Allocation record deleted');
+}
+
+async function clearReleasedAllocs(){
+  const released=db.allocations.filter(a=>a.status==='released');
+  const active=db.allocations.filter(a=>a.status!=='released');
+  if(!released.length){toast('No released allocations to clear','info');return;}
+  if(!confirm(`Clear ${released.length} released allocation record${released.length!==1?'s':''}?\n\nOnly released records will be removed. The ${active.length} active allocation${active.length!==1?'s':''} still holding stock will NOT be affected.\n\nStock has already been returned for all released items — this just cleans up the history.`))return;
+  db.allocations=active; // keep only active ones
+  await saveDB();
+  renderAllocations();
+  toast(`${released.length} released record${released.length!==1?'s':''} cleared`);
 }
 
 async function releaseSingleAlloc(idx){
