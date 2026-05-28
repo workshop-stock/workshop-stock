@@ -286,6 +286,7 @@ tr:hover td{background:#f9fafb}
   <div class="tab" onclick="go('delivery')">BOM Delivery</div>
   <div class="tab" onclick="go('quotations')">Quotations</div>
   <div class="tab" onclick="go('orders')">Order List</div>
+  <div class="tab" onclick="go('allocations')">▣ Allocations</div>
   <div class="tab" onclick="go('history')">History</div>
   <div class="tab" onclick="go('settings')">&#9881; Settings</div>
 </div>
@@ -313,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 45 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 46 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -931,6 +932,29 @@ tr:hover td{background:#f9fafb}
       <button onclick="saveQuotation()" style="background:#6d28d9;color:#fff;border-color:#6d28d9;flex:1">Save this split</button>
       <button onclick="closeQtModal()">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- ALLOCATIONS -->
+<div class="panel" id="panel-allocations">
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <div>
+        <div class="sec" style="margin:0">▣ Project Allocations</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">Parts held for specific projects — these are reserved and not counted as general stock.</div>
+      </div>
+      <button onclick="showManualAllocModal()" class="btn-blue">+ Allocate parts to project</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="alloc-search" placeholder="Search by part, project, PO…" oninput="renderAllocations()" style="flex:1;min-width:160px">
+      <select id="alloc-filter" onchange="renderAllocations()" style="width:160px">
+        <option value="">All statuses</option>
+        <option value="allocated">Held for project</option>
+        <option value="released">Released to stock</option>
+      </select>
+    </div>
+    <div id="alloc-summary" style="margin-bottom:10px"></div>
+    <div id="alloc-list"></div>
   </div>
 </div>
 
@@ -1629,6 +1653,7 @@ function go(t){
   if(t==='delivery'){renderDelSel();renderDelHist();}
   if(t==='quotations')renderQuotations();
   if(t==='orders')renderOrder();
+  if(t==='allocations')renderAllocations();
   if(t==='history'){renderHist();populateBrandDropdowns();}
   if(t==='search'){doSearch();populateBrandDropdowns();}
   if(t==='stocklevels'){renderSL();populateBrandDropdowns();}
@@ -2279,6 +2304,12 @@ function coLook(){
       }else{fuzzyWarn.style.display='none';fuzzyWarn.innerHTML='';}
     }
     document.getElementById('co-qty').textContent=p.qty;
+    // Show allocation warning if parts held for projects
+    const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+    const availDisplay=allocQty>0
+      ?`${p.qty} <span style="font-size:12px;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:6px;margin-left:4px">⚠ ${allocQty} allocated to projects</span>`
+      :`${p.qty}`;
+    document.getElementById('co-qty').innerHTML=availDisplay;
     document.getElementById('co-result').dataset.code=p.code;
     const tick=document.getElementById('co-verify-tick');
     if(tick)tick.checked=false;
@@ -2325,7 +2356,14 @@ async function doCO(){
   const code=document.getElementById('co-result').dataset.code;
   const qty=parseInt(document.getElementById('co-take').value)||1;
   const ref=document.getElementById('co-ref').value.trim();
-  if(db.parts[code].qty<qty){toast(`Only ${db.parts[code].qty} in stock — cannot take ${qty}`,'err');return;}
+  const p=db.parts[code];
+  if(p.qty<qty){toast(`Only ${p.qty} in stock — cannot take ${qty}`,'err');return;}
+  // Warn if taking allocated parts
+  const allocQty=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+  if(allocQty>0){
+    const builds=[...new Set((db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').map(a=>a.build))].join(', ');
+    if(!confirm(`⚠ ${allocQty} of these are allocated to: ${builds}\n\nTaking ${qty} may dip into project-reserved stock.\n\nContinue anyway?`))return;
+  }
   pushUndo();
   db.parts[code].qty-=qty;
   trackFreq('cat',db.parts[code].cat);
@@ -2883,8 +2921,10 @@ function renderBOMRows(){
       </div>`;
     }else if(item.matchedCode&&item.matchedCode===item.code&&cataloguePart){
       // Exact code match — show catalogue details but no tick needed
+      const allocQty=(db.allocations||[]).filter(a=>a.code===item.matchedCode&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
       matchSection=`<div style="margin-top:4px;font-size:11px;color:#166534">
         ✓ Exact match: ${cataloguePart.name} · ${formatLoc(cataloguePart)||cataloguePart.loc||''}
+        ${allocQty>0?`<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:8px;margin-left:6px">⚠ ${allocQty} allocated to projects — not counted as available</span>`:''}
       </div>`;
     }
 
@@ -3018,7 +3058,13 @@ function checkStock(){
   curBOM.forEach(item=>{
     const p=findPartForBOM(item);
     if(p){
-      item.inStock=p.qty;
+      // Subtract parts allocated to projects from available qty
+      const allocQty=(db.allocations||[])
+        .filter(a=>a.code===p.code&&a.status!=='released')
+        .reduce((s,a)=>s+a.qty,0);
+      const availQty=Math.max(0,p.qty-allocQty);
+      item.inStock=availQty;
+      item.allocatedQty=allocQty;
       item.matchedCode=p.code;
       matched++;
     }else{
@@ -3586,7 +3632,243 @@ function promptAddPO(delId){
   if(del.po)toast(`PO ${del.po} saved`);
 }
 
-// ─── ORDER LIST ───────────────────────────────────────────────────────────────
+// ─── ALLOCATIONS ──────────────────────────────────────────────────────────────
+function renderAllocations(){
+  if(!db.allocations)db.allocations=[];
+  const q=((document.getElementById('alloc-search')||{value:''}).value||'').toLowerCase();
+  const filterStatus=(document.getElementById('alloc-filter')||{value:''}).value;
+  const el=document.getElementById('alloc-list');
+  const sumEl=document.getElementById('alloc-summary');
+  if(!el)return;
+
+  let allocs=[...db.allocations];
+  if(q)allocs=allocs.filter(a=>(a.build+a.code+a.name+(a.po||'')).toLowerCase().includes(q));
+  if(filterStatus)allocs=allocs.filter(a=>(a.status||'allocated')===filterStatus);
+
+  // Summary stats
+  const active=db.allocations.filter(a=>a.status!=='released');
+  const projects=[...new Set(active.map(a=>a.build))];
+  const totalParts=active.reduce((s,a)=>s+a.qty,0);
+  if(sumEl){
+    sumEl.innerHTML=active.length?`<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px;padding:10px 14px;background:#f5f0ff;border-radius:8px;border-left:4px solid #6d28d9">
+      <span style="color:#6d28d9;font-weight:600">▣ ${active.length} active allocation${active.length!==1?'s':''}</span>
+      <span style="color:#6b7280">across <strong>${projects.length}</strong> project${projects.length!==1?'s':''}</span>
+      <span style="color:#6b7280"><strong>${totalParts}</strong> total units reserved</span>
+    </div>`:'<div style="font-size:13px;color:#9ca3af;padding:8px 0">No active allocations</div>';
+  }
+
+  if(!allocs.length){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">No allocations found</div>';
+    return;
+  }
+
+  // Group by project
+  const byProject={};
+  allocs.forEach(a=>{
+    if(!byProject[a.build])byProject[a.build]=[];
+    byProject[a.build].push(a);
+  });
+
+  el.innerHTML=Object.entries(byProject).map(([project,items])=>{
+    const active=items.filter(i=>i.status!=='released');
+    const released=items.filter(i=>i.status==='released');
+    return`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
+      <!-- Project header -->
+      <div style="padding:12px 14px;background:#f5f0ff;border-bottom:1px solid #e9d5ff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-weight:700;font-size:14px;color:#6d28d9">▣ ${project}</span>
+          <span style="font-size:12px;color:#7c3aed;margin-left:10px">${active.length} part${active.length!==1?'s':''} held · ${active.reduce((s,i)=>s+i.qty,0)} total units</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="releaseAllProject('${project.replace(/'/g,"\\'")}',false)" style="font-size:12px;padding:4px 12px;background:#fee2e2;color:#991b1b;border-color:#fca5a5;font-weight:600">
+            ✗ Release all to stock
+          </button>
+        </div>
+      </div>
+      <!-- Parts table -->
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="background:#faf5ff">
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Part</th>
+            <th style="padding:7px 10px;text-align:center;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Qty held</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Location</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">PO / Delivery</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Date</th>
+            <th style="padding:7px 10px;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Status</th>
+            <th style="padding:7px 10px;text-align:right;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Action</th>
+          </tr></thead>
+          <tbody>${items.map((a,ai)=>{
+            const p=db.parts[a.code];
+            const globalIdx=db.allocations.indexOf(a);
+            const isReleased=a.status==='released';
+            return`<tr style="border-bottom:1px solid #f3f4f6;${isReleased?'opacity:.6':''}">
+              <td style="padding:8px 10px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${p?partImgHtml(p,36):'<div style="width:36px;height:36px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px">📦</div>'}
+                  <div>
+                    <div style="font-weight:600">${a.name}</div>
+                    <div style="font-size:11px;color:#9ca3af">${a.code}</div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding:8px 10px;text-align:center">
+                ${isReleased
+                  ?`<span style="font-weight:700;color:#9ca3af">${a.qty}</span>`
+                  :`<input type="number" value="${a.qty}" min="1" style="width:60px;text-align:center;font-weight:700;color:#6d28d9;border-color:#c4b5fd"
+                    onchange="updateAllocQty(${globalIdx},parseInt(this.value)||1)">`}
+              </td>
+              <td style="padding:8px 10px;font-size:12px">${p?formatLoc(p)||p.loc||'—':'—'}</td>
+              <td style="padding:8px 10px;font-size:12px">${a.po||'—'}</td>
+              <td style="padding:8px 10px;font-size:12px;color:#6b7280">${a.date||'—'}</td>
+              <td style="padding:8px 10px">
+                <span class="badge" style="background:${isReleased?'#f3f4f6':'#f5f0ff'};color:${isReleased?'#6b7280':'#6d28d9'}">
+                  ${isReleased?'Released':'Held for project'}
+                </span>
+              </td>
+              <td style="padding:8px 10px;text-align:right">
+                ${!isReleased
+                  ?`<button onclick="releaseSingleAlloc(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#f0fdf4;color:#166534;border-color:#86efac;font-weight:600">Release to stock</button>`
+                  :`<span style="font-size:11px;color:#9ca3af">Released ${a.releaseDate||''}</span>`}
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function updateAllocQty(idx,qty){
+  if(!db.allocations[idx])return;
+  db.allocations[idx].qty=qty;
+  await saveDB();
+  toast('Allocation updated','info');
+}
+
+async function releaseSingleAlloc(idx){
+  const a=db.allocations[idx];
+  if(!a)return;
+  if(!confirm(`Release ${a.qty}× ${a.name} from project "${a.build}" to general stock?`))return;
+  if(db.parts[a.code])db.parts[a.code].qty+=a.qty;
+  a.status='released';
+  a.releaseDate=nowD();
+  addHist('IN',a.name,a.code,a.qty,`Released from project: ${a.build}`);
+  await saveDB();
+  renderAllocations();
+  renderDash();
+  toast(`${a.qty}× ${a.name} released to stock`);
+}
+
+async function releaseAllProject(project,keepInStock){
+  if(!confirm(`Release ALL parts for "${project}" back to general stock?`))return;
+  const toRelease=(db.allocations||[]).filter(a=>a.build===project&&a.status!=='released');
+  for(const a of toRelease){
+    if(db.parts[a.code])db.parts[a.code].qty+=a.qty;
+    a.status='released';
+    a.releaseDate=nowD();
+    addHist('IN',a.name,a.code,a.qty,`Released from project: ${project}`);
+  }
+  await saveDB();
+  renderAllocations();
+  renderDash();
+  toast(`All parts from "${project}" released to stock`);
+}
+
+function showManualAllocModal(){
+  const existing=document.getElementById('alloc-modal');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='alloc-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:16px;font-weight:700;margin:0">▣ Allocate parts to project</h2>
+      <button onclick="document.getElementById('alloc-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Part (search by name or code)</label>
+      <input id="am-part" placeholder="Type part name or code…" list="dl-parts-alloc" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px" oninput="amPartSearch(this.value)">
+      <datalist id="dl-parts-alloc">${Object.values(db.parts).map(p=>`<option value="${p.code}">${p.name}</option>`).join('')}</datalist>
+      <div id="am-part-info" style="font-size:12px;color:#6b7280;margin-top:4px;padding:6px 10px;background:#f9fafb;border-radius:6px;display:none"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Qty to allocate</label>
+        <input type="number" id="am-qty" value="1" min="1" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Project / build name *</label>
+        <input id="am-project" placeholder="e.g. Splines Machine 4" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">PO number (optional)</label>
+        <input id="am-po" placeholder="e.g. PO-2024-001" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Notes (optional)</label>
+        <input id="am-notes" placeholder="Any notes…" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
+      </div>
+    </div>
+    <div id="am-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="doManualAlloc()" class="btn-blue" style="flex:1">Allocate to project</button>
+      <button onclick="document.getElementById('alloc-modal').remove()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function amPartSearch(val){
+  const infoEl=document.getElementById('am-part-info');
+  if(!infoEl)return;
+  const p=db.parts[val]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(val)||normalise(pt.name)===normalise(val));
+  if(p){
+    const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+    const avail=Math.max(0,p.qty-allocQty);
+    infoEl.style.display='block';
+    infoEl.innerHTML=`<strong>${p.name}</strong> · In stock: <strong style="color:#166534">${p.qty}</strong> · Allocated: <strong style="color:#6d28d9">${allocQty}</strong> · Available: <strong style="color:${avail>0?'#166534':'#991b1b'}">${avail}</strong>`;
+    document.getElementById('am-qty').max=avail;
+  }else{
+    infoEl.style.display='none';
+  }
+}
+
+async function doManualAlloc(){
+  const partVal=(document.getElementById('am-part').value||'').trim();
+  const qty=parseInt(document.getElementById('am-qty').value)||0;
+  const project=(document.getElementById('am-project').value||'').trim();
+  const po=(document.getElementById('am-po').value||'').trim();
+  const notes=(document.getElementById('am-notes').value||'').trim();
+  const errEl=document.getElementById('am-err');
+  errEl.style.display='none';
+
+  const p=db.parts[partVal]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(partVal)||normalise(pt.name)===normalise(partVal));
+  if(!p){errEl.style.display='block';errEl.textContent='Part not found — type the exact code or name';return;}
+  if(!project){errEl.style.display='block';errEl.textContent='Enter a project name';return;}
+  if(qty<1){errEl.style.display='block';errEl.textContent='Quantity must be at least 1';return;}
+
+  const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+  const avail=Math.max(0,p.qty-allocQty);
+  if(qty>avail){errEl.style.display='block';errEl.textContent=`Only ${avail} available (${p.qty} in stock, ${allocQty} already allocated)`;return;}
+
+  if(!db.allocations)db.allocations=[];
+  db.allocations.push({
+    code:p.code,name:p.name,qty,
+    build:project,po,notes,
+    date:nowD(),
+    deliveryId:'manual',
+    allocatedBy:currentUser?currentUser.name:'Unknown',
+    status:'allocated'
+  });
+  addEventHist('ALLOC',`${qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
+  await saveDB();
+  document.getElementById('alloc-modal').remove();
+  renderAllocations();
+  renderDash();
+  toast(`${qty}× ${p.name} allocated to "${project}"`);
+}
 // Get usage stats for a part from history
 function getPartUsage(code){
   const hist=[...(db.hist||[])].filter(h=>h.code===code);
@@ -3918,6 +4200,7 @@ function renderHist(){
   const eventBadge={
     BOM_LOAD:{cls:'b-blue',label:'BOM Load'},
     BOM_SAVE:{cls:'b-blue',label:'BOM Saved'},
+    ALLOC:{cls:'',style:'background:#f5f0ff;color:#6d28d9',label:'Allocated'},
     QUOTE_ACCEPT:{cls:'b-ok',label:'Quote Accepted'},
     EMAIL:{cls:'',style:'background:#f5f0ff;color:#6d28d9',label:'Email'},
     JOB_CLOSE:{cls:'b-gray',label:'Job Closed'},
