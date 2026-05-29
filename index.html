@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 66 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 67 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1505,8 +1505,8 @@ function getCats(){return db.categories&&db.categories.length?db.categories:DEFA
 
 // Format location from part — handles both old string loc and new loc/loc2/loc3
 function formatLoc(p){
-  if(p.loc2||p.loc3){
-    return[p.loc,p.loc2,p.loc3].filter(Boolean).join(' › ');
+  if(p.loc2||p.loc3||p.locCustom){
+    return[p.loc,p.loc2,p.loc3,p.locCustom].filter(Boolean).join(' › ');
   }
   return p.loc||'';
 }
@@ -3680,12 +3680,49 @@ function renderDelRows(del){
     const receiving=item.receiving!==undefined?item.receiving:remaining;
     const forProject=item.forProject!==undefined?item.forProject:receiving;
     const forStock=Math.max(0,receiving-forProject);
+    // Pull part from catalogue for image + mfrno
+    const catPart=db.parts[item.code]||Object.values(db.parts).find(p=>
+      normalise(p.code)===normalise(item.code)||
+      normalise(p.mfrno||'')===normalise(item.code)||
+      normalise(stripVendorPrefix(p.code))===normalise(item.code)
+    );
+    const imgHtml=catPart?partImgHtml(catPart,44):`<div style="width:44px;height:44px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div>`;
+
+    // 3-level location - pre-fill from catalogue part if set
+    const loc1=item.loc||(catPart?catPart.loc||'':'');
+    const loc2=item.loc2||(catPart?catPart.loc2||'':'');
+    const loc3=item.loc3||(catPart?catPart.loc3||'':'');
+    const locCustom=item.locCustom||'';
+
+    const locPicker=`<div style="display:grid;gap:3px">
+      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},1,this.value)">
+        <option value="">Area…</option>${masterLocOpts(loc1).replace('<option value="">— Select location —</option>','')}
+      </select>
+      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},2,this.value)">
+        <option value="">Section…</option>${masterLocOpts(loc2).replace('<option value="">— Select location —</option>','')}
+      </select>
+      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},3,this.value)">
+        <option value="">Container…</option>${masterLocOpts(loc3).replace('<option value="">— Select location —</option>','')}
+      </select>
+      <input placeholder="Custom tag (e.g. Splines shelf 2)…" value="${locCustom}"
+        style="font-size:11px;padding:3px 4px;border:1px solid #d1d5db;border-radius:4px"
+        onchange="delSetLoc(${dIdx},${i},'custom',this.value)">
+      ${loc1||loc2||loc3||locCustom?`<div style="font-size:10px;color:#6d28d9;font-weight:600;margin-top:1px">📍 ${[loc1,loc2,loc3,locCustom].filter(Boolean).join(' › ')}</div>`:''}
+    </div>`;
+
     if(item.done){
+      const locStr=[item.loc,item.loc2,item.loc3,item.locCustom].filter(Boolean).join(' › ');
       return`<div class="del-row" style="background:#f0fdf4;opacity:.75;grid-template-columns:28px 2fr 70px 80px 1fr 90px">
         <div style="color:#166534;font-size:16px">✓</div>
-        <div><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af">${item.code}</div>
-          ${item.stockQty?`<div style="font-size:11px;color:#3b82f6">+${item.stockQty} to stock</div>`:''}
-          ${item.projectQty?`<div style="font-size:11px;color:#6d28d9">+${item.projectQty} kept for project</div>`:''}
+        <div style="display:flex;align-items:center;gap:8px">
+          ${imgHtml}
+          <div>
+            <div style="font-weight:600">${item.name}</div>
+            <div style="font-size:11px;color:#9ca3af">${item.code}${catPart&&catPart.mfrno?` · ${catPart.mfrno}`:''}</div>
+            ${locStr?`<div style="font-size:10px;color:#6d28d9">📍 ${locStr}</div>`:''}
+            ${item.stockQty?`<div style="font-size:11px;color:#3b82f6">+${item.stockQty} to stock</div>`:''}
+            ${item.projectQty?`<div style="font-size:11px;color:#6d28d9">+${item.projectQty} kept for project</div>`:''}
+          </div>
         </div>
         <div style="font-weight:600">${item.expected}</div>
         <div style="font-weight:600;color:#166534">${item.alreadyReceived||0}</div>
@@ -3696,10 +3733,13 @@ function renderDelRows(del){
     return`<div class="del-row" style="${item.checked?'background:#fffbeb;border-left:3px solid #f59e0b;padding-left:5px':''}">
       <input type="checkbox" ${item.checked?'checked':''} style="width:18px;height:18px;cursor:pointer"
         onchange="db.deliveries[${dIdx}].items[${i}].checked=this.checked;saveDB();renderDelRows(db.deliveries[${dIdx}])">
-      <div>
-        <div style="font-weight:600">${item.name}</div>
-        <div style="font-size:11px;color:#9ca3af">${item.code}</div>
-        ${item.alreadyReceived>0?`<div style="font-size:11px;color:#166534">${item.alreadyReceived} already received</div>`:''}
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        ${imgHtml}
+        <div>
+          <div style="font-weight:600">${item.name}</div>
+          <div style="font-size:11px;color:#9ca3af">${item.code}${catPart&&catPart.mfrno?` · <span style="color:#1e40af;font-weight:600">${catPart.mfrno}</span>`:''}</div>
+          ${item.alreadyReceived>0?`<div style="font-size:11px;color:#166534">${item.alreadyReceived} already received</div>`:''}
+        </div>
       </div>
       <div style="font-weight:600">${item.expected}</div>
       <div style="color:#6b7280;font-size:13px">${item.alreadyReceived||0}</div>
@@ -3722,12 +3762,20 @@ function renderDelRows(del){
         </div>
       </div>
 
-      <select onchange="db.deliveries[${dIdx}].items[${i}].loc=this.value;saveDB()" style="font-size:12px">
-        <option value="">Choose location…</option>${locOpts(item.loc)}
-      </select>
+      ${locPicker}
       <span class="badge ${item.alreadyReceived>0?'b-part':'b-gray'}">${item.alreadyReceived>0?'Partial':'Pending'}</span>
     </div>`;
   }).join('');
+}
+
+function delSetLoc(dIdx,itemIdx,level,val){
+  const item=db.deliveries[dIdx].items[itemIdx];
+  if(level===1)item.loc=val;
+  else if(level===2)item.loc2=val;
+  else if(level===3)item.loc3=val;
+  else if(level==='custom')item.locCustom=val;
+  saveDB();
+  renderDelRows(db.deliveries[dIdx]);
 }
 
 function delUpdateReceiving(dIdx,itemIdx,val){
@@ -3839,6 +3887,7 @@ async function delScanAdd(){
   // Add to general stock
   if(forStock>0){
     p.qty+=forStock;
+    // preserve existing location — scan receive doesn't set location (done in del-rows)
     addHist('IN',p.name,code,forStock,`BOM delivery: ${del.bomName}${del.po?' PO:'+del.po:''}${del.assignTo?' → '+del.assignTo:''} (to stock)`);
   }
 
@@ -3938,8 +3987,12 @@ async function confirmDelivery(){
 
     // Add to general stock
     if(db.parts[item.code]){
-      db.parts[item.code].qty+=forStock; // only stock portion goes to general stock
+      db.parts[item.code].qty+=forStock;
+      // Save all 3 location levels + custom tag back to the catalogue part
       if(item.loc)db.parts[item.code].loc=item.loc;
+      if(item.loc2)db.parts[item.code].loc2=item.loc2;
+      if(item.loc3)db.parts[item.code].loc3=item.loc3;
+      if(item.locCustom)db.parts[item.code].locCustom=item.locCustom;
     }
     const note=`Delivery: ${activeDel.bomName}${activeDel.po?' PO:'+activeDel.po:''}${activeDel.assignTo?' → '+activeDel.assignTo:''}`;
     if(forStock>0)addHist('IN',item.name,item.code,forStock,note+' (to stock)');
