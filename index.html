@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 72 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 73 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -807,6 +807,8 @@ tr:hover td{background:#f9fafb}
           <div style="font-size:12px;color:#6b7280;margin-top:3px">Parts from your BOM that are available in stock right now. Tick what you're taking, assign a project box location, then commit the pull.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="cancelStockPull()" style="font-size:12px;padding:8px 14px;background:#f3f4f6;color:#374151;border-color:#d1d5db">✕ Cancel / Clear selection</button>
+          <button onclick="undoStockPull()" id="undo-pull-btn" style="display:none;font-size:12px;padding:8px 14px;background:#f3f4f6;color:#92400e;border-color:#f59e0b;font-weight:600">↺ Undo last pull</button>
           <button onclick="printPickList()" class="btn-blue" style="font-size:12px">🖨 Print pick list</button>
           <button onclick="commitStockPull()" class="btn-green" style="font-size:13px;font-weight:700;padding:8px 16px">✓ Commit pull — deduct from stock</button>
         </div>
@@ -3550,6 +3552,25 @@ function pickSelectAll(checked){
   renderPickList();
 }
 
+function cancelStockPull(){
+  if(Object.keys(pickSelections).filter(k=>k!=='__projLoc').length){
+    if(!confirm('Clear all selections and return to BOM builder?'))return;
+  }
+  pickSelections={};
+  setBomTab('build');
+}
+
+async function undoStockPull(){
+  if(!confirm('Undo the last stock pull? This will return deducted quantities to stock and remove the allocation records created by that pull.'))return;
+  await undoLast();
+  // Reset pick selections so they can re-do
+  pickSelections={};
+  const btn=document.getElementById('undo-pull-btn');
+  if(btn)btn.style.display='none';
+  renderPickList();
+  toast('Stock pull undone — quantities restored');
+}
+
 async function commitStockPull(){
   const bomName=document.getElementById('bom-name').value.trim()||'BOM pull';
   const projLocGlobal=(document.getElementById('pick-proj-loc')||{value:''}).value.trim();
@@ -3620,6 +3641,9 @@ async function commitStockPull(){
   renderDash();
 
   toast(`✓ ${pulled} part${pulled!==1?'s':''} pulled from stock for "${bomName}"`);
+  // Show undo button
+  const undoBtn=document.getElementById('undo-pull-btn');
+  if(undoBtn)undoBtn.style.display='inline-block';
 
   // Show quotation warnings if any
   if(quoteWarnings.length){
@@ -4033,6 +4057,14 @@ function findPartForBOM(item){
       );
       if(foundStripped)return foundStripped;
     }
+    // Search notes field — catches cross-reference codes like "TYPE R88A-FI1S103-SE"
+    if(nc.length>=6){
+      const inNotes=Object.values(db.parts).find(p=>{
+        const notes=normalise(p.notes||'');
+        return notes.includes(nc)||notes.includes(ncStripped);
+      });
+      if(inNotes)return inNotes;
+    }
   }
 
   // Prefix match (min 6 chars)
@@ -4046,12 +4078,12 @@ function findPartForBOM(item){
     if(byPrefix)return byPrefix;
   }
 
-  // Similarity match — catch typos/prefix variations (max 2 char difference on codes ≥8 chars)
+  // Similarity match — catch typos/prefix variations (max 15% difference on codes ≥8 chars)
   if(nc.length>=8){
     const similar=Object.values(db.parts).find(p=>{
       const pc=normalise(stripVendorPrefix(p.code));
       const pm=normalise(stripVendorPrefix(p.mfrno||''));
-      const maxDist=Math.floor(nc.length*0.15); // max 15% difference
+      const maxDist=Math.floor(nc.length*0.15);
       return (pc.length>=6&&levenshtein(nc,pc)<=maxDist)||
              (pm.length>=6&&levenshtein(nc,pm)<=maxDist);
     });
