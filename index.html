@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 73 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 74 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -4057,13 +4057,15 @@ function findPartForBOM(item){
       );
       if(foundStripped)return foundStripped;
     }
-    // Search notes field — catches cross-reference codes like "TYPE R88A-FI1S103-SE"
+    // Search notes AND name — catches cross-refs like "FS35056-3-07 TYPE R88A-FI1S103-SE SCHAFFNER"
     if(nc.length>=6){
-      const inNotes=Object.values(db.parts).find(p=>{
+      const inNotesOrName=Object.values(db.parts).find(p=>{
         const notes=normalise(p.notes||'');
-        return notes.includes(nc)||notes.includes(ncStripped);
+        const name=normalise(p.name||'');
+        return notes.includes(nc)||name.includes(nc)||
+               notes.includes(ncStripped)||name.includes(ncStripped);
       });
-      if(inNotes)return inNotes;
+      if(inNotesOrName)return inNotesOrName;
     }
   }
 
