@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 62 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 66 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -469,7 +469,7 @@ tr:hover td{background:#f9fafb}
     </div>
     <div class="scan-bar">
       <input id="co-scan" placeholder="Scan barcode or type part number, press Enter…" autocomplete="off" 
-        onkeydown="if(event.key==='Enter'){coLook();if(coMode==='basket')setTimeout(()=>{const f=document.getElementById('co-basket-found');if(f&&f.style.display!=='none')addToBasket();},80)}">
+        onkeydown="if(event.key==='Enter'){coLook();}">
       <button class="btn-blue" onclick="coLook()">Lookup</button>
     </div>
     <!-- QUICK MODE -->
@@ -512,22 +512,25 @@ tr:hover td{background:#f9fafb}
     </div>
     <!-- BASKET MODE -->
     <div id="co-basket-panel" style="display:none">
-      <div id="co-basket-found" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;margin-bottom:10px;display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <div><span style="font-weight:600" id="co-b-name"></span> <span style="font-size:12px;color:#6b7280" id="co-b-info"></span></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="margin:0;font-size:12px">Qty:</label>
-            <input type="number" id="co-b-qty" value="1" min="1" style="width:60px">
-            <button class="btn-amber" onclick="addToBasket()" style="font-size:12px">Add to basket</button>
-          </div>
+
+      <!-- Continuous scan strip -->
+      <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span style="font-size:16px">🛒</span> Basket mode — scan parts one by one, check out all at the end
+          <span style="font-size:11px;font-weight:400;color:#4ade80">· parts auto-add on scan · allocated parts will warn</span>
+        </div>
+        <!-- Last scan feedback -->
+        <div id="co-basket-last" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:7px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px"></div>
+        <div id="co-notfound-b" style="display:none;padding:8px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b;margin-bottom:8px">
+          ⚠ Part not found — check barcode or try the browse list below.
         </div>
       </div>
-      <div id="co-notfound-b" style="display:none;padding:8px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b;margin-bottom:8px">Part not found.</div>
+
       <div id="co-basket-list" style="margin-bottom:12px"></div>
       <div id="co-basket-actions" style="display:none">
         <div style="margin-bottom:10px"><label>Job / project ref for all items</label><input id="co-basket-ref" placeholder="e.g. JOB-2024-042"></div>
         <div style="display:flex;gap:8px">
-          <button class="btn-amber" onclick="checkoutBasket()" style="flex:1">&#8595; Check out all basket items</button>
+          <button class="btn-amber" onclick="checkoutBasket()" style="flex:1;font-size:14px;padding:11px;font-weight:700">&#8595; Check out all basket items</button>
           <button onclick="clearBasket()">Clear basket</button>
         </div>
       </div>
@@ -833,8 +836,68 @@ tr:hover td{background:#f9fafb}
           <button onclick="document.getElementById('del-active').style.display='none'" style="font-size:12px">Close</button>
         </div>
       </div>
+
+      <!-- ══ CONTINUOUS BARCODE SCAN RECEIVE ══ -->
+      <div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:13px;color:#0369a1;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">📦</span> Scan &amp; receive parts continuously
+          <span style="font-size:11px;font-weight:400;color:#0284c7">— scan barcode, set qty, press Enter or Add, scan next</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input id="del-scan" placeholder="Scan barcode or type part number — press Enter…" autocomplete="off"
+            style="flex:2;min-width:200px;font-size:14px;border-color:#0ea5e9"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();delScanLook();}"
+            onfocus="this.style.borderColor='#0369a1'" onblur="this.style.borderColor='#0ea5e9'">
+          <button class="btn-blue" onclick="delScanLook()" style="background:#0369a1;border-color:#0369a1">Lookup</button>
+        </div>
+
+        <!-- Scan result card -->
+        <div id="del-scan-result" style="display:none;background:#fff;border:1px solid #bae6fd;border-radius:8px;padding:12px">
+          <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px">
+            <div id="del-scan-img" style="flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:15px" id="del-scan-name"></div>
+              <div style="font-size:12px;color:#6b7280;margin-top:3px" id="del-scan-info"></div>
+              <div id="del-scan-bom-match" style="margin-top:5px"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+            <div>
+              <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Qty receiving</label>
+              <input type="number" id="del-scan-qty" value="1" min="1"
+                style="width:100%;font-size:18px;font-weight:700;text-align:center;border-color:#0ea5e9;padding:8px"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();delScanAdd();}">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">▣ For project</label>
+              <input type="number" id="del-scan-proj" value="0" min="0"
+                style="width:100%;font-size:18px;font-weight:700;text-align:center;border-color:#c4b5fd;padding:8px"
+                oninput="delScanUpdateStock()">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#1d4ed8;display:block;margin-bottom:3px">📦 To general stock</label>
+              <div id="del-scan-stock-qty"
+                style="font-size:18px;font-weight:700;text-align:center;color:#1d4ed8;padding:9px;background:#eff6ff;border-radius:6px;border:1px solid #bfdbfe">0</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="delScanAdd()" class="btn-green" style="flex:1;font-size:15px;padding:10px;font-weight:700">
+              ✓ Add &amp; scan next (Enter)
+            </button>
+            <button onclick="delScanClear()" style="padding:10px 16px">Cancel</button>
+          </div>
+        </div>
+
+        <div id="del-scan-notfound" style="display:none;padding:8px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">
+          Part not found in catalogue or not on this BOM.
+        </div>
+
+        <!-- Running received log -->
+        <div id="del-scan-log" style="margin-top:10px"></div>
+      </div>
+
       <div style="font-size:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 12px;margin-bottom:10px">
-        Tick items as they arrive. Already received items are greyed out and locked — only unticked items will be processed. Parts go into general stock and are flagged as allocated to the assigned build.
+        Tick items below as they arrive. Already received items are greyed out and locked — only unticked items will be processed. Parts go into general stock and are flagged as allocated to the assigned build.
       </div>
       <div class="del-hdr"><span></span><span>Part</span><span>Ordered</span><span>Prev. recd</span><span>Receiving now</span><span>Put to location</span><span>Status</span></div>
       <div id="del-rows"></div>
@@ -1647,8 +1710,10 @@ function toast(msg,type='ok'){
   clearTimeout(t._tid);t._tid=setTimeout(()=>t.classList.remove('show'),3000);
 }
 function go(t){
-  const ids=['dash','checkin','checkout','search','stocklevels','addpart','bom','delivery','quotations','orders','history','settings'];
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',ids[i]===t));
+  document.querySelectorAll('.tabs .tab').forEach(el=>{
+    const m=el.getAttribute('onclick')||'';
+    el.classList.toggle('active',m.includes("'"+t+"'"));
+  });
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
   if(t==='dash')renderDash();
@@ -2342,32 +2407,80 @@ function coLook(){
     document.getElementById('co-take').value=1;
     document.getElementById('co-ref').value='';
   } else {
-    // ── BASKET MODE ──
+    // ── BASKET MODE — auto-add on scan ──
     document.getElementById('co-notfound-b').style.display='none';
-    document.getElementById('co-basket-found').style.display='none';
+    const lastEl=document.getElementById('co-basket-last');
     const p=result?result.part:null;
-    if(!p){document.getElementById('co-notfound-b').style.display='block';soundNotFound();return;}
 
-    // Check allocations FIRST — show full blocking modal before they can add
-    const activeAllocsB=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
-    const allocQtyB=activeAllocsB.reduce((s,a)=>s+a.qty,0);
-    const freeQtyB=Math.max(0,p.qty-allocQtyB);
-
-    if(allocQtyB>0){
-      soundOutOfStock();
-      // Show the full blocking modal immediately
-      showAllocCheckoutWarning(p.code,1,'',freeQtyB,allocQtyB,activeAllocsB,true);
+    if(!p){
+      document.getElementById('co-notfound-b').style.display='block';
+      if(lastEl)lastEl.style.display='none';
+      soundNotFound();
       return;
     }
 
-    // No allocations — show normal basket add UI
-    document.getElementById('co-b-name').innerHTML=p.name;
-    document.getElementById('co-b-info').textContent=`In stock: ${p.qty} · ${formatLoc(p)||p.loc||''}`;
-    document.getElementById('co-b-qty').value=1;
-    document.getElementById('co-b-qty').max=p.qty;
-    document.getElementById('co-basket-found').style.display='block';
-    document.getElementById('co-basket-found').dataset.code=p.code;
-    soundOK();
+    // Out of stock?
+    if(p.qty<=0){
+      soundOutOfStock();
+      if(lastEl){
+        lastEl.style.display='flex';
+        lastEl.style.background='#fee2e2';
+        lastEl.style.border='1px solid #fca5a5';
+        lastEl.style.color='#991b1b';
+        lastEl.innerHTML=`${partImgHtml(p,36)}<div><strong>${p.name}</strong> — OUT OF STOCK (${p.qty} in stock) — cannot add to basket</div>`;
+      }
+      document.getElementById('co-scan').value='';
+      return;
+    }
+
+    // Check allocations
+    const activeAllocs=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
+    const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
+    const freeQty=Math.max(0,p.qty-allocQty);
+
+    if(allocQty>0){
+      // Play warning sound and show full blocking modal
+      soundOutOfStock();
+      if(lastEl)lastEl.style.display='none';
+      showAllocCheckoutWarning(p.code,1,'',freeQty,allocQty,activeAllocs,true);
+      document.getElementById('co-scan').value='';
+      return;
+    }
+
+    // Would adding 1 exceed available stock?
+    const alreadyInBasket=(basket.find(b=>b.code===p.code)||{qty:0}).qty;
+    if(alreadyInBasket>=p.qty){
+      soundOutOfStock();
+      if(lastEl){
+        lastEl.style.display='flex';
+        lastEl.style.background='#fef3c7';
+        lastEl.style.border='1px solid #f59e0b';
+        lastEl.style.color='#92400e';
+        lastEl.innerHTML=`${partImgHtml(p,36)}<div><strong>${p.name}</strong> — already have all ${p.qty} in basket</div>`;
+      }
+      document.getElementById('co-scan').value='';
+      return;
+    }
+
+    // ✓ All clear — auto-add 1 to basket
+    const ex=basket.find(b=>b.code===p.code);
+    if(ex){ex.qty++;}
+    else{basket.push({code:p.code,name:p.name,qty:1,loc:p.loc,inStock:p.qty});}
+    renderBasket();
+    soundBasketAdd();
+
+    // Show last scan feedback
+    if(lastEl){
+      lastEl.style.display='flex';
+      lastEl.style.background='#f0fdf4';
+      lastEl.style.border='1px solid #86efac';
+      lastEl.style.color='#166534';
+      lastEl.innerHTML=`${partImgHtml(p,36)}<div><strong>${p.name}</strong> added — ${ex?ex.qty:1} in basket &nbsp;<span style="color:#6b7280;font-size:11px">${p.code} · ${p.qty} in stock</span></div>`;
+    }
+
+    // Clear scan field and refocus for next scan
+    document.getElementById('co-scan').value='';
+    document.getElementById('co-scan').focus();
   }
 }
 
@@ -2551,17 +2664,25 @@ async function confirmAllocBasket(code,qty){
   if(ex){ex.qty+=realQty;ex.replaceDate=replaceDate;ex.replacePO=replacePO;}
   else{basket.push({code,name:p.name,qty:realQty,loc:p.loc,inStock:p.qty,replaceDate,replacePO});}
   renderBasket();
-  document.getElementById('co-basket-found').style.display='none';
-  // Log the override against the allocation
+  document.getElementById('co-basket-found') && (document.getElementById('co-basket-found').style.display='none');
+  // Log the override against the allocation record
   (db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').forEach(a=>{
     if(!a.overrides)a.overrides=[];
     a.overrides.push({by:currentUser?currentUser.name:'Unknown',qty:realQty,replaceDate,replacePO,date:nowDT()});
   });
   await saveDB();
+  // update last scan feedback
+  const lastEl=document.getElementById('co-basket-last');
+  if(lastEl&&p){
+    lastEl.style.display='flex';
+    lastEl.style.background='#fffbeb';
+    lastEl.style.border='1px solid #f59e0b';
+    lastEl.style.color='#92400e';
+    lastEl.innerHTML=`${partImgHtml(p,36)}<div><strong>${p.name}</strong> added with override — replace by ${replaceDate} · PO: ${replacePO}</div>`;
+  }
   const scanInput=document.getElementById('co-scan');
   if(scanInput){scanInput.value='';scanInput.focus();}
   soundBasketAdd();
-  toast(`⚠ ${realQty}× ${p.name} in basket — replace by ${replaceDate}. PO: ${replacePO}`,'info');
 }
 
 async function confirmAllocCheckout(code,qty,ref,freeQty,dipping){
@@ -2641,21 +2762,44 @@ function addToBasket(){
 function renderBasket(){
   const el=document.getElementById('co-basket-list');
   const act=document.getElementById('co-basket-actions');
-  if(!basket.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">Basket empty — scan parts to add</div>';act.style.display='none';return;}
+  if(!basket.length){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">Basket empty — scan parts to add them</div>';
+    act.style.display='none';
+    return;
+  }
   act.style.display='block';
-  el.innerHTML=`<div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:4px">
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;padding:7px 12px;font-size:11px;font-weight:600;color:#6b7280;background:#f9fafb;text-transform:uppercase">
-      <span>Part</span><span>Location</span><span>Qty</span><span></span>
+  el.innerHTML=`<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:4px">
+    <div style="display:grid;grid-template-columns:44px 1fr 70px 80px 44px;gap:8px;padding:7px 12px;font-size:11px;font-weight:600;color:#6b7280;background:#f9fafb;text-transform:uppercase;letter-spacing:.04em">
+      <span></span><span>Part</span><span>Stock</span><span style="text-align:center">Qty</span><span></span>
     </div>
-    ${basket.map((item,i)=>`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;padding:8px 12px;border-top:1px solid #f3f4f6;align-items:center;font-size:13px">
-      <div><div style="font-weight:500">${item.name}</div><div style="font-size:11px;color:#9ca3af">${item.code}</div></div>
-      <div style="font-size:12px">${item.loc}</div>
-      <div><input type="number" value="${item.qty}" min="1" max="${item.inStock}" style="width:60px" onchange="basket[${i}].qty=parseInt(this.value)||1;renderBasket()"></div>
-      <div><button onclick="basket.splice(${i},1);renderBasket()" style="font-size:11px;padding:3px 7px;color:#991b1b;border-color:#fca5a5">✕</button></div>
-    </div>`).join('')}
-    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f9fafb;font-size:13px;font-weight:600;border-top:1px solid #e5e7eb">
-      <span>${basket.length} item${basket.length!==1?'s':''}</span>
-      <span>${basket.reduce((a,b)=>a+b.qty,0)} total parts</span>
+    ${basket.map((item,i)=>{
+      const p=db.parts[item.code]||{};
+      const allocQty=(db.allocations||[]).filter(a=>a.code===item.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+      const freeQty=Math.max(0,(p.qty||0)-allocQty);
+      const hasWarning=item.replaceDate; // was an allocated override
+      return`<div style="display:grid;grid-template-columns:44px 1fr 70px 80px 44px;gap:8px;padding:8px 12px;border-top:1px solid #f3f4f6;align-items:center;${hasWarning?'background:#fffbeb;border-left:3px solid #f59e0b':''}">
+        <div>${partImgHtml(p,36)}</div>
+        <div>
+          <div style="font-weight:600;font-size:13px">${item.name}</div>
+          <div style="font-size:11px;color:#9ca3af">${item.code}</div>
+          ${hasWarning?`<div style="font-size:10px;color:#92400e;margin-top:2px">⚠ Allocated — replace by ${item.replaceDate}${item.replacePO?' · PO: '+item.replacePO:''}</div>`:''}
+        </div>
+        <div style="font-size:12px;color:${freeQty>0?'#166534':'#991b1b'};font-weight:600">
+          ${freeQty} free<br><span style="color:#9ca3af;font-weight:400">${p.qty||0} total</span>
+        </div>
+        <div style="text-align:center">
+          <input type="number" value="${item.qty}" min="1" max="${item.inStock}"
+            style="width:60px;font-size:15px;font-weight:700;text-align:center;padding:4px"
+            onchange="basket[${i}].qty=Math.max(1,Math.min(parseInt(this.value)||1,${item.inStock}));this.value=basket[${i}].qty;renderBasket()">
+        </div>
+        <div>
+          <button onclick="basket.splice(${i},1);renderBasket()" style="font-size:14px;padding:4px 8px;color:#991b1b;border-color:#fca5a5;line-height:1">✕</button>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="display:flex;justify-content:space-between;padding:9px 12px;background:#f9fafb;font-size:13px;font-weight:700;border-top:1px solid #e5e7eb">
+      <span style="color:#6b7280">${basket.length} part${basket.length!==1?'s':''}</span>
+      <span style="color:#1a1a1a">${basket.reduce((a,b)=>a+b.qty,0)} units total</span>
     </div>
   </div>`;
 }
@@ -3494,6 +3638,7 @@ async function startDelivery(){
   toast(`Delivery record created for "${b.name}"`,'info');
 }
 function showDelivery(del){
+  _delScanLog=[];
   document.getElementById('del-active').style.display='block';
   document.getElementById('del-title').textContent=del.bomName+(del.ref?' — '+del.ref:'');
   document.getElementById('del-sub').textContent=`Created ${del.created}${del.dueDate?' · Due: '+del.dueDate:''}`;
@@ -3609,6 +3754,170 @@ function delUpdateProject(dIdx,itemIdx,val){
   const projEl=document.getElementById(`proj-${dIdx}-${itemIdx}`);
   if(projEl)projEl.value=item.forProject;
 }
+// ─── DELIVERY CONTINUOUS SCAN RECEIVE ────────────────────────────────────────
+let _delScanLog=[]; // running log of scanned items this session
+let _delScanActiveDel=null;
+
+function delScanLook(){
+  const v=(document.getElementById('del-scan').value||'').trim();
+  document.getElementById('del-scan-result').style.display='none';
+  document.getElementById('del-scan-notfound').style.display='none';
+  if(!v)return;
+
+  // Find the active delivery
+  const activeTitle=document.getElementById('del-title').textContent;
+  const del=db.deliveries.find(d=>(d.bomName+(d.ref?' — '+d.ref:''))===activeTitle&&d.status!=='complete');
+  if(!del){toast('No active delivery — create one above first','err');return;}
+  _delScanActiveDel=del;
+
+  // Try to find the part in catalogue
+  const result=findPartWithType(v);
+  const p=result?result.part:null;
+  if(!p){
+    document.getElementById('del-scan-notfound').style.display='block';
+    soundNotFound();return;
+  }
+
+  // Check if it's on this BOM
+  const bomItem=del.items.find(i=>
+    normalise(i.code)===normalise(p.code)||
+    normalise(i.code)===normalise(p.mfrno||'')||
+    normalise(stripVendorPrefix(i.code))===normalise(p.code)
+  );
+  const remaining=bomItem?Math.max(0,bomItem.expected-(bomItem.alreadyReceived||0)):null;
+
+  // Show part card with image
+  document.getElementById('del-scan-img').innerHTML=partImgHtml(p,72);
+  document.getElementById('del-scan-name').textContent=p.name;
+  document.getElementById('del-scan-info').textContent=
+    `${p.code}${p.mfrno?' · Mfr: '+p.mfrno:''} · ${formatLoc(p)||p.loc||'No location'}`;
+
+  // BOM match info
+  const matchEl=document.getElementById('del-scan-bom-match');
+  if(bomItem){
+    if(bomItem.done){
+      matchEl.innerHTML=`<span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600">✓ Already fully received (${bomItem.alreadyReceived}/${bomItem.expected})</span>`;
+    }else{
+      matchEl.innerHTML=`<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600">
+        ▣ On this BOM — ordered: ${bomItem.expected} · received so far: ${bomItem.alreadyReceived||0} · still needed: ${remaining}
+      </span>`;
+    }
+  }else{
+    matchEl.innerHTML=`<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:8px;font-size:12px">⚠ Not on this BOM — will go to general stock only</span>`;
+  }
+
+  // Pre-fill qty with remaining needed, default project qty to remaining
+  const suggestQty=remaining||1;
+  document.getElementById('del-scan-qty').value=suggestQty;
+  document.getElementById('del-scan-proj').value=bomItem&&!bomItem.done?suggestQty:0;
+  document.getElementById('del-scan-result').dataset.code=p.code;
+  delScanUpdateStock();
+  document.getElementById('del-scan-result').style.display='block';
+  soundOK();
+  // Focus qty field so user can adjust then hit Enter
+  setTimeout(()=>document.getElementById('del-scan-qty').select(),50);
+}
+
+function delScanUpdateStock(){
+  const qty=parseInt(document.getElementById('del-scan-qty').value)||0;
+  const proj=Math.min(parseInt(document.getElementById('del-scan-proj').value)||0,qty);
+  document.getElementById('del-scan-proj').value=proj;
+  document.getElementById('del-scan-stock-qty').textContent=Math.max(0,qty-proj);
+}
+
+async function delScanAdd(){
+  const code=document.getElementById('del-scan-result').dataset.code;
+  const qty=parseInt(document.getElementById('del-scan-qty').value)||0;
+  const forProject=Math.min(parseInt(document.getElementById('del-scan-proj').value)||0,qty);
+  const forStock=Math.max(0,qty-forProject);
+  const p=db.parts[code];
+  const del=_delScanActiveDel;
+  if(!p||!del||qty<1){toast('Check qty and part','err');return;}
+
+  pushUndo();
+
+  // Add to general stock
+  if(forStock>0){
+    p.qty+=forStock;
+    addHist('IN',p.name,code,forStock,`BOM delivery: ${del.bomName}${del.po?' PO:'+del.po:''}${del.assignTo?' → '+del.assignTo:''} (to stock)`);
+  }
+
+  // Auto-allocate to project
+  if(forProject>0&&del.assignTo){
+    if(!db.allocations)db.allocations=[];
+    db.allocations.push({
+      code:p.code,name:p.name,qty:forProject,
+      build:del.assignTo,
+      po:del.po||'',
+      deliveryId:del.id,
+      date:nowD(),
+      allocatedBy:currentUser?currentUser.name:'Unknown',
+      status:'allocated'
+    });
+    addHist('IN',p.name,code,forProject,`BOM delivery: ${del.bomName}${del.po?' PO:'+del.po:''} → allocated to ${del.assignTo}`);
+  }
+
+  // Update BOM delivery item tracking
+  const bomItemIdx=del.items.findIndex(i=>
+    normalise(i.code)===normalise(code)||
+    normalise(i.code)===normalise(p.mfrno||'')||
+    normalise(stripVendorPrefix(i.code))===normalise(code)
+  );
+  if(bomItemIdx>=0){
+    const item=del.items[bomItemIdx];
+    item.alreadyReceived=(item.alreadyReceived||0)+qty;
+    item.stockQty=(item.stockQty||0)+forStock;
+    item.projectQty=(item.projectQty||0)+forProject;
+    if(item.alreadyReceived>=item.expected)item.done=true;
+  }
+
+  // Update delivery status
+  const allDone=del.items.every(i=>i.done);
+  if(allDone)del.status='complete';
+  else if(del.items.some(i=>i.alreadyReceived>0))del.status='partial';
+
+  await saveDB();
+
+  // Add to running log
+  _delScanLog.unshift({name:p.name,code,qty,forProject,forStock,img:p.img||''});
+  renderDelScanLog();
+
+  // Show success toast
+  toast(`✓ ${qty}× ${p.name}${forProject>0?` — ${forProject} → ${del.assignTo}`:''} ${forStock>0?`— ${forStock} → stock`:''}`)
+
+  // Clear scan and refocus for next part
+  delScanClear();
+  renderDelRows(del);
+  renderDash();
+}
+
+function delScanClear(){
+  document.getElementById('del-scan').value='';
+  document.getElementById('del-scan-result').style.display='none';
+  document.getElementById('del-scan-notfound').style.display='none';
+  setTimeout(()=>document.getElementById('del-scan').focus(),50);
+}
+
+function renderDelScanLog(){
+  const el=document.getElementById('del-scan-log');
+  if(!el||!_delScanLog.length)return;
+  el.innerHTML=`<div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">
+    Received this session (${_delScanLog.length} scan${_delScanLog.length!==1?'s':''}):
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto">
+    ${_delScanLog.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fff;border:1px solid #bae6fd;border-radius:6px;font-size:12px">
+      ${r.img?`<img src="${r.img}" style="width:32px;height:32px;object-fit:contain;border-radius:4px;border:1px solid #e5e7eb;background:#fff">`:'<div style="width:32px;height:32px;background:#f3f4f6;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:14px">📦</div>'}
+      <div style="flex:1">
+        <span style="font-weight:600">${r.name}</span>
+        <span style="color:#6b7280;margin-left:6px">${r.code}</span>
+      </div>
+      <span style="font-weight:700;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:6px">+${r.qty}</span>
+      ${r.forProject>0?`<span style="font-size:11px;color:#6d28d9;background:#f5f0ff;padding:2px 8px;border-radius:6px">▣ ${r.forProject} allocated</span>`:''}
+      ${r.forStock>0?`<span style="font-size:11px;color:#1d4ed8;background:#eff6ff;padding:2px 8px;border-radius:6px">📦 ${r.forStock} to stock</span>`:''}
+    </div>`).join('')}
+  </div>`;
+}
+
 async function confirmDelivery(){
   const del=db.deliveries.find(d=>d.id===document.getElementById('del-title').dataset.delId||(d.status!=='complete'&&document.getElementById('del-active').style.display!=='none'));
   // find the delivery that is currently shown
@@ -4286,6 +4595,7 @@ function renderOrder(){
       </td>
       <td style="padding:6px 6px">
         <input value="${o.name||''}" style="font-weight:500;width:100%;border:none;background:transparent;padding:2px 3px;font-size:13px" onchange="db.order[${i}].name=this.value;saveDB()" title="Edit part name">
+        ${p&&p.mfrno?`<div style="font-size:11px;color:#1e40af;font-family:monospace;font-weight:600;margin-top:2px;padding:1px 0;user-select:all" title="Manufacturer part number — click to copy" onclick="navigator.clipboard&&navigator.clipboard.writeText('${p.mfrno.replace(/'/g,"\\'")}').then(()=>toast('Mfr no. copied'))">${p.mfrno}</div>`:''}
         ${stockPill}
         ${allocLine}
         ${usagePill}
@@ -4448,6 +4758,9 @@ function addBlankOrderLine(){
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
+// Stored for safe deletion without inline JSON
+let _lastHistRows=[];
+
 function renderHist(){
   const f=(document.getElementById('hf').value||'').toLowerCase();
   const range=document.getElementById('h-range').value;
@@ -4532,6 +4845,7 @@ function renderHist(){
     LOGIN:{cls:'b-gray',label:'Login'}
   };
 
+  _lastHistRows=allRows;
   el.innerHTML=`<table><thead><tr>
     <th style="width:52px"></th>
     <th style="width:105px">Date/time</th>
@@ -4543,10 +4857,11 @@ function renderHist(){
     <th style="width:110px">Supplier</th>
     <th>Ref / notes</th>
     <th style="width:90px">User</th>
+    ${currentUser&&currentUser.isAdmin?'<th style="width:36px"></th>':''}
   </tr></thead><tbody>${allRows.map((r,rowIdx)=>{
     const delBtn=currentUser&&currentUser.isAdmin
-      ?`<td><button onclick="deleteHistRow(${rowIdx},${JSON.stringify(allRows)})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`
-      :`<td></td>`;
+      ?`<td><button onclick="deleteHistRow(${rowIdx})" style="font-size:11px;padding:2px 6px;color:#991b1b;border-color:#fca5a5;background:#fff" title="Delete this entry">✕</button></td>`
+      :'';
     if(r.kind==='stock'){
       const badge=r.qty>0?'b-ok':'b-low';
       const label=r.type||(r.qty>0?'IN':'OUT');
@@ -4579,8 +4894,8 @@ function renderHist(){
   }).join('')}</tbody></table>`;
 }
 
-async function deleteHistRow(rowIdx, allRows){
-  const r=allRows[rowIdx];
+async function deleteHistRow(rowIdx){
+  const r=_lastHistRows[rowIdx];
   if(!r)return;
   if(!confirm('Delete this history entry?'))return;
   if(r.kind==='stock'){
@@ -5057,19 +5372,19 @@ function openSmSupplierSplit(){
   const codes=smGetSelected();
   if(!codes.length){toast('Tick at least one item first','err');return;}
   document.getElementById('sm-split-panel').style.display='block';
-  // Auto-populate suppliers from parts' existing supplier field
-  smSuppliers=[];
+  // Pre-populate from db.suppliers (all saved suppliers)
+  smSuppliers=(db.suppliers||[]).map((s,i)=>({id:'sup_db_'+i,name:s.name,email:s.email||''}));
+  // Also add any suppliers from part records that aren't already in the list
   codes.forEach(code=>{
     const p=db.parts[code];
     if(p&&p.sup&&p.sup.trim()){
       const name=p.sup.trim();
       if(!smSuppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){
-        smSuppliers.push({id:'sup_'+Date.now()+'_'+smSuppliers.length,name,email:''});
+        smSuppliers.push({id:'sup_part_'+Date.now()+'_'+smSuppliers.length,name,email:''});
       }
     }
   });
   renderSmSupList();
-  // Scroll to split panel
   setTimeout(()=>document.getElementById('sm-split-panel').scrollIntoView({behavior:'smooth'}),100);
 }
 
@@ -5078,7 +5393,16 @@ function smAddSupplier(){
   const email=document.getElementById('sm-sup-email').value.trim();
   if(!name){toast('Enter supplier name','err');return;}
   if(smSuppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){toast('Already added','err');return;}
-  smSuppliers.push({id:'sup_'+Date.now(),name,email});
+  const newSup={id:'sup_'+Date.now(),name,email};
+  smSuppliers.push(newSup);
+  // Also persist to db.suppliers so it appears in Settings and future sessions
+  if(!db.suppliers)db.suppliers=[];
+  if(!db.suppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){
+    db.suppliers.push({name,email,phone:''});
+    saveDB();
+    buildDatalist('dl-suppliers',db.suppliers.map(s=>s.name));
+    buildDatalist('dl-suppliers-order',db.suppliers.map(s=>s.name));
+  }
   document.getElementById('sm-sup-name').value='';
   document.getElementById('sm-sup-email').value='';
   renderSmSupList();
