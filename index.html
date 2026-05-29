@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 67 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 69 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -3688,26 +3688,33 @@ function renderDelRows(del){
     );
     const imgHtml=catPart?partImgHtml(catPart,44):`<div style="width:44px;height:44px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div>`;
 
-    // 3-level location - pre-fill from catalogue part if set
-    const loc1=item.loc||(catPart?catPart.loc||'':'');
-    const loc2=item.loc2||(catPart?catPart.loc2||'':'');
-    const loc3=item.loc3||(catPart?catPart.loc3||'':'');
-    const locCustom=item.locCustom||'';
+    // Catalogue stock location
+    const stockLoc=catPart?formatLoc(catPart)||catPart.loc||'':'';
 
-    const locPicker=`<div style="display:grid;gap:3px">
-      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},1,this.value)">
-        <option value="">Area…</option>${masterLocOpts(loc1).replace('<option value="">— Select location —</option>','')}
-      </select>
-      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},2,this.value)">
-        <option value="">Section…</option>${masterLocOpts(loc2).replace('<option value="">— Select location —</option>','')}
-      </select>
-      <select style="font-size:11px;padding:3px 4px;border-color:#d1d5db" onchange="delSetLoc(${dIdx},${i},3,this.value)">
-        <option value="">Container…</option>${masterLocOpts(loc3).replace('<option value="">— Select location —</option>','')}
-      </select>
-      <input placeholder="Custom tag (e.g. Splines shelf 2)…" value="${locCustom}"
-        style="font-size:11px;padding:3px 4px;border:1px solid #d1d5db;border-radius:4px"
-        onchange="delSetLoc(${dIdx},${i},'custom',this.value)">
-      ${loc1||loc2||loc3||locCustom?`<div style="font-size:10px;color:#6d28d9;font-weight:600;margin-top:1px">📍 ${[loc1,loc2,loc3,locCustom].filter(Boolean).join(' › ')}</div>`:''}
+    // 3-level location picker - ONLY for project-allocated parts
+    const projLoc1=item.projLoc1||'';
+    const projLoc2=item.projLoc2||'';
+    const projLoc3=item.projLoc3||'';
+    const projLocCustom=item.projLocCustom||'';
+    const projLocStr=[projLoc1,projLoc2,projLoc3,projLocCustom].filter(Boolean).join(' › ');
+
+    const projLocPicker=`<div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:7px;padding:8px;margin-top:4px">
+      <div style="font-size:10px;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">▣ Project storage location</div>
+      <div style="display:grid;gap:3px">
+        <select style="font-size:11px;padding:3px 4px;border-color:#c4b5fd" onchange="delSetProjLoc(${dIdx},${i},1,this.value)">
+          <option value="">Area…</option>${masterLocOpts(projLoc1).replace('<option value="">— Select location —</option>','')}
+        </select>
+        <select style="font-size:11px;padding:3px 4px;border-color:#c4b5fd" onchange="delSetProjLoc(${dIdx},${i},2,this.value)">
+          <option value="">Section…</option>${masterLocOpts(projLoc2).replace('<option value="">— Select location —</option>','')}
+        </select>
+        <select style="font-size:11px;padding:3px 4px;border-color:#c4b5fd" onchange="delSetProjLoc(${dIdx},${i},3,this.value)">
+          <option value="">Container…</option>${masterLocOpts(projLoc3).replace('<option value="">— Select location —</option>','')}
+        </select>
+        <input placeholder="Custom tag (e.g. Splines shelf 2)…" value="${projLocCustom}"
+          style="font-size:11px;padding:3px 4px;border:1px solid #c4b5fd;border-radius:4px"
+          onchange="delSetProjLoc(${dIdx},${i},'custom',this.value)">
+        ${projLocStr?`<div style="font-size:10px;color:#6d28d9;font-weight:700;margin-top:2px">📍 ${projLocStr}</div>`:'<div style="font-size:10px;color:#9ca3af;margin-top:2px">Where will the project store these parts?</div>'}
+      </div>
     </div>`;
 
     if(item.done){
@@ -3719,9 +3726,8 @@ function renderDelRows(del){
           <div>
             <div style="font-weight:600">${item.name}</div>
             <div style="font-size:11px;color:#9ca3af">${item.code}${catPart&&catPart.mfrno?` · ${catPart.mfrno}`:''}</div>
-            ${locStr?`<div style="font-size:10px;color:#6d28d9">📍 ${locStr}</div>`:''}
-            ${item.stockQty?`<div style="font-size:11px;color:#3b82f6">+${item.stockQty} to stock</div>`:''}
-            ${item.projectQty?`<div style="font-size:11px;color:#6d28d9">+${item.projectQty} kept for project</div>`:''}
+            ${item.stockQty?`<div style="font-size:11px;color:#1d4ed8">📦 ${item.stockQty} to stock${stockLoc?' → <strong>'+stockLoc+'</strong>':''}</div>`:''}
+            ${item.projectQty?`<div style="font-size:11px;color:#6d28d9">▣ ${item.projectQty} for project${projLocStr?' → <strong>'+projLocStr+'</strong>':''}</div>`:''}
           </div>
         </div>
         <div style="font-weight:600">${item.expected}</div>
@@ -3756,16 +3762,33 @@ function renderDelRows(del){
           <input type="number" id="proj-${dIdx}-${i}" value="${forProject}" min="0" style="width:54px;font-size:12px;border-color:#c4b5fd"
             onchange="delUpdateProject(${dIdx},${i},parseInt(this.value)||0)">
         </div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <label style="font-size:11px;color:#1d4ed8;white-space:nowrap">📦 To stock:</label>
-          <span id="stock-${dIdx}-${i}" style="font-size:12px;font-weight:700;color:#1d4ed8">${forStock}</span>
+        <!-- TO STOCK — show return location as reminder, no picker needed -->
+        <div style="background:${forStock>0?'#eff6ff':'#f9fafb'};border:1px solid ${forStock>0?'#bfdbfe':'#e5e7eb'};border-radius:6px;padding:5px 7px;margin-top:2px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:#1d4ed8;white-space:nowrap;font-weight:700">📦 To stock:</span>
+            <span id="stock-${dIdx}-${i}" style="font-size:13px;font-weight:800;color:#1d4ed8">${forStock}</span>
+          </div>
+          ${forStock>0&&stockLoc?`<div style="font-size:11px;font-weight:700;color:#166534;margin-top:3px;padding:3px 6px;background:#dcfce7;border-radius:4px;display:inline-block">
+            ↩ PUT BACK: ${stockLoc}
+          </div>`:''}
+          ${forStock>0&&!stockLoc?`<div style="font-size:11px;color:#92400e;margin-top:3px">⚠ No stock location set — check catalogue</div>`:''}
         </div>
+        ${forProject>0?projLocPicker:''}
       </div>
 
-      ${locPicker}
-      <span class="badge ${item.alreadyReceived>0?'b-part':'b-gray'}">${item.alreadyReceived>0?'Partial':'Pending'}</span>
+      <span class="badge ${item.alreadyReceived>0?'b-part':'b-gray'}" style="align-self:start;margin-top:4px">${item.alreadyReceived>0?'Partial':'Pending'}</span>
     </div>`;
   }).join('');
+}
+
+function delSetProjLoc(dIdx,itemIdx,level,val){
+  const item=db.deliveries[dIdx].items[itemIdx];
+  if(level===1)item.projLoc1=val;
+  else if(level===2)item.projLoc2=val;
+  else if(level===3)item.projLoc3=val;
+  else if(level==='custom')item.projLocCustom=val;
+  saveDB();
+  renderDelRows(db.deliveries[dIdx]);
 }
 
 function delSetLoc(dIdx,itemIdx,level,val){
@@ -4000,14 +4023,16 @@ async function confirmDelivery(){
     // Record project allocation for the project portion
     if(!db.allocations)db.allocations=[];
     if(forProject>0){
+      const projLocStr=[item.projLoc1,item.projLoc2,item.projLoc3,item.projLocCustom].filter(Boolean).join(' › ');
       db.allocations.push({
         code:item.code,name:item.name,qty:forProject,
         build:activeDel.assignTo||activeDel.bomName,
         po:activeDel.po||'',
         deliveryId:activeDel.id,date:nowD(),
-        status:'allocated' // held for project, not in general stock
+        projectLoc:projLocStr||'',
+        status:'allocated'
       });
-      addHist('IN',item.name,item.code,forProject,note+' (for project)');
+      addHist('IN',item.name,item.code,forProject,note+' (for project)'+(projLocStr?' → '+projLocStr:''));
     }
 
     // Track split on item for display
@@ -4297,8 +4322,9 @@ function renderAllocations(){
           <thead><tr style="background:#faf5ff">
             <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Part</th>
             <th style="padding:7px 10px;text-align:center;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Qty held</th>
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Location</th>
-            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">PO / Delivery</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">📍 Project box / location</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">🏭 Stock location</th>
+            <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">PO</th>
             <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Date</th>
             <th style="padding:7px 10px;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Status</th>
             <th style="padding:7px 10px;text-align:right;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Action</th>
@@ -4307,13 +4333,33 @@ function renderAllocations(){
             const p=db.parts[a.code];
             const globalIdx=db.allocations.indexOf(a);
             const isReleased=a.status==='released';
+            const stockLoc=p?formatLoc(p)||p.loc||'':'';
+
+            // Project location — editable inline
+            const projLoc=a.projectLoc||'';
+            const projLocCell=isReleased
+              ?`<span style="font-size:12px;color:#9ca3af">${projLoc||'—'}</span>`
+              :`<div>
+                  ${projLoc
+                    ?`<div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:6px;padding:4px 8px;display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                        <span style="font-size:14px">📍</span>
+                        <span style="font-weight:700;color:#6d28d9;font-size:12px">${projLoc}</span>
+                      </div>`
+                    :`<div style="font-size:11px;color:#9ca3af;margin-bottom:4px;padding:3px 0">⚠ No project location set</div>`}
+                  <input value="${projLoc}" placeholder="e.g. Mechanical Rack › Shelf 2 › Tote 4"
+                    style="width:100%;font-size:11px;padding:4px 7px;border:1px solid #c4b5fd;border-radius:5px;color:#6d28d9"
+                    onchange="updateAllocProjLoc(${globalIdx},this.value)"
+                    onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#c4b5fd'">
+                </div>`;
+
             return`<tr style="border-bottom:1px solid #f3f4f6;${isReleased?'opacity:.6':''}">
               <td style="padding:8px 10px">
                 <div style="display:flex;align-items:center;gap:8px">
-                  ${p?partImgHtml(p,36):'<div style="width:36px;height:36px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px">📦</div>'}
+                  ${p?partImgHtml(p,40):'<div style="width:40px;height:40px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>'}
                   <div>
-                    <div style="font-weight:600">${a.name}</div>
-                    <div style="font-size:11px;color:#9ca3af">${a.code}</div>
+                    <div style="font-weight:700;font-size:13px">${a.name}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-family:monospace">${a.code}</div>
+                    ${p&&p.mfrno?`<div style="font-size:10px;color:#1e40af;font-family:monospace;font-weight:600">${p.mfrno}</div>`:''}
                   </div>
                 </div>
               </td>
@@ -4323,15 +4369,23 @@ function renderAllocations(){
                   :`<input type="number" value="${a.qty}" min="1" style="width:60px;text-align:center;font-weight:700;color:#6d28d9;border-color:#c4b5fd"
                     onchange="updateAllocQty(${globalIdx},parseInt(this.value)||1)">`}
               </td>
-              <td style="padding:8px 10px;font-size:12px">${p?formatLoc(p)||p.loc||'—':'—'}</td>
+              <td style="padding:8px 10px;min-width:180px">${projLocCell}</td>
+              <td style="padding:8px 10px;font-size:12px">
+                ${stockLoc
+                  ?`<div style="display:flex;align-items:center;gap:5px">
+                      <span style="font-size:12px">🏭</span>
+                      <span style="color:#166534;font-weight:600">${stockLoc}</span>
+                    </div>`
+                  :`<span style="color:#9ca3af">—</span>`}
+              </td>
               <td style="padding:8px 10px;font-size:12px">${a.po||'—'}</td>
-              <td style="padding:8px 10px;font-size:12px;color:#6b7280">${a.date||'—'}</td>
+              <td style="padding:8px 10px;font-size:12px;color:#6b7280;white-space:nowrap">${a.date||'—'}</td>
               <td style="padding:8px 10px">
                 <span class="badge" style="background:${isReleased?'#f3f4f6':'#f5f0ff'};color:${isReleased?'#6b7280':'#6d28d9'}">
                   ${isReleased?'Released':'Held for project'}
                 </span>
               </td>
-              <td style="padding:8px 10px;text-align:right">
+              <td style="padding:8px 10px;text-align:right;white-space:nowrap">
                 ${!isReleased
                   ?`<button onclick="releaseSingleAlloc(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#f0fdf4;color:#166534;border-color:#86efac;font-weight:600">Release to stock</button>`
                   :`<span style="font-size:11px;color:#9ca3af">Released ${a.releaseDate||''}</span>
@@ -4343,6 +4397,14 @@ function renderAllocations(){
       </div>
     </div>`;
   }).join('');
+}
+
+async function updateAllocProjLoc(idx,val){
+  if(!db.allocations[idx])return;
+  db.allocations[idx].projectLoc=val.trim();
+  await saveDB();
+  renderAllocations();
+  if(val.trim())toast(`Project location saved: ${val.trim()}`,'info');
 }
 
 async function updateAllocQty(idx,qty){
@@ -4380,15 +4442,18 @@ async function clearReleasedAllocs(){
 async function releaseSingleAlloc(idx){
   const a=db.allocations[idx];
   if(!a)return;
-  if(!confirm(`Release ${a.qty}× ${a.name} from project "${a.build}" to general stock?`))return;
-  if(db.parts[a.code])db.parts[a.code].qty+=a.qty;
+  const p=db.parts[a.code];
+  const stockLoc=p?formatLoc(p)||p.loc||'':'';
+  const locMsg=stockLoc?`\n\n📦 PUT BACK AT: ${stockLoc}`:'';
+  if(!confirm(`Release ${a.qty}× ${a.name} from project "${a.build}" to general stock?${locMsg}`))return;
+  if(p)p.qty+=a.qty;
   a.status='released';
   a.releaseDate=nowD();
-  addHist('IN',a.name,a.code,a.qty,`Released from project: ${a.build}`);
+  addHist('IN',a.name,a.code,a.qty,`Released from project: ${a.build}${stockLoc?' → back to '+stockLoc:''}`);
   await saveDB();
   renderAllocations();
   renderDash();
-  toast(`${a.qty}× ${a.name} released to stock`);
+  toast(`${a.qty}× ${a.name} released to stock${stockLoc?' — put back at: '+stockLoc:''}`);
 }
 
 async function releaseAllProject(project,keepInStock){
