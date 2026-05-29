@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 69 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 71 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -728,6 +728,20 @@ tr:hover td{background:#f9fafb}
 
 <!-- BOM BUILDER -->
 <div class="panel" id="panel-bom">
+  <!-- Sub-tab strip -->
+  <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e5e7eb;padding-bottom:0">
+    <button id="bom-tab-build" onclick="setBomTab('build')"
+      style="padding:8px 18px;border:none;border-bottom:3px solid #1e3a5f;background:none;font-weight:700;font-size:13px;color:#1e3a5f;cursor:pointer;margin-bottom:-2px">
+      🔧 Build BOM
+    </button>
+    <button id="bom-tab-pick" onclick="setBomTab('pick')"
+      style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;font-weight:600;font-size:13px;color:#6b7280;cursor:pointer;margin-bottom:-2px">
+      📋 Pull from Stock
+    </button>
+  </div>
+
+  <!-- BUILD TAB -->
+  <div id="bom-sub-build">
   <div class="g2" style="align-items:start">
     <div>
       <div class="card">
@@ -782,9 +796,26 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
   </div>
-</div>
+  </div><!-- end bom-sub-build -->
 
-<!-- BOM DELIVERY -->
+  <!-- PICK LIST TAB -->
+  <div id="bom-sub-pick" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div>
+          <div class="sec" style="margin:0">📋 Pull from Stock</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:3px">Parts from your BOM that are available in stock right now. Tick what you're taking, assign a project box location, then commit the pull.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="printPickList()" class="btn-blue" style="font-size:12px">🖨 Print pick list</button>
+          <button onclick="commitStockPull()" class="btn-green" style="font-size:13px;font-weight:700;padding:8px 16px">✓ Commit pull — deduct from stock</button>
+        </div>
+      </div>
+      <div id="pick-list-body"></div>
+    </div>
+  </div>
+
+</div><!-- end panel-bom -->
 <div class="panel" id="panel-delivery">
   <div class="card" style="margin-bottom:12px">
     <div class="sec">Create delivery / order record from BOM</div>
@@ -3228,7 +3259,502 @@ async function addPart(){
   renderDash();doSearch();
 }
 
-// ─── BOM BUILDER ──────────────────────────────────────────────────────────────
+function printBOMShelfCheck(){
+  const bomName=document.getElementById('bom-name').value.trim()||'BOM';
+  const bomRef=document.getElementById('bom-ref').value.trim();
+  const items=curBOM.filter(i=>i.matchConfirmed===true&&i.matchedCode&&(i.inStock>0||i.qty<=i.inStock));
+  const partial=curBOM.filter(i=>i.matchConfirmed===true&&i.inStock>0&&i.inStock<i.qty);
+  const allCheck=[...items,...partial.filter(i=>!items.includes(i))];
+
+  if(!allCheck.length){toast('No confirmed stock items to print — confirm some matches first','err');return;}
+
+  const rows=allCheck.map(item=>{
+    const p=db.parts[item.matchedCode];
+    const stockLoc=p?formatLoc(p)||p.loc||'⚠ No location set':'';
+    const hasLoc=p&&(p.loc||p.loc2||p.loc3);
+    const isPartial=item.inStock<item.qty;
+    const allocQty=item.allocatedQty||0;
+    return`<tr>
+      <td style="padding:8px 10px;text-align:center;font-size:20px;width:40px">☐</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:700;font-size:14px">${item.name}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px">${item.matchedCode}${p&&p.mfrno?` &nbsp;·&nbsp; <strong style="color:#1e40af">${p.mfrno}</strong>`:''}</div>
+        ${isPartial?`<div style="font-size:11px;color:#92400e;margin-top:3px">⚠ Partial — only ${item.inStock} of ${item.qty} needed in stock</div>`:''}
+        ${allocQty>0?`<div style="font-size:11px;color:#6d28d9;margin-top:2px">▣ ${allocQty} already allocated to another project</div>`:''}
+      </td>
+      <td style="padding:8px 10px;text-align:center;font-weight:800;font-size:18px;color:#1e3a5f;width:70px">${item.qty}</td>
+      <td style="padding:8px 10px;font-size:13px;font-weight:700;color:${hasLoc?'#166534':'#991b1b'};background:${hasLoc?'#f0fdf4':'#fff5f5'};border-radius:6px">
+        ${hasLoc?'📍 ':'⚠ '}${stockLoc}
+      </td>
+      <td style="padding:8px 10px;text-align:center;width:80px">
+        <div style="border:1px solid #d1d5db;border-radius:4px;height:26px;width:60px;display:inline-block"></div>
+      </td>
+    </tr>`;
+  });
+
+  // Also list shortfall
+  const needOrder=curBOM.filter(i=>i.matchRejected||(i.matchedCode===null)||(i.matchConfirmed===true&&i.qty>i.inStock&&i.inStock===0));
+  const shortfallRows=needOrder.map(item=>`<tr style="background:#fff5f5">
+    <td style="padding:6px 10px;text-align:center;color:#991b1b">✗</td>
+    <td style="padding:6px 10px;color:#991b1b;font-weight:600">${item.name}</td>
+    <td style="padding:6px 10px;text-align:center;font-weight:700;color:#991b1b">${item.qty}</td>
+    <td colspan="2" style="padding:6px 10px;font-size:12px;color:#991b1b">NOT IN STOCK — needs to be ordered</td>
+  </tr>`).join('');
+
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><title>${bomName} — Shelf Check</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;font-size:13px;padding:24px;color:#1a1a1a}
+    h1{font-size:22px;font-weight:800;margin-bottom:4px}
+    .meta{font-size:12px;color:#6b7280;margin-bottom:14px}
+    .instructions{background:#fffbeb;border:2px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1e3a5f;color:#fff;padding:9px 10px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+    td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+    tr:hover td{background:#f9fafb}
+    .shortfall-hdr{background:#991b1b!important;margin-top:20px}
+    .summary{margin-top:16px;padding:10px 14px;background:#f0fdf4;border-radius:6px;font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+    .sig{margin-top:28px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px}
+    .sig-box{border-top:2px solid #1e3a5f;padding-top:8px;font-size:12px;color:#6b7280}
+    @media print{.no-print{display:none!important}body{padding:14px}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div>
+      <h1>📋 Shelf Check — ${bomName}</h1>
+      <div class="meta">${bomRef?`Ref: ${bomRef} &nbsp;·&nbsp; `:``}Printed ${nowDT()} &nbsp;·&nbsp; By: ${currentUser?currentUser.name:'Unknown'}</div>
+    </div>
+    <div class="no-print" style="display:flex;gap:8px">
+      <button onclick="window.print()" style="padding:8px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
+      <button onclick="window.close()" style="padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:13px">Close</button>
+    </div>
+  </div>
+  <div class="instructions">
+    👷 Go to each location below, verify the part is there, tick the checkbox, note the actual qty in the "Actual qty" column. 
+    Bring this list back and use it to confirm the Pull from Stock in the app.
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:40px">✓</th>
+      <th>Part name &amp; code</th>
+      <th style="text-align:center;width:70px">Need</th>
+      <th>Stock location</th>
+      <th style="text-align:center;width:80px">Actual qty</th>
+    </tr></thead>
+    <tbody>${rows.join('')}
+    ${shortfallRows?`<tr><td colspan="5" style="padding:12px 10px 6px;font-weight:700;color:#991b1b;background:#fff5f5;font-size:12px;text-transform:uppercase;letter-spacing:.05em">⚠ Not in stock — needs ordering</td></tr>${shortfallRows}`:''}
+    </tbody>
+  </table>
+  <div class="summary">
+    <span><strong>${allCheck.length}</strong> parts to pick from stock &nbsp;·&nbsp; <strong>${allCheck.reduce((s,i)=>s+i.qty,0)}</strong> total units</span>
+    ${needOrder.length?`<span style="color:#991b1b"><strong>${needOrder.length}</strong> parts need ordering</span>`:'<span style="color:#166534">✓ All BOM parts covered</span>'}
+  </div>
+  <div class="sig">
+    <div class="sig-box">Picked by: ________________</div>
+    <div class="sig-box">Checked by: _______________</div>
+    <div class="sig-box">Date: _____________________</div>
+    <div class="sig-box">Project: __________________</div>
+  </div>
+  </body></html>`);
+  w.document.close();
+}
+
+// ─── BOM SUB-TABS ─────────────────────────────────────────────────────────────
+function setBomTab(tab){
+  document.getElementById('bom-sub-build').style.display=tab==='build'?'block':'none';
+  document.getElementById('bom-sub-pick').style.display=tab==='pick'?'block':'none';
+  const build=document.getElementById('bom-tab-build');
+  const pick=document.getElementById('bom-tab-pick');
+  build.style.borderBottomColor=tab==='build'?'#1e3a5f':'transparent';
+  build.style.color=tab==='build'?'#1e3a5f':'#6b7280';
+  build.style.fontWeight=tab==='build'?'700':'600';
+  pick.style.borderBottomColor=tab==='pick'?'#166534':'transparent';
+  pick.style.color=tab==='pick'?'#166534':'#6b7280';
+  pick.style.fontWeight=tab==='pick'?'700':'600';
+  if(tab==='pick')renderPickList();
+}
+
+// ─── PICK LIST ────────────────────────────────────────────────────────────────
+// pickSelections[code] = { pulling: bool, qty: number, projLoc: string }
+let pickSelections={};
+
+function renderPickList(){
+  const el=document.getElementById('pick-list-body');
+  if(!el)return;
+  const bomName=document.getElementById('bom-name').value.trim();
+  const bomRef=document.getElementById('bom-ref').value.trim();
+
+  if(!curBOM.length){
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:#9ca3af">
+      <div style="font-size:32px;margin-bottom:8px">📋</div>
+      <div style="font-size:14px;font-weight:600">No BOM loaded</div>
+      <div style="font-size:12px;margin-top:4px">Go to Build BOM tab, add parts and run Check stock levels first</div>
+      <button onclick="setBomTab('build')" class="btn-blue" style="margin-top:12px;font-size:13px">← Go to Build BOM</button>
+    </div>`;
+    return;
+  }
+
+  // Split into: available from stock / need to order
+  const available=curBOM.filter(i=>i.matchedCode&&i.inStock>0&&i.matchConfirmed!==false&&!i.matchRejected);
+  const shortfall=curBOM.filter(i=>!i.matchedCode||i.inStock<=0||i.matchRejected);
+  const partial=curBOM.filter(i=>i.matchedCode&&i.inStock>0&&i.inStock<i.qty&&i.matchConfirmed!==false&&!i.matchRejected);
+
+  if(!available.length){
+    el.innerHTML=`<div style="padding:20px;text-align:center;background:#fff5f5;border-radius:8px;color:#991b1b">
+      <div style="font-size:28px;margin-bottom:8px">⚠</div>
+      <div style="font-weight:700">Nothing in stock for this BOM</div>
+      <div style="font-size:12px;margin-top:4px">Run Check stock levels in the Build tab first, or all parts need to be ordered.</div>
+    </div>`;
+    return;
+  }
+
+  // Project location — shared input for all items
+  const projLocGlobal=pickSelections['__projLoc']||'';
+
+  el.innerHTML=`
+  ${bomName?`<div style="background:#1e3a5f;color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+    <div>
+      <div style="font-weight:700;font-size:14px">${bomName}</div>
+      <div style="font-size:12px;color:#93c5fd">${bomRef||'No reference'} · ${curBOM.length} parts in BOM</div>
+    </div>
+    <div style="display:flex;gap:10px;font-size:12px">
+      <span style="color:#86efac">✓ ${available.length} in stock</span>
+      ${shortfall.length?`<span style="color:#fca5a5">⚠ ${shortfall.length} need ordering</span>`:''}
+    </div>
+  </div>`:''}
+
+  <!-- Shared project location -->
+  <div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:16px">📍</span>
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Project box / storage location for ALL picked parts</div>
+      <input id="pick-proj-loc" value="${projLocGlobal}" placeholder="e.g. Mechanical Rack › Shelf 2 › Tote 4 — Splines build"
+        style="width:100%;font-size:13px;padding:6px 10px;border:2px solid #c4b5fd;border-radius:6px;color:#6d28d9;font-weight:600"
+        oninput="pickSelections['__projLoc']=this.value"
+        onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#c4b5fd'">
+    </div>
+    <div style="font-size:11px;color:#7c3aed;max-width:180px">This applies to all ticked parts. You can override per-part below.</div>
+  </div>
+
+  <!-- Select all -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:6px 10px;background:#f9fafb;border-radius:6px">
+    <input type="checkbox" id="pick-all" style="width:16px;height:16px;cursor:pointer" onchange="pickSelectAll(this.checked)">
+    <label for="pick-all" style="font-size:13px;font-weight:600;cursor:pointer">Select all available parts</label>
+    <span style="font-size:12px;color:#6b7280">${available.length} part${available.length!==1?'s':''} available · ${available.reduce((s,i)=>s+Math.min(i.qty,i.inStock),0)} units total</span>
+  </div>
+
+  <!-- Parts table -->
+  <div id="pick-print-area">
+    ${bomName?`<div id="pick-print-header" style="display:none;margin-bottom:16px">
+      <h2 style="font-size:18px;font-weight:700">${bomName} — Stock Pick List</h2>
+      <div style="font-size:13px;color:#6b7280">${bomRef||''} · Printed ${nowDT()}</div>
+      <hr style="margin:8px 0">
+    </div>`:''}
+    <table style="width:100%;border-collapse:collapse;font-size:13px" id="pick-table">
+      <thead><tr style="background:#f0fdf4">
+        <th style="padding:8px 10px;width:32px"></th>
+        <th style="padding:8px 10px;width:52px"></th>
+        <th style="padding:8px 10px;text-align:left">Part</th>
+        <th style="padding:8px 10px;text-align:center;width:70px">Need</th>
+        <th style="padding:8px 10px;text-align:center;width:70px">Taking</th>
+        <th style="padding:8px 10px;text-align:center;width:80px">In stock</th>
+        <th style="padding:8px 10px;text-align:left">Stock location</th>
+        <th style="padding:8px 10px;text-align:left">Project location override</th>
+      </tr></thead>
+      <tbody>
+        ${available.map((item,idx)=>{
+          const p=db.parts[item.matchedCode];
+          const stockLoc=p?formatLoc(p)||p.loc||'':'No location set';
+          const canTake=Math.min(item.qty,item.inStock);
+          const sel=pickSelections[item.matchedCode]||{pulling:false,qty:canTake,projLoc:''};
+          const isPartial=item.inStock<item.qty;
+          // Check if this part is in any active quotation
+          const inQuote=Object.values(db.quotes||{}).some(q=>q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(item.matchedCode))));
+          return`<tr style="border-bottom:1px solid #f3f4f6;${sel.pulling?'background:#f0fdf4':''}" id="pick-row-${item.matchedCode}">
+            <td style="padding:6px 10px;text-align:center">
+              <input type="checkbox" ${sel.pulling?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#166534"
+                onchange="pickToggle('${item.matchedCode}',this.checked)">
+            </td>
+            <td style="padding:6px 8px">${p?partImgHtml(p,44):'<div style="width:44px;height:44px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px">📦</div>'}</td>
+            <td style="padding:6px 10px">
+              <div style="font-weight:700">${item.name}</div>
+              <div style="font-size:11px;color:#9ca3af">${item.matchedCode}${p&&p.mfrno?` · <span style="color:#1e40af;font-family:monospace">${p.mfrno}</span>`:''}</div>
+              ${isPartial?`<span style="background:#fef3c7;color:#92400e;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">⚠ Partial — only ${item.inStock} of ${item.qty} needed</span>`:''}
+              ${inQuote?`<span style="background:#f5f0ff;color:#6d28d9;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">📋 In quotation</span>`:''}
+            </td>
+            <td style="padding:6px 10px;text-align:center;font-weight:700">${item.qty}</td>
+            <td style="padding:6px 10px;text-align:center">
+              <input type="number" value="${sel.qty}" min="1" max="${item.inStock}"
+                style="width:56px;text-align:center;font-weight:700;font-size:14px;border-color:#86efac;${!sel.pulling?'opacity:.4':''}"
+                ${!sel.pulling?'disabled':''}
+                onchange="pickSetQty('${item.matchedCode}',parseInt(this.value)||1)">
+            </td>
+            <td style="padding:6px 10px;text-align:center">
+              <span style="font-weight:700;color:${item.inStock>=item.qty?'#166534':'#92400e'}">${item.inStock}</span>
+            </td>
+            <td style="padding:6px 10px;font-size:12px">
+              <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:5px;padding:4px 8px;display:inline-block;color:#166534;font-weight:600">
+                📍 ${stockLoc}
+              </div>
+            </td>
+            <td style="padding:6px 10px">
+              <input value="${sel.projLoc||''}" placeholder="Override location…"
+                style="width:100%;font-size:11px;padding:4px 7px;border:1px solid #c4b5fd;border-radius:5px;color:#6d28d9;${!sel.pulling?'opacity:.4':''}"
+                ${!sel.pulling?'disabled':''}
+                oninput="pickSetProjLoc('${item.matchedCode}',this.value)">
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  ${shortfall.length?`
+  <details style="margin-top:14px">
+    <summary style="font-size:13px;font-weight:600;color:#92400e;cursor:pointer;padding:8px 10px;background:#fffbeb;border-radius:6px;border:1px solid #fcd34d">
+      ⚠ ${shortfall.length} part${shortfall.length!==1?'s':''} not in stock — need to order (click to see)
+    </summary>
+    <div style="margin-top:8px;border:1px solid #fcd34d;border-radius:6px;overflow:hidden">
+      ${shortfall.map(item=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fef3c7;font-size:13px">
+        ${item.matchedCode&&db.parts[item.matchedCode]?partImgHtml(db.parts[item.matchedCode],36):'<div style="width:36px;height:36px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center">📦</div>'}
+        <div style="flex:1"><div style="font-weight:600">${item.name}</div><div style="font-size:11px;color:#9ca3af">${item.code}</div></div>
+        <span style="font-weight:700;color:#92400e">Need ${item.qty} · In stock ${item.inStock||0}</span>
+        <span class="badge b-low">Needs ordering</span>
+      </div>`).join('')}
+    </div>
+  </details>`:''}`;
+}
+
+function pickToggle(code,checked){
+  if(!pickSelections[code]){
+    const item=curBOM.find(i=>i.matchedCode===code);
+    pickSelections[code]={pulling:checked,qty:item?Math.min(item.qty,item.inStock):1,projLoc:''};
+  }else{
+    pickSelections[code].pulling=checked;
+  }
+  renderPickList();
+}
+function pickSetQty(code,qty){
+  if(!pickSelections[code])pickSelections[code]={pulling:true,qty,projLoc:''};
+  else pickSelections[code].qty=qty;
+}
+function pickSetProjLoc(code,val){
+  if(!pickSelections[code])pickSelections[code]={pulling:true,qty:1,projLoc:val};
+  else pickSelections[code].projLoc=val;
+}
+function pickSelectAll(checked){
+  curBOM.filter(i=>i.matchedCode&&i.inStock>0&&!i.matchRejected).forEach(item=>{
+    if(!pickSelections[item.matchedCode])pickSelections[item.matchedCode]={pulling:checked,qty:Math.min(item.qty,item.inStock),projLoc:''};
+    else pickSelections[item.matchedCode].pulling=checked;
+  });
+  renderPickList();
+}
+
+async function commitStockPull(){
+  const bomName=document.getElementById('bom-name').value.trim()||'BOM pull';
+  const projLocGlobal=(document.getElementById('pick-proj-loc')||{value:''}).value.trim();
+  const toPull=Object.entries(pickSelections).filter(([code,s])=>code!=='__projLoc'&&s.pulling&&s.qty>0);
+  if(!toPull.length){toast('Tick at least one part to pull','err');return;}
+
+  // Check each against current stock + quotations
+  const warnings=[];
+  for(const [code,sel] of toPull){
+    const p=db.parts[code];
+    if(!p){warnings.push(`${code} — not found in catalogue`);continue;}
+    if(p.qty<sel.qty){warnings.push(`${p.name} — only ${p.qty} in stock, you want ${sel.qty}`);continue;}
+    // Check if in active quotation
+    const inQuote=Object.values(db.quotes||{}).some(q=>q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(code))));
+    if(inQuote)warnings.push(`⚠ ${p.name} is in an active quotation — pulling from stock may affect that order`);
+  }
+  if(warnings.length){
+    if(!confirm(`Before committing:\n\n${warnings.join('\n')}\n\nContinue anyway?`))return;
+  }
+
+  if(!confirm(`Pull ${toPull.length} part${toPull.length!==1?'s':''} from stock for "${bomName}"?\n\nThis will:\n• Deduct quantities from stock\n• Create allocation records for each part\n• Log the pull in history`))return;
+
+  pushUndo();
+  let pulled=0;
+  const quoteWarnings=[];
+
+  for(const [code,sel] of toPull){
+    const p=db.parts[code];
+    if(!p||p.qty<sel.qty)continue;
+    const projLoc=sel.projLoc||projLocGlobal;
+
+    // Deduct from stock
+    p.qty-=sel.qty;
+
+    // Create allocation
+    if(!db.allocations)db.allocations=[];
+    db.allocations.push({
+      code,name:p.name,qty:sel.qty,
+      build:bomName,po:'Internal stock pull',
+      deliveryId:'internal',date:nowD(),
+      projectLoc:projLoc,
+      allocatedBy:currentUser?currentUser.name:'Unknown',
+      status:'allocated'
+    });
+
+    // Log in history
+    addHist('OUT',p.name,code,-sel.qty,`Internal pull for: ${bomName}${projLoc?' → '+projLoc:''}`);
+
+    // Check if pulling depletes a part that's in a quotation
+    const quotesWithPart=Object.entries(db.quotes||{}).filter(([qid,q])=>
+      q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(code)))
+    );
+    quotesWithPart.forEach(([qid,q])=>{
+      quoteWarnings.push({part:p.name,code,bomName:q.bomName,splitRef:q.splitRef,qtId:qid});
+    });
+
+    // Update BOM inStock
+    const bomItem=curBOM.find(i=>i.matchedCode===code);
+    if(bomItem)bomItem.inStock=p.qty;
+
+    pulled++;
+  }
+
+  await saveDB();
+  pickSelections={};
+  renderPickList();
+  renderBOMRows();
+  renderDash();
+
+  toast(`✓ ${pulled} part${pulled!==1?'s':''} pulled from stock for "${bomName}"`);
+
+  // Show quotation warnings if any
+  if(quoteWarnings.length){
+    setTimeout(()=>showPullQuoteWarning(quoteWarnings,bomName),600);
+  }
+}
+
+function showPullQuoteWarning(warnings,bomName){
+  const existing=document.getElementById('pull-quote-warn-modal');
+  if(existing)existing.remove();
+  const unique=[...new Map(warnings.map(w=>[w.code,w])).values()];
+  const div=document.createElement('div');
+  div.id='pull-quote-warn-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px';
+  div.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden">
+    <div style="background:#92400e;padding:14px 20px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:24px">⚠</span>
+      <div style="color:#fff;font-weight:800;font-size:15px">Parts pulled — quotations may need updating</div>
+    </div>
+    <div style="padding:16px 20px">
+      <p style="font-size:13px;color:#374151;margin-bottom:12px">
+        You pulled parts that are also in active quotations. Those quotations may now be for more than you need. 
+        We've flagged them below — you should raise a new quotation for the shortfall only.
+      </p>
+      ${unique.map(w=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:7px;margin-bottom:6px">
+        ${db.parts[w.code]?partImgHtml(db.parts[w.code],36):''}
+        <div style="flex:1">
+          <div style="font-weight:600">${w.part}</div>
+          <div style="font-size:12px;color:#6b7280">In quotation: ${w.bomName}${w.splitRef?' · '+w.splitRef:''}</div>
+        </div>
+      </div>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="autoNewQuote('${bomName.replace(/'/g,"\\'")}');document.getElementById('pull-quote-warn-modal').remove()"
+          style="flex:1;padding:10px;background:#6d28d9;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          📋 Auto-create shortfall quotation
+        </button>
+        <button onclick="document.getElementById('pull-quote-warn-modal').remove()"
+          style="padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;cursor:pointer">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function autoNewQuote(bomName){
+  // Find BOM id from name
+  const bomId=Object.keys(db.boms).find(id=>db.boms[id].name===bomName)||
+    Object.keys(db.boms).find(id=>db.boms[id].name.includes(bomName.split(' ')[0]));
+  openQuoteBuilder(bomId||'');
+  toast('Quotation builder opened — quote only what you still need to order','info');
+}
+
+function printPickList(){
+  const bomName=document.getElementById('bom-name').value.trim()||'Stock Pick List';
+  const bomRef=document.getElementById('bom-ref').value.trim();
+  const projLoc=(document.getElementById('pick-proj-loc')||{value:''}).value.trim();
+  const ticked=Object.entries(pickSelections).filter(([c,s])=>c!=='__projLoc'&&s.pulling);
+  const all=curBOM.filter(i=>i.matchedCode&&i.inStock>0&&!i.matchRejected);
+
+  const rows=all.map(item=>{
+    const p=db.parts[item.matchedCode];
+    const stockLoc=p?formatLoc(p)||p.loc||'—':'—';
+    const sel=pickSelections[item.matchedCode];
+    const taking=sel&&sel.pulling?sel.qty:0;
+    const projLocItem=sel&&sel.projLoc?sel.projLoc:projLoc||'';
+    const ticked=sel&&sel.pulling;
+    return`<tr style="${ticked?'background:#f0fdf4':''}">
+      <td style="padding:7px 10px;text-align:center;font-size:18px">${ticked?'☑':'☐'}</td>
+      <td style="padding:7px 10px;font-weight:600">${item.name}</td>
+      <td style="padding:7px 10px;font-family:monospace;font-size:12px">${item.matchedCode}</td>
+      <td style="padding:7px 10px;font-family:monospace;font-size:12px;color:#1e40af">${p&&p.mfrno?p.mfrno:'—'}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:700">${item.qty}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:700;color:${taking>0?'#166534':'#6b7280'}">${taking||'—'}</td>
+      <td style="padding:7px 10px;color:#166534;font-weight:600">${stockLoc}</td>
+      <td style="padding:7px 10px;color:#6d28d9">${projLocItem}</td>
+    </tr>`;
+  });
+
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><title>${bomName} — Pick List</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;font-size:13px;padding:24px;color:#1a1a1a}
+    h1{font-size:20px;font-weight:700;margin-bottom:4px}
+    .meta{font-size:12px;color:#6b7280;margin-bottom:6px}
+    .proj-loc{background:#f5f0ff;border:1px solid #c4b5fd;border-radius:6px;padding:7px 12px;margin-bottom:14px;font-size:13px;color:#6d28d9;font-weight:600}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f0fdf4;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #86efac}
+    td{padding:7px 10px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+    tr:hover td{background:#f9fafb}
+    .summary{margin-top:14px;padding:10px 14px;background:#f9fafb;border-radius:6px;font-size:12px;color:#6b7280;display:flex;justify-content:space-between}
+    .sig{margin-top:30px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
+    .sig-box{border-top:1px solid #d1d5db;padding-top:8px;font-size:12px;color:#6b7280}
+    @media print{button{display:none!important}.no-print{display:none!important}}
+  </style></head>
+  <body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+      <div>
+        <h1>${bomName}</h1>
+        <div class="meta">${bomRef||'No reference'} · Pick list generated ${nowDT()}</div>
+        <div class="meta">Picked by: ${currentUser?currentUser.name:'Unknown'}</div>
+      </div>
+      <div class="no-print" style="display:flex;gap:8px">
+        <button onclick="window.print()" style="padding:8px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
+        <button onclick="window.close()" style="padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:13px">Close</button>
+      </div>
+    </div>
+    ${projLoc?`<div class="proj-loc">📍 Project storage location: ${projLoc}</div>`:''}
+    <table>
+      <thead><tr>
+        <th style="width:36px">✓</th>
+        <th>Part name</th>
+        <th>Internal no.</th>
+        <th>Mfr part no.</th>
+        <th style="text-align:center;width:60px">Need</th>
+        <th style="text-align:center;width:70px">Taking</th>
+        <th>Stock location</th>
+        <th>Project location</th>
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <div class="summary">
+      <span>${all.length} parts · ${ticked.length} ticked to pull · ${ticked.reduce((s,[c,sel])=>s+sel.qty,0)} total units</span>
+      <span>Stock shortfall: ${curBOM.filter(i=>!i.matchedCode||i.inStock<=0).length} parts still need ordering</span>
+    </div>
+    <div class="sig">
+      <div class="sig-box">Picked by: ___________________</div>
+      <div class="sig-box">Checked by: ___________________</div>
+      <div class="sig-box">Date: _________________________</div>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
 let curBOM=[];
 
 function bomSug(){
@@ -3336,12 +3862,17 @@ function confirmBOMMatch(idx, confirmed){
   curBOM[idx].matchConfirmed=confirmed;
   if(confirmed){
     curBOM[idx].matchRejected=false;
-    // Restore actual stock level from catalogue
     const p=db.parts[curBOM[idx].matchedCode];
-    if(p)curBOM[idx].inStock=p.qty;
+    if(p){
+      // Subtract already-allocated qty so we only count truly free stock
+      const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+      curBOM[idx].inStock=Math.max(0,p.qty-allocQty);
+      curBOM[idx].allocatedQty=allocQty;
+    }
   }
   renderBOMRows();
-  toast(confirmed?'Match confirmed ✓ — stock restored':'Match unconfirmed','info');
+  recalcBOMSummary();
+  toast(confirmed?'Match confirmed ✓ — stock levels updated':'Match unconfirmed','info');
 }
 
 function rejectBOMMatch(idx){
@@ -3350,7 +3881,79 @@ function rejectBOMMatch(idx){
   curBOM[idx].matchConfirmed=false;
   curBOM[idx].inStock=0;
   renderBOMRows();
-  toast('Marked as no match — will appear in shortfall. Tick "Confirm match?" to undo.','info');
+  recalcBOMSummary();
+  toast('Marked as no match — will appear in shortfall','info');
+}
+
+function recalcBOMSummary(){
+  // Re-run the same summary logic as checkStock so it stays live after confirming/rejecting
+  const confirmed=curBOM.filter(i=>i.matchedCode&&i.matchConfirmed===true);
+  const rejected=curBOM.filter(i=>i.matchRejected);
+  const pending=curBOM.filter(i=>i.matchedCode&&i.inStock===undefined);
+  const short=curBOM.filter(i=>i.matchConfirmed===true&&i.qty>i.inStock);
+  const ok=curBOM.filter(i=>i.matchConfirmed===true&&i.qty<=i.inStock);
+  const needOrder=curBOM.filter(i=>i.matchRejected||(i.matchedCode===null)||(i.matchConfirmed===true&&i.qty>i.inStock));
+  const unmatched=curBOM.filter(i=>i.matchedCode===null);
+
+  const btn=document.getElementById('btn-shortfall');
+  const sum=document.getElementById('bom-summary');
+  if(!sum)return;
+
+  // Build live summary
+  const fromStock=confirmed.filter(i=>i.qty<=i.inStock);
+  const partial=confirmed.filter(i=>i.qty>i.inStock&&i.inStock>0);
+  const totalFromStock=fromStock.reduce((s,i)=>s+i.qty,0);
+
+  let html='';
+
+  // Main status panel
+  if(confirmed.length||rejected.length){
+    html+=`<div style="padding:10px 14px;background:#f0fdf4;border:2px solid #86efac;border-radius:8px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:13px;color:#166534;margin-bottom:8px">BOM status — live update</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${fromStock.length?`<div style="background:#fff;border:1px solid #86efac;border-radius:6px;padding:7px 12px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#166534">${fromStock.length}</div>
+          <div style="font-size:11px;color:#6b7280">From stock ✓</div>
+          <div style="font-size:10px;color:#166534">${totalFromStock} units</div>
+        </div>`:''}
+        ${partial.length?`<div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:7px 12px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#92400e">${partial.length}</div>
+          <div style="font-size:11px;color:#6b7280">Partial stock</div>
+        </div>`:''}
+        ${needOrder.length?`<div style="background:#fff;border:1px solid #fca5a5;border-radius:6px;padding:7px 12px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#991b1b">${needOrder.length}</div>
+          <div style="font-size:11px;color:#6b7280">Need to order</div>
+        </div>`:''}
+        ${unmatched.length?`<div style="background:#fff;border:1px solid #fca5a5;border-radius:6px;padding:7px 12px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:#991b1b">${unmatched.length}</div>
+          <div style="font-size:11px;color:#6b7280">Not in catalogue</div>
+        </div>`:''}
+      </div>
+    </div>`;
+  }
+
+  // Shelf check button — show when any confirmed matches exist
+  if(fromStock.length||partial.length){
+    html+=`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <span style="font-weight:700;font-size:13px;color:#92400e">📋 Ready to go pick ${fromStock.length+partial.length} part${(fromStock.length+partial.length)!==1?'s':''} from stock</span>
+        <div style="font-size:11px;color:#78350f;margin-top:2px">Print the shelf check list, go verify they're there, then commit the pull</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="printBOMShelfCheck()" style="font-size:12px;padding:6px 14px;background:#92400e;color:#fff;border-color:#92400e;font-weight:700">🖨 Print shelf check list</button>
+        <button onclick="setBomTab('pick')" style="font-size:12px;padding:6px 14px;background:#166534;color:#fff;border-color:#166534;font-weight:700">→ Go to Pull from Stock</button>
+      </div>
+    </div>`;
+  }
+
+  // Shortfall button
+  if(needOrder.length){
+    if(btn){btn.style.display='inline-block';btn.textContent=`Order shortfall only (${needOrder.length} line${needOrder.length!==1?'s':''})`;}
+  }else{
+    if(btn)btn.style.display='none';
+  }
+
+  sum.innerHTML=html;
 }
 // Strip common vendor/supplier prefixes added by import tools
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
@@ -3489,6 +4092,13 @@ function checkStock(){
     </div>${unmatchedMsg}`;
   }
   toast(`Stock checked: ${ok.length} OK, ${short.length} short, ${unmatched.length} not found in catalogue`,'info');
+  // Pre-initialise pickSelections for available parts
+  curBOM.filter(i=>i.matchedCode&&i.inStock>0&&!i.matchRejected).forEach(item=>{
+    if(!pickSelections[item.matchedCode])
+      pickSelections[item.matchedCode]={pulling:false,qty:Math.min(item.qty,item.inStock),projLoc:''};
+  });
+  if(ok.length)toast(`${ok.length} part${ok.length!==1?'s':''} in stock — use the "Pull from Stock" tab to pick them`,'info');
+  recalcBOMSummary();
 }
 async function orderShortfall(){
   if(!curBOM.length){toast('Add parts to BOM first — then Check stock levels','err');return;}
@@ -3557,7 +4167,7 @@ async function saveBOM(){
   renderSavedBoms();renderDelSel();renderDash();
 }
 function clearBOM(){
-  curBOM=[];renderBOMRows();
+  curBOM=[];pickSelections={};renderBOMRows();
   document.getElementById('bom-name').value='';
   document.getElementById('bom-ref').value='';
   document.getElementById('bom-summary').innerHTML='';
