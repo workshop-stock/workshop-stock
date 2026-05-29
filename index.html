@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 74 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 75 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2409,29 +2409,26 @@ function coLook(){
       }else{fuzzyWarn.style.display='none';fuzzyWarn.innerHTML='';}
     }
     document.getElementById('co-qty').textContent=p.qty;
-    // Show allocation warning prominently
-    const allocQty=(db.allocations||[]).filter(a=>{
+    // Check allocations — if any, show full blocking modal immediately (same as basket mode)
+    const activeAllocsQ=(db.allocations||[]).filter(a=>{
       if(a.status==='released')return false;
-      return a.code===p.code||normalise(a.code)===normalise(p.code)||
-        normalise(stripVendorPrefix(a.code))===normalise(p.code);
-    }).reduce((s,a)=>s+a.qty,0);
+      return normalise(a.code)===normalise(p.code)||
+        normalise(stripVendorPrefix(a.code))===normalise(p.code)||
+        normalise(a.code)===normalise(p.mfrno||'');
+    });
+    const allocQty=activeAllocsQ.reduce((s,a)=>s+a.qty,0);
     const freeQty=Math.max(0,p.qty-allocQty);
-    const coQtyEl=document.getElementById('co-qty');
-    const allocWarnBar=document.getElementById('co-alloc-warn-bar');
-    const verifyBox=document.getElementById('co-verify-box');
     if(allocQty>0){
-      const builds=[...new Set((db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').map(a=>a.build))].join(', ');
-      coQtyEl.innerHTML=`<span style="color:${freeQty>0?'#166534':'#991b1b'};font-size:20px;font-weight:700">${freeQty} free</span><div style="font-size:12px;color:#6b7280;margin-top:2px">${p.qty} total · ${allocQty} allocated</div>`;
-      if(allocWarnBar){
-        allocWarnBar.style.display='block';
-        allocWarnBar.innerHTML=`🚫 ${allocQty} UNIT${allocQty!==1?'S':''} HELD FOR PROJECT: ${builds} — FREE STOCK: ${freeQty}`;
-      }
-      if(verifyBox){verifyBox.style.borderColor='#991b1b';}
-    }else{
-      coQtyEl.textContent=p.qty;
-      if(allocWarnBar)allocWarnBar.style.display='none';
-      if(verifyBox)verifyBox.style.borderColor='#f59e0b';
+      soundOutOfStock();
+      // Don't show the verify box at all — show the hard stop modal
+      document.getElementById('co-result').style.display='none';
+      showAllocCheckoutWarning(p.code,1,'',freeQty,allocQty,activeAllocsQ,false);
+      return;
     }
+    const allocWarnBar=document.getElementById('co-alloc-warn-bar');
+    if(allocWarnBar)allocWarnBar.style.display='none';
+    const verifyBox=document.getElementById('co-verify-box');
+    if(verifyBox)verifyBox.style.borderColor='#f59e0b';
     document.getElementById('co-result').dataset.code=p.code;
     const tick=document.getElementById('co-verify-tick');
     if(tick)tick.checked=false;
@@ -6535,12 +6532,15 @@ function renderSL(){
         <td><input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)"></td>
         <td style="text-align:center">
           ${allocQty>0
-            ?`<button onclick="showAllocDetail('${p.code}')"
-                style="background:#fee2e2;color:#991b1b;border-color:#fca5a5;font-weight:700;font-size:12px;padding:3px 10px;border-radius:6px"
-                title="Click — these are held for projects, not available for general use">
-                ⚠ ${allocQty}
-              </button>`
-            :`<span style="color:#d1d5db;font-size:12px">—</span>`}
+            ?`<div style="text-align:center">
+                <button onclick="showAllocDetail('${p.code}')"
+                  style="background:#fee2e2;color:#991b1b;border-color:#fca5a5;font-weight:700;font-size:12px;padding:3px 10px;border-radius:6px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:56px"
+                  title="Click — these are held for projects, not available for general use">
+                  <span style="font-size:14px">⚠ ${allocQty}</span>
+                  <span style="font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase">Allocated</span>
+                </button>
+              </div>`
+            :`<span style="color:#d1d5db;font-size:12px;text-align:center;display:block">—</span>`}
         </td>
         <td><input type="number" value="${p.min}" min="0" style="width:60px;border-color:#fcd34d" onchange="updateSLField('${p.code}','min',parseInt(this.value)||0)"></td>
         <td><input type="number" value="${p.max||''}" min="0" placeholder="—" style="width:60px;border-color:#86efac" onchange="updateSLField('${p.code}','max',parseInt(this.value)||0)"></td>
