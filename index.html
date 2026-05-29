@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 71 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 72 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -3789,70 +3789,91 @@ function renderBOMRows(){
   if(!curBOM.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">No parts added yet. Search above or scan a barcode.</div>';hdr.style.display='none';return;}
   hdr.style.display='grid';
   el.innerHTML=curBOM.map((item,i)=>{
-    const need=item.qty-(item.inStock||0);
     const cataloguePart=item.matchedCode?db.parts[item.matchedCode]:null;
+    const isExactMatch=item.matchedCode&&item.matchedCode===item.code;
+    // Auto-confirm exact matches
+    if(isExactMatch&&item.matchConfirmed!==true&&!item.matchRejected){
+      item.matchConfirmed=true;
+    }
+    const confirmed=item.matchConfirmed===true;
+    const inStock=item.inStock||0;
+    const need=item.qty-inStock;
+    const orderQty=Math.max(0,need); // how many still need ordering
+    const allocQty=item.allocatedQty||0;
 
-    // Status badge
+    // Status badge — clear and accurate
     let st;
-    if(item.matchedCode===null){
-      st='<span class="badge b-out" title="Not found in catalogue">⚠ Not in catalogue</span>';
+    if(item.matchedCode===null||item.matchRejected){
+      st=`<span class="badge b-out">Order all ${item.qty}</span>`;
     }else if(item.inStock===undefined){
-      st='<span class="badge b-gray">Click Check stock levels</span>';
-    }else if(need>0){
-      st=`<span class="badge b-low">Need ${need} more</span>`;
+      st='<span class="badge b-gray">Run Check stock</span>';
+    }else if(!confirmed){
+      st='<span class="badge b-gray">Confirm match →</span>';
+    }else if(inStock===0){
+      st=`<span class="badge b-out">Order all ${item.qty}</span>`;
+    }else if(orderQty>0){
+      st=`<div style="display:flex;flex-direction:column;gap:2px">
+        <span class="badge b-ok" style="font-size:10px">✓ ${inStock} from stock</span>
+        <span class="badge b-low" style="font-size:10px">Order ${orderQty} more</span>
+      </div>`;
     }else{
       st='<span class="badge b-ok">In stock ✓</span>';
     }
 
     // Match confirmation section
     let matchSection='';
-    if(item.matchedCode&&item.matchedCode!==item.code&&cataloguePart){
-      const confirmed=item.matchConfirmed===true;
-      matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':item.matchRejected?'#fff5f5':'#fffbeb'};border:1px solid ${confirmed?'#86efac':item.matchRejected?'#fca5a5':'#fcd34d'};border-radius:8px;padding:8px 10px">
-        <div style="font-size:11px;color:#6b7280;margin-bottom:4px;font-weight:600">CATALOGUE MATCH</div>
+    if(item.matchedCode&&!isExactMatch&&cataloguePart){
+      matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':item.matchRejected?'#fff5f5':'#fffbeb'};border:2px solid ${confirmed?'#86efac':item.matchRejected?'#fca5a5':'#f59e0b'};border-radius:8px;padding:8px 10px">
+        <div style="font-size:10px;color:#6b7280;margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Catalogue match — confirm this is the right part</div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div style="flex-shrink:0">${partImgHtml(cataloguePart,40)}</div>
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:700;color:#1a1a1a">${cataloguePart.name}</div>
+            <div style="font-size:13px;font-weight:700;color:#1a1a1a">${cataloguePart.name}</div>
             <div style="font-size:11px;color:#6b7280;margin-top:2px">
               Internal: <strong>${cataloguePart.code}</strong>
-              ${cataloguePart.mfrno?` · Mfr: <strong>${cataloguePart.mfrno}</strong>`:''}
+              ${cataloguePart.mfrno?` · Mfr: <strong style="color:#1e40af">${cataloguePart.mfrno}</strong>`:''}
               · ${formatLoc(cataloguePart)||cataloguePart.loc||'—'}
             </div>
+            ${item.inStock!==undefined?`<div style="font-size:11px;margin-top:3px;font-weight:600;color:${inStock>0?'#166534':'#991b1b'}">
+              ${inStock>0?`✓ ${inStock} in stock`:'✗ 0 in stock — full qty needs ordering'}
+              ${allocQty>0?` · <span style="color:#92400e">${allocQty} allocated to projects</span>`:''}
+            </div>`:''}
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap">
-            <input type="checkbox" id="match-tick-${i}" ${confirmed?'checked':''} 
-              style="width:18px;height:18px;cursor:pointer;accent-color:#166534"
-              onchange="confirmBOMMatch(${i},this.checked)">
-            <label for="match-tick-${i}" style="font-size:12px;font-weight:600;color:${confirmed?'#166534':item.matchRejected?'#991b1b':'#92400e'};cursor:pointer">
-              ${confirmed?'✓ Match confirmed':item.matchRejected?'✗ No match':'Confirm match?'}
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;background:${confirmed?'#dcfce7':'#fff'};border:2px solid ${confirmed?'#22c55e':item.matchRejected?'#fca5a5':'#d1d5db'};border-radius:7px">
+              <input type="checkbox" id="match-tick-${i}" ${confirmed?'checked':''}
+                style="width:18px;height:18px;cursor:pointer;accent-color:#166534"
+                onchange="confirmBOMMatch(${i},this.checked)">
+              <span style="font-size:12px;font-weight:700;color:${confirmed?'#166534':item.matchRejected?'#991b1b':'#374151'}">
+                ${confirmed?'✓ Yes, this is it':item.matchRejected?'✗ Wrong part':'Is this the right part?'}
+              </span>
             </label>
-            ${!confirmed?`<button onclick="rejectBOMMatch(${i})" 
-              style="font-size:11px;padding:2px 8px;color:#991b1b;border-color:#fca5a5;background:${item.matchRejected?'#fee2e2':'#fff'}" 
-              title="Wrong part — mark as not in catalogue">✗ No match</button>`:''}
+            <button onclick="rejectBOMMatch(${i})"
+              style="font-size:11px;padding:5px 10px;color:#991b1b;border-color:#fca5a5;background:${item.matchRejected?'#fee2e2':'#fff'};font-weight:600"
+              title="Wrong part — order full quantity">✗ Wrong part</button>
           </div>
         </div>
       </div>`;
-    }else if(item.matchedCode&&item.matchedCode===item.code&&cataloguePart){
-      // Exact code match — show catalogue details but no tick needed
-      const allocQty=(db.allocations||[]).filter(a=>a.code===item.matchedCode&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
-      matchSection=`<div style="margin-top:4px;font-size:11px;color:#166534">
-        ✓ Exact match: ${cataloguePart.name} · ${formatLoc(cataloguePart)||cataloguePart.loc||''}
-        ${allocQty>0?`<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:8px;margin-left:6px">⚠ ${allocQty} allocated to projects — not counted as available</span>`:''}
+    }else if(isExactMatch&&cataloguePart){
+      matchSection=`<div style="margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">✓ Exact match</span>
+        <span style="font-size:11px;color:#6b7280">${cataloguePart.name} · ${formatLoc(cataloguePart)||cataloguePart.loc||'—'}</span>
+        ${item.inStock!==undefined?`<span style="font-size:11px;font-weight:700;color:${inStock>0?'#166534':'#991b1b'}">${inStock>0?inStock+' in stock':'None in stock'}</span>`:''}
+        ${allocQty>0?`<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:6px;font-size:10px;font-weight:600">⚠ ${allocQty} allocated</span>`:''}
       </div>`;
     }
 
-    return`<div class="bom-row" style="${item.matchedCode===null?'background:#fff5f5':''}">
+    return`<div class="bom-row" style="${item.matchedCode===null||item.matchRejected?'background:#fff5f5':confirmed&&inStock>0&&orderQty===0?'background:#f0fdf4':''}">
       <div>
-        <div style="font-weight:600">${item.name}</div>
-        <div style="font-size:11px;color:#9ca3af;margin-top:1px">BOM code: ${item.code}</div>
+        <div style="font-weight:700;font-size:13px">${item.name}</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:1px;font-family:monospace">BOM: ${item.code}</div>
         ${matchSection}
       </div>
       <span class="chip">${item.cat||'—'}</span>
-      <input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows()">
-      <div style="font-weight:600;color:${(item.inStock||0)>0?'#166534':'#991b1b'}">${item.inStock!==undefined?item.inStock:'—'}</div>
+      <input type="number" value="${item.qty}" min="1" style="width:64px" onchange="curBOM[${i}].qty=parseInt(this.value)||1;renderBOMRows();recalcBOMSummary()">
+      <div style="font-weight:700;font-size:15px;color:${inStock>0?'#166534':'#991b1b'}">${item.inStock!==undefined?inStock:'—'}</div>
       <div>${st}</div>
-      <button onclick="curBOM.splice(${i},1);renderBOMRows()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button>
+      <button onclick="curBOM.splice(${i},1);renderBOMRows();recalcBOMSummary()" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">Remove</button>
     </div>`;
   }).join('');
 }
@@ -3886,57 +3907,61 @@ function rejectBOMMatch(idx){
 }
 
 function recalcBOMSummary(){
-  // Re-run the same summary logic as checkStock so it stays live after confirming/rejecting
-  const confirmed=curBOM.filter(i=>i.matchedCode&&i.matchConfirmed===true);
-  const rejected=curBOM.filter(i=>i.matchRejected);
-  const pending=curBOM.filter(i=>i.matchedCode&&i.inStock===undefined);
-  const short=curBOM.filter(i=>i.matchConfirmed===true&&i.qty>i.inStock);
-  const ok=curBOM.filter(i=>i.matchConfirmed===true&&i.qty<=i.inStock);
-  const needOrder=curBOM.filter(i=>i.matchRejected||(i.matchedCode===null)||(i.matchConfirmed===true&&i.qty>i.inStock));
+  const confirmed=curBOM.filter(i=>i.matchConfirmed===true);
+  const needOrder=curBOM.filter(i=>{
+    if(i.matchRejected||i.matchedCode===null)return true;
+    if(i.matchConfirmed===true&&i.qty>(i.inStock||0))return true;
+    return false;
+  });
+  const fromStock=confirmed.filter(i=>(i.inStock||0)>=i.qty);
+  const partial=confirmed.filter(i=>(i.inStock||0)>0&&i.qty>(i.inStock||0));
+  const zeroStock=confirmed.filter(i=>(i.inStock||0)===0);
   const unmatched=curBOM.filter(i=>i.matchedCode===null);
+
+  const totalFromStock=fromStock.reduce((s,i)=>s+i.qty,0);
+  const totalToOrder=needOrder.reduce((s,i)=>s+Math.max(0,i.qty-(i.inStock||0)),0);
 
   const btn=document.getElementById('btn-shortfall');
   const sum=document.getElementById('bom-summary');
   if(!sum)return;
 
-  // Build live summary
-  const fromStock=confirmed.filter(i=>i.qty<=i.inStock);
-  const partial=confirmed.filter(i=>i.qty>i.inStock&&i.inStock>0);
-  const totalFromStock=fromStock.reduce((s,i)=>s+i.qty,0);
-
   let html='';
 
-  // Main status panel
-  if(confirmed.length||rejected.length){
-    html+=`<div style="padding:10px 14px;background:#f0fdf4;border:2px solid #86efac;border-radius:8px;margin-bottom:8px">
-      <div style="font-weight:700;font-size:13px;color:#166534;margin-bottom:8px">BOM status — live update</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${fromStock.length?`<div style="background:#fff;border:1px solid #86efac;border-radius:6px;padding:7px 12px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#166534">${fromStock.length}</div>
-          <div style="font-size:11px;color:#6b7280">From stock ✓</div>
-          <div style="font-size:10px;color:#166534">${totalFromStock} units</div>
+  if(confirmed.length||unmatched.length){
+    html+=`<div style="padding:12px 14px;background:#f0fdf4;border:2px solid #86efac;border-radius:8px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:13px;color:#166534;margin-bottom:10px">📊 BOM status — live update as you confirm matches</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${fromStock.length?`<div style="background:#fff;border:2px solid #86efac;border-radius:7px;padding:8px 12px;text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:800;color:#166534">${fromStock.length}</div>
+          <div style="font-size:11px;color:#6b7280">In stock ✓</div>
+          <div style="font-size:10px;color:#166534;font-weight:600">${totalFromStock} units</div>
         </div>`:''}
-        ${partial.length?`<div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:7px 12px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#92400e">${partial.length}</div>
+        ${partial.length?`<div style="background:#fff;border:2px solid #fcd34d;border-radius:7px;padding:8px 12px;text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:800;color:#92400e">${partial.length}</div>
           <div style="font-size:11px;color:#6b7280">Partial stock</div>
+          <div style="font-size:10px;color:#92400e;font-weight:600">${partial.reduce((s,i)=>s+(i.inStock||0),0)} available</div>
         </div>`:''}
-        ${needOrder.length?`<div style="background:#fff;border:1px solid #fca5a5;border-radius:6px;padding:7px 12px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#991b1b">${needOrder.length}</div>
-          <div style="font-size:11px;color:#6b7280">Need to order</div>
+        ${zeroStock.length?`<div style="background:#fff;border:2px solid #fca5a5;border-radius:7px;padding:8px 12px;text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:800;color:#991b1b">${zeroStock.length}</div>
+          <div style="font-size:11px;color:#6b7280">0 in stock</div>
+          <div style="font-size:10px;color:#991b1b;font-weight:600">order all</div>
         </div>`:''}
-        ${unmatched.length?`<div style="background:#fff;border:1px solid #fca5a5;border-radius:6px;padding:7px 12px;text-align:center">
-          <div style="font-size:20px;font-weight:800;color:#991b1b">${unmatched.length}</div>
+        ${unmatched.length?`<div style="background:#fff;border:2px solid #fca5a5;border-radius:7px;padding:8px 12px;text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:800;color:#991b1b">${unmatched.length}</div>
           <div style="font-size:11px;color:#6b7280">Not in catalogue</div>
+        </div>`:''}
+        ${totalToOrder>0?`<div style="background:#fff;border:2px solid #1e3a5f;border-radius:7px;padding:8px 12px;text-align:center;min-width:80px">
+          <div style="font-size:22px;font-weight:800;color:#1e3a5f">${totalToOrder}</div>
+          <div style="font-size:11px;color:#6b7280">Units to order</div>
         </div>`:''}
       </div>
     </div>`;
   }
 
-  // Shelf check button — show when any confirmed matches exist
   if(fromStock.length||partial.length){
     html+=`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
-        <span style="font-weight:700;font-size:13px;color:#92400e">📋 Ready to go pick ${fromStock.length+partial.length} part${(fromStock.length+partial.length)!==1?'s':''} from stock</span>
+        <span style="font-weight:700;font-size:13px;color:#92400e">📋 ${fromStock.length+partial.length} part${(fromStock.length+partial.length)!==1?'s':''} can be picked from stock</span>
         <div style="font-size:11px;color:#78350f;margin-top:2px">Print the shelf check list, go verify they're there, then commit the pull</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -3946,15 +3971,15 @@ function recalcBOMSummary(){
     </div>`;
   }
 
-  // Shortfall button
   if(needOrder.length){
-    if(btn){btn.style.display='inline-block';btn.textContent=`Order shortfall only (${needOrder.length} line${needOrder.length!==1?'s':''})`;}
+    if(btn){btn.style.display='inline-block';btn.textContent=`Order shortfall only (${needOrder.length} line${needOrder.length!==1?'s':''} · ${totalToOrder} units)`;}
   }else{
     if(btn)btn.style.display='none';
   }
 
   sum.innerHTML=html;
 }
+
 // Strip common vendor/supplier prefixes added by import tools
 // e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
 function stripVendorPrefix(code){
@@ -4102,14 +4127,25 @@ function checkStock(){
 }
 async function orderShortfall(){
   if(!curBOM.length){toast('Add parts to BOM first — then Check stock levels','err');return;}
-  const short=curBOM.filter(i=>i.qty>i.inStock);
-  if(!short.length){toast('No shortfall — all parts are in stock','info');return;}
+  // Build shortfall list:
+  // - rejected/null match → order full qty
+  // - confirmed match with 0 stock → order full qty
+  // - confirmed match with partial stock → order qty - inStock
+  // - NOT confirmed fuzzy matches → order full qty (can't trust stock count without confirmation)
+  const shortList=curBOM.filter(i=>{
+    if(i.matchRejected||i.matchedCode===null)return true; // definitely need to order
+    if(i.matchConfirmed===true&&i.qty>(i.inStock||0))return true; // confirmed but not enough
+    if(i.matchConfirmed!==true&&i.matchedCode&&i.inStock===0)return true; // unconfirmed, 0 stock
+    return false;
+  });
+  if(!shortList.length){toast('No shortfall — all confirmed parts are in stock','info');return;}
   let n=0;
-  for(const item of short){
+  for(const item of shortList){
     const lookupCode=item.matchedCode||item.code;
     const p=db.parts[lookupCode]||findPartForBOM(item);
-    const shortQty=item.qty-item.inStock;
-    if(!db.order.find(o=>o.code===item.code)){
+    // Order only the gap if confirmed, full qty if not confirmed or no match
+    const shortQty=item.matchConfirmed===true?Math.max(0,item.qty-(item.inStock||0)):item.qty;
+    if(shortQty>0&&!db.order.find(o=>o.code===item.code)){
       db.order.push({
         code:item.code,
         name:item.name,
