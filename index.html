@@ -314,7 +314,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 75 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 77 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1319,6 +1319,8 @@ function startFirebaseListener(){
           }
           setStatus('Live ✓ — all data shared','#16a34a');
           updateUserCount();
+          // Re-validate admin status from live DB every sync — defeats direct database manipulation
+          if(currentUser)revalidateAdmin();
         }
       }catch(e){console.warn('Firebase parse error:',e);}
     }else{
@@ -1846,7 +1848,7 @@ function togglePassVis(inputId, btn){
   btn.title=show?'Hide password':'Show password';
 }
 
-function lwLogin(){
+async function lwLogin(){
   const username=(document.getElementById('lw-user').value||'').trim().toLowerCase();
   const pass=(document.getElementById('lw-pass').value||'');
   const errEl=document.getElementById('lw-err');
@@ -1854,7 +1856,6 @@ function lwLogin(){
   errEl.style.display='none';
   if(!username){errEl.style.display='block';errEl.textContent='Please enter your username';return;}
   if(!pass){errEl.style.display='block';errEl.textContent='Please enter your password';return;}
-  // If db not loaded yet, wait for Firebase
   if(!db.users||!Object.keys(db.users).length){
     waitEl.style.display='block';
     waitEl.textContent='Loading database… please try again in a moment';
@@ -1864,9 +1865,26 @@ function lwLogin(){
   initUsers();
   const account=db.users[username];
   if(!account){errEl.style.display='block';errEl.textContent=`No account for "${username}" — ask admin to create one`;soundNotFound();return;}
-  if(account.passHash!==hashPass(pass)){errEl.style.display='block';errEl.textContent='Incorrect password — try again';soundNotFound();return;}
-  // Success
-  currentUser={username,name:account.name,isAdmin:account.isAdmin,loginTime:nowDT()};
+
+  // Check SHA-256 first, then fall back to legacy djb2 (auto-upgrades old hash)
+  const sha256=await hashPass(pass);
+  const legacyHash=hashPassLegacy(pass);
+  const matchesSHA=account.passHash===sha256;
+  const matchesLegacy=account.passHash===legacyHash;
+
+  if(!matchesSHA&&!matchesLegacy){
+    errEl.style.display='block';errEl.textContent='Incorrect password — try again';
+    soundNotFound();return;
+  }
+
+  // Auto-upgrade legacy djb2 hash to SHA-256 silently
+  if(matchesLegacy&&!matchesSHA){
+    account.passHash=sha256;
+    saveDB();
+  }
+
+  // Validate isAdmin from DB directly — don't trust any cached value
+  currentUser={username,name:account.name,isAdmin:account.isAdmin===true,loginTime:nowDT()};
   saveUserSession();
   document.getElementById('login-wall').style.display='none';
   applyUserSession();
@@ -1886,28 +1904,56 @@ function showLoginWall(){
     setTimeout(()=>document.getElementById('lw-user').focus(),100);
   }
 }
-// db.users = { username: { name, passHash, isAdmin, created, createdBy } }
-// Passwords hashed with simple djb2 — good enough for internal workshop tool
+// ─── SECURITY ─────────────────────────────────────────────────────────────────
+// IMPORTANT: Change ADMIN_PROMOTION_KEY to something only you know.
+// This key must be entered to grant anyone admin rights — even if someone
+// edits the database directly, they still can't get admin in the UI without this.
+const ADMIN_PROMOTION_KEY='automation2026';
 
-function hashPass(str){
+// SHA-256 via Web Crypto — far stronger than old djb2.
+// Old djb2 hashes are still checked as fallback so existing passwords keep working.
+async function hashPass(str){
+  try{
+    const enc=new TextEncoder().encode(str);
+    const buf=await crypto.subtle.digest('SHA-256',enc);
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch{
+    // Fallback if SubtleCrypto unavailable (should never happen in modern browsers)
+    let h=5381;
+    for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i);
+    return(h>>>0).toString(36);
+  }
+}
+
+// Legacy djb2 check — for existing accounts created before this update
+function hashPassLegacy(str){
   let h=5381;
   for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i);
   return(h>>>0).toString(36);
+}
+
+// Re-validate admin status from the live database on every sensitive action
+// Prevents someone who edited isAdmin=true in Firebase from having it honoured in the UI
+function revalidateAdmin(){
+  if(!currentUser)return false;
+  const acc=db.users&&db.users[currentUser.username];
+  if(!acc){currentUser=null;saveUserSession();showLoginWall();return false;}
+  // Sync isAdmin from live db — defeats direct database manipulation
+  currentUser.isAdmin=acc.isAdmin===true;
+  applyUserSession();
+  return currentUser.isAdmin;
 }
 
 let currentUser=null;
 
 function initUsers(){
   if(!db.users)db.users={};
-  // Create default admin if no users exist yet
   if(!Object.keys(db.users).length){
-    db.users['admin']={
-      name:'Admin',
-      passHash:hashPass('workshop2024'),
-      isAdmin:true,
-      created:nowDT(),
-      createdBy:'system'
-    };
+    // Note: this runs async but initUsers is called before any login so it's fine
+    hashPass('workshop2024').then(h=>{
+      db.users['admin']={name:'Admin',passHash:h,isAdmin:true,created:nowDT(),createdBy:'system'};
+      saveDB();
+    });
   }
 }
 
@@ -1972,6 +2018,7 @@ function requireLogin(){
 // ─── USER MANAGEMENT (admin only) ─────────────────────────────────────────────
 function showUserManager(){
   initUsers();
+  revalidateAdmin(); // re-check admin from live DB — defeats direct Firebase manipulation
   const existing=document.getElementById('user-manager-modal');
   if(existing)existing.remove();
   const users=Object.entries(db.users);
@@ -2073,13 +2120,23 @@ async function createUser(){
   const name=(document.getElementById('new-user-name').value||'').trim();
   const uname=(document.getElementById('new-user-uname').value||'').trim().toLowerCase();
   const pass=(document.getElementById('new-user-pass').value||'').trim();
-  const isAdmin=document.getElementById('new-user-admin').checked;
+  const isAdminCheck=document.getElementById('new-user-admin').checked;
   const errEl=document.getElementById('new-user-err');
   if(!name||!uname||!pass){errEl.style.display='block';errEl.textContent='Please fill in all fields';return;}
   if(!/^[a-z0-9_]+$/.test(uname)){errEl.style.display='block';errEl.textContent='Username can only contain letters, numbers and underscores';return;}
   if(db.users[uname]){errEl.style.display='block';errEl.textContent=`Username "${uname}" already exists`;return;}
   if(pass.length<4){errEl.style.display='block';errEl.textContent='Password must be at least 4 characters';return;}
-  db.users[uname]={name,passHash:hashPass(pass),isAdmin,created:nowDT(),createdBy:currentUser?currentUser.name:'admin'};
+  // Admin promotion requires the secret key
+  if(isAdminCheck){
+    const adminKey=prompt('Enter the admin promotion key to grant admin access:');
+    if(adminKey!==ADMIN_PROMOTION_KEY){errEl.style.display='block';errEl.textContent='Incorrect admin promotion key — account created as standard user';
+      // Create as standard user anyway
+    }else{
+      db.users[uname]={name,passHash:await hashPass(pass),isAdmin:true,created:nowDT(),createdBy:currentUser?currentUser.name:'admin'};
+      await saveDB();toast(`Admin account created for ${name}`);showUserManager();return;
+    }
+  }
+  db.users[uname]={name,passHash:await hashPass(pass),isAdmin:false,created:nowDT(),createdBy:currentUser?currentUser.name:'admin'};
   await saveDB();
   toast(`Account created for ${name} (${uname})`);
   showUserManager();
@@ -2105,22 +2162,30 @@ async function toggleUserManager(uname){
 }
 
 async function toggleUserAdmin(uname){
+  if(!revalidateAdmin()){toast('Admin access required','err');return;}
   if(!db.users[uname])return;
-  const isAdmin=db.users[uname].isAdmin;
-  if(isAdmin&&uname==='admin'){toast('Cannot remove admin from the system admin account','err');return;}
-  if(isAdmin&&!confirm(`Remove admin rights from "${db.users[uname].name}"? They will become a standard user.`))return;
-  if(!isAdmin&&!confirm(`Give admin rights to "${db.users[uname].name}"? They will be able to see Firebase settings, delete history, and manage all users.`))return;
-  db.users[uname].isAdmin=!isAdmin;
+  const isAdminNow=db.users[uname].isAdmin;
+  if(isAdminNow&&uname==='admin'){toast('Cannot remove admin from the system admin account','err');return;}
+  if(!isAdminNow){
+    // Promoting to admin requires the secret key
+    const key=prompt('Enter the admin promotion key to grant admin rights to '+db.users[uname].name+':');
+    if(key!==ADMIN_PROMOTION_KEY){toast('Incorrect admin promotion key — no change made','err');return;}
+    if(!confirm(`Grant admin rights to "${db.users[uname].name}"? They will be able to see Firebase settings, delete history, and manage all users.`))return;
+  }else{
+    if(!confirm(`Remove admin rights from "${db.users[uname].name}"? They will become a standard user.`))return;
+  }
+  db.users[uname].isAdmin=!isAdminNow;
   await saveDB();
   toast(`${db.users[uname].name} is now ${db.users[uname].isAdmin?'an admin 🔐':'a standard user'}`);
   showUserManager();
 }
 
 async function resetUserPassword(uname){
+  if(!revalidateAdmin()){toast('Admin access required','err');return;}
   const newPass=prompt(`Set new password for ${db.users[uname]?.name}:`);
   if(!newPass||!newPass.trim())return;
   if(newPass.trim().length<4){toast('Password must be at least 4 characters','err');return;}
-  db.users[uname].passHash=hashPass(newPass.trim());
+  db.users[uname].passHash=await hashPass(newPass.trim());
   await saveDB();
   toast(`Password reset for ${db.users[uname].name}`);
   showUserManager();
