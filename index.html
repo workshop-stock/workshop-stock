@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev20</title>
+<title>Workshop Stock Control v2.1 Rev79</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -311,7 +311,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 77 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 79 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1057,6 +1057,8 @@ tr:hover td{background:#f9fafb}
           <option value="QUOTE_ACCEPT">Quotes accepted</option>
           <option value="EMAIL">Emails sent</option>
           <option value="JOB_CLOSE">Jobs closed</option>
+          <option value="LOGIN">Logins</option>
+          <option value="LOGOUT">Logouts</option>
         </select>
       </div>
       <div style="flex:0 0 auto"><label>Brand</label>
@@ -1815,6 +1817,8 @@ async function lwLogin(){
   applyUserSession();
   soundOK();
   toast(`Welcome, ${account.name}${account.isAdmin?' 🔐':''}!`,'info');
+  account.lastLogin=nowDT();
+  account.loginCount=(account.loginCount||0)+1;
   addEventHist('LOGIN',`${account.name} signed in`,account.isAdmin?'Admin':'Standard');
   saveDB();
 }
@@ -1914,9 +1918,11 @@ function showLoginModal(){showLoginWall();}
 
 function logoutUser(){
   const name=currentUser?currentUser.name:'';
+  if(currentUser)addEventHist('LOGOUT',`${name} signed out`,'');
   currentUser=null;
   saveUserSession();
   applyUserSession();
+  saveDB();
   toast(`${name} signed out`,'info');
   showLoginWall();
 }
@@ -1954,7 +1960,7 @@ function showUserManager(){
               ?'<span style="background:#dcfce7;color:#166534;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px;font-weight:700">🔐 ADMIN</span>'
               :'<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px">Standard</span>'}
           </div>
-          <div style="font-size:11px;color:#9ca3af">@${uname}</div>
+          <div style="font-size:11px;color:#9ca3af">@${uname}${u.lastLogin?' · last seen '+u.lastLogin:' · never logged in'}</div>
         </div>
         ${uname===currentUser?.username?'<span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-weight:600">You</span>':''}
       </div>`).join('')}
@@ -1979,6 +1985,7 @@ function showUserManager(){
                 :'<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:1px 8px;border-radius:8px;margin-left:6px">Standard</span>'}
             </div>
             <div style="font-size:11px;color:#9ca3af">@${uname} · created ${u.created||'—'}</div>
+            <div style="font-size:11px;color:${u.lastLogin?'#166534':'#9ca3af'};font-weight:${u.lastLogin?600:400}">${u.lastLogin?'Last login: '+u.lastLogin+' · '+(u.loginCount||1)+' login'+((u.loginCount||1)!==1?'s':''):'Never logged in'}</div>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap">
             <button onclick="toggleUserAdmin('${uname}')" style="font-size:11px;padding:3px 9px;color:${u.isAdmin?'#991b1b':'#166534'};border-color:${u.isAdmin?'#fca5a5':'#86efac'};background:${u.isAdmin?'#fff5f5':'#f0fdf4'};font-weight:600">
@@ -1988,6 +1995,19 @@ function showUserManager(){
             ${uname!=='admin'?`<button onclick="deleteUser('${uname}')" style="font-size:11px;padding:3px 9px;color:#991b1b;border-color:#fca5a5;background:#fff">Delete</button>`:'<span style="font-size:11px;color:#9ca3af;padding:3px 6px">System account</span>'}
           </div>
         </div>`).join('')}
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:10px">📋 Recent login activity</div>
+      ${(()=>{
+        const events=[...(db.eventHist||[])].filter(e=>e.type==='LOGIN'||e.type==='LOGOUT').reverse().slice(0,15);
+        if(!events.length)return'<div style="font-size:12px;color:#9ca3af">No login activity recorded yet</div>';
+        return events.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+          <span class="badge ${e.type==='LOGIN'?'b-ok':'b-gray'}" style="flex-shrink:0">${e.type==='LOGIN'?'IN':'OUT'}</span>
+          <span style="flex:1">${e.title}</span>
+          <span style="color:#9ca3af;white-space:nowrap">${e.ts}</span>
+        </div>`).join('');
+      })()}
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">Full history — including all logins/logouts — is also in the History tab, filterable by "Logins" / "Logouts".</div>
     </div>
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
       <div style="font-weight:600;font-size:13px;margin-bottom:12px">➕ Create new account</div>
@@ -5388,7 +5408,7 @@ function renderHist(){
 
   function partMeta(code){return db.parts[code]||{};}
 
-  const EVENT_TYPES=['BOM_LOAD','QUOTE_ACCEPT','EMAIL','JOB_CLOSE'];
+  const EVENT_TYPES=['BOM_LOAD','QUOTE_ACCEPT','EMAIL','JOB_CLOSE','LOGIN','LOGOUT'];
   const isEventType=type&&EVENT_TYPES.includes(type);
   const isStockType=type&&!EVENT_TYPES.includes(type);
 
@@ -5439,7 +5459,8 @@ function renderHist(){
     QUOTE_ACCEPT:{cls:'b-ok',label:'Quote Accepted'},
     EMAIL:{cls:'',style:'background:#f5f0ff;color:#6d28d9',label:'Email'},
     JOB_CLOSE:{cls:'b-gray',label:'Job Closed'},
-    LOGIN:{cls:'b-gray',label:'Login'}
+    LOGIN:{cls:'b-gray',label:'Login'},
+    LOGOUT:{cls:'b-gray',label:'Logout'}
   };
 
   _lastHistRows=allRows;
