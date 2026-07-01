@@ -109,7 +109,6 @@ tr:hover td{background:#f9fafb}
 .src-sw{background:#dbeafe;color:#1e40af}
 .src-ep{background:#fce7f3;color:#9d174d}
 .src-gen{background:#f3f4f6;color:#374151}
-/* Quotation styles */
 .qt-company-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden}
 .qt-company-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;gap:8px;flex-wrap:wrap}
 .qt-company-body{padding:14px 16px}
@@ -190,7 +189,6 @@ tr:hover td{background:#f9fafb}
 
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
       <h2 style="margin:0">Connect to your shared database</h2>
-      <!-- Emergency close — always works -->
       <button onclick="forceCloseSetup()" style="font-size:22px;border:none;background:none;cursor:pointer;color:#6b7280;line-height:1;padding:0 4px" title="Close">&times;</button>
     </div>
     <p>Your data is stored in Firebase. No credentials needed — everything is baked in.</p>
@@ -293,7 +291,6 @@ tr:hover td{background:#f9fafb}
 
 <!-- DASHBOARD -->
 <div class="panel active" id="panel-dash">
-  <!-- Clean header bar with cog -->
   <div style="background:#1e3a5f;border-radius:10px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
     <div style="display:flex;align-items:center;gap:14px">
       <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
@@ -326,7 +323,6 @@ tr:hover td{background:#f9fafb}
     </div>
   </div>
 
-  <!-- Metric cards -->
   <div class="g4" style="margin-bottom:14px">
     <div class="met"><div class="met-v" id="m-tot">—</div><div class="met-l">Total parts</div></div>
     <div class="met" onclick="openStockModal('low')" style="cursor:pointer" title="Click to view low stock list"><div class="met-v" id="m-low" style="color:#92400e">—</div><div class="met-l">Low stock &#8599;</div></div>
@@ -357,7 +353,6 @@ tr:hover td{background:#f9fafb}
       <button onclick="openSmSupplierSplit()" style="font-size:12px;background:#6d28d9;color:#fff;border-color:#6d28d9">&#9993; Split to suppliers &amp; email</button>
     </div>
     <div id="stock-modal-body"></div>
-    <!-- supplier split section -->
     <div id="sm-split-panel" style="display:none;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:14px">
       <div style="font-weight:600;font-size:13px;margin-bottom:8px">Assign selected items to suppliers &amp; send reorder emails</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
@@ -389,9 +384,7 @@ tr:hover td{background:#f9fafb}
       <button class="btn-blue" onclick="ciLook()">Lookup</button>
     </div>
     <div id="ci-result" style="display:none">
-      <!-- FUZZY MATCH WARNING — shown when match is not exact -->
       <div id="ci-fuzzy-warn" style="display:none;margin-bottom:10px"></div>
-      <!-- VERIFICATION BOX -->
       <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px">
         <div style="background:#fffbeb;padding:10px 14px;border-bottom:1px solid #fcd34d;display:flex;align-items:center;gap:10px">
           <span style="font-size:18px">🔍</span>
@@ -406,7 +399,6 @@ tr:hover td{background:#f9fafb}
               <div id="ci-detail-table" style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px"></div>
             </div>
           </div>
-          <!-- TICK TO CONFIRM -->
           <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px">
             <input type="checkbox" id="ci-verify-tick" style="width:22px;height:22px;cursor:pointer;accent-color:#166534" onchange="updateCIConfirmBtn()">
             <label for="ci-verify-tick" style="font-size:13px;font-weight:600;color:#92400e;cursor:pointer">
@@ -436,7 +428,6 @@ tr:hover td{background:#f9fafb}
     </div>
     <div id="ci-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found. <a href="#" onclick="go('addpart');return false" style="color:#991b1b;font-weight:600">Add new part?</a></div>
 
-    <!-- BROWSE STOCK TO CHECK IN -->
     <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="font-weight:600;font-size:13px">Browse stock to check in</div>
@@ -472,7 +463,6 @@ tr:hover td{background:#f9fafb}
         onkeydown="if(event.key==='Enter'){coLook();}">
       <button class="btn-blue" onclick="coLook()">Lookup</button>
     </div>
-    <!-- QUICK MODE -->
     <div id="co-quick-panel">
       <div id="co-result" style="display:none">
         <div style="border:2px solid #f59e0b;border-radius:10px;overflow:hidden;margin-bottom:14px" id="co-verify-box">
@@ -510,16 +500,13 @@ tr:hover td{background:#f9fafb}
       </div>
       <div id="co-notfound" style="display:none;padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b">Part not found.</div>
     </div>
-    <!-- BASKET MODE -->
     <div id="co-basket-panel" style="display:none">
 
-      <!-- Continuous scan strip -->
       <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:12px;margin-bottom:12px">
         <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;display:flex;align-items:center;gap:6px">
           <span style="font-size:16px">🛒</span> Basket mode — scan parts one by one, check out all at the end
           <span style="font-size:11px;font-weight:400;color:#4ade80">· parts auto-add on scan · allocated parts will warn</span>
         </div>
-        <!-- Last scan feedback -->
         <div id="co-basket-last" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:7px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px"></div>
         <div id="co-notfound-b" style="display:none;padding:8px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;font-size:13px;color:#991b1b;margin-bottom:8px">
           ⚠ Part not found — check barcode or try the browse list below.
@@ -535,7 +522,6 @@ tr:hover td{background:#f9fafb}
         </div>
       </div>
     </div>
-    <!-- STOCK BROWSER -->
     <div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="font-weight:600;font-size:13px">Browse stock to take</div>
@@ -642,7 +628,6 @@ tr:hover td{background:#f9fafb}
     </div>
     <div style="margin-bottom:14px"><label>Notes</label><input id="ep-notes"></div>
 
-    <!-- PART IMAGE -->
     <div style="margin-bottom:14px">
       <label>Part image (drag &amp; drop or click to upload)</label>
       <div id="ep-img-zone" onclick="document.getElementById('ep-img-file').click()"
@@ -728,7 +713,6 @@ tr:hover td{background:#f9fafb}
 
 <!-- BOM BUILDER -->
 <div class="panel" id="panel-bom">
-  <!-- Sub-tab strip -->
   <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e5e7eb;padding-bottom:0">
     <button id="bom-tab-build" onclick="setBomTab('build')"
       style="padding:8px 18px;border:none;border-bottom:3px solid #1e3a5f;background:none;font-weight:700;font-size:13px;color:#1e3a5f;cursor:pointer;margin-bottom:-2px">
@@ -740,7 +724,6 @@ tr:hover td{background:#f9fafb}
     </button>
   </div>
 
-  <!-- BUILD TAB -->
   <div id="bom-sub-build">
   <div class="g2" style="align-items:start">
     <div>
@@ -772,7 +755,6 @@ tr:hover td{background:#f9fafb}
           <button onclick="openQuoteBuilder()" style="background:#6d28d9;color:#fff;border-color:#6d28d9">&#9993; Split to quotations</button>
           <button onclick="clearBOM()">Clear</button>
         </div>
-        <!-- Order choice panel -->
         <div id="order-choice" style="display:none;margin-top:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px">
           <div style="font-weight:600;font-size:13px;margin-bottom:10px">How do you want to order this BOM?</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -796,9 +778,8 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
   </div>
-  </div><!-- end bom-sub-build -->
+  </div>
 
-  <!-- PICK LIST TAB -->
   <div id="bom-sub-pick" style="display:none">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -817,7 +798,7 @@ tr:hover td{background:#f9fafb}
     </div>
   </div>
 
-</div><!-- end panel-bom -->
+</div>
 <div class="panel" id="panel-delivery">
   <div class="card" style="margin-bottom:12px">
     <div class="sec">Create delivery / order record from BOM</div>
@@ -870,7 +851,6 @@ tr:hover td{background:#f9fafb}
         </div>
       </div>
 
-      <!-- ══ CONTINUOUS BARCODE SCAN RECEIVE ══ -->
       <div style="background:#f0f9ff;border:2px solid #0ea5e9;border-radius:10px;padding:14px;margin-bottom:14px">
         <div style="font-weight:700;font-size:13px;color:#0369a1;margin-bottom:10px;display:flex;align-items:center;gap:8px">
           <span style="font-size:18px">📦</span> Scan &amp; receive parts continuously
@@ -884,7 +864,6 @@ tr:hover td{background:#f9fafb}
           <button class="btn-blue" onclick="delScanLook()" style="background:#0369a1;border-color:#0369a1">Lookup</button>
         </div>
 
-        <!-- Scan result card -->
         <div id="del-scan-result" style="display:none;background:#fff;border:1px solid #bae6fd;border-radius:8px;padding:12px">
           <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px">
             <div id="del-scan-img" style="flex-shrink:0"></div>
@@ -925,7 +904,6 @@ tr:hover td{background:#f9fafb}
           Part not found in catalogue or not on this BOM.
         </div>
 
-        <!-- Running received log -->
         <div id="del-scan-log" style="margin-top:10px"></div>
       </div>
 
@@ -1016,7 +994,6 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
 
-    <!-- Existing splits for this BOM -->
     <div id="qt-existing-splits" style="display:none;margin-bottom:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px">
       <div style="font-weight:600;font-size:12px;color:#166534;margin-bottom:6px">Existing splits for this BOM — parts already quoted are shown below</div>
       <div id="qt-splits-list"></div>
@@ -1137,7 +1114,6 @@ tr:hover td{background:#f9fafb}
           <input id="new-sup-phone" placeholder="Phone (optional)" style="flex:1;min-width:100px">
           <button class="btn-green" onclick="addSupplier()">Add</button>
         </div>
-        <!-- Brand → Supplier assignments -->
         <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:#374151">Brand → Default supplier assignments</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:8px">When a part has no supplier set, this default will be used automatically for ordering.</div>
         <div id="brand-sup-list" style="margin-bottom:8px"></div>
@@ -1195,24 +1171,15 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-// ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║           WORKSHOP STOCK CONTROL — FIREBASE CONFIGURATION                  ║
-// ╚══════════════════════════════════════════════════════════════════════════════╝
-
-// ─── FIREBASE CONFIG — loaded at runtime from separate file ──────────────────
-// Config is stored in /config.js on the same GitHub repo — NOT in this file
-// This means the API key is never visible in the app source code
 let fbdb = null;
 let DATA_REF = null;
 let _firebaseReady = false;
 
 async function loadFirebaseConfig(){
   try{
-    // Fetch config from separate file — obfuscated and not indexed
     const resp = await fetch('./workshop.js?v='+Date.now());
     if(!resp.ok)throw new Error('Config not found');
     const text = await resp.text();
-    // Extract config object from the JS file
     const match = text.match(/window\.__wsc_cfg\s*=\s*(\{[\s\S]*?\});/);
     if(!match)throw new Error('Config format invalid');
     const cfg = JSON.parse(match[1]);
@@ -1223,13 +1190,11 @@ async function loadFirebaseConfig(){
     return true;
   }catch(e){
     console.warn('Config load failed:',e);
-    // Fallback — show error to admin only
     setStatus('⚠ Firebase config not found — contact admin','#ef4444');
     return false;
   }
 }
 
-// ─── LOCAL CACHE ──────────────────────────────────────────────────────────────
 const LOCAL_KEY='wsc_data_v1';
 const LOCAL_KEY_2='wsc_data_v2';
 const LOCAL_BACKUP_KEY=LOCAL_KEY;
@@ -1272,7 +1237,6 @@ function readLocal(){
   return null;
 }
 
-// ─── FIREBASE SAVE — store as JSON string to avoid key name restrictions ────────
 async function saveDB(){
   writeLocal();
   if(!_firebaseReady||!DATA_REF){return;}
@@ -1295,7 +1259,6 @@ async function saveDB(){
   },1500);
 }
 
-// ─── FIREBASE REAL-TIME LISTENER ──────────────────────────────────────────────
 function startFirebaseListener(){
   if(_fbListenerActive)return;
   _fbListenerActive=true;
@@ -1319,7 +1282,6 @@ function startFirebaseListener(){
           }
           setStatus('Live ✓ — all data shared','#16a34a');
           updateUserCount();
-          // Re-validate admin status from live DB every sync — defeats direct database manipulation
           if(currentUser)revalidateAdmin();
         }
       }catch(e){console.warn('Firebase parse error:',e);}
@@ -1344,7 +1306,6 @@ function startFirebaseListener(){
   });
 }
 
-// ─── MANUAL SAVE ──────────────────────────────────────────────────────────────
 async function manualSave(){
   if(_saveTimer)clearTimeout(_saveTimer);
   setStatus('Saving…','#f59e0b');
@@ -1358,7 +1319,6 @@ async function manualSave(){
   }
 }
 
-// ─── ACTIVE USERS — Firebase presence (no polling, no request cost) ───────────
 const SESSION_ID='ses_'+Math.random().toString(36).slice(2,8);
 let presenceRef=null;
 
@@ -1387,21 +1347,6 @@ function updateUserCount(){
   });
 }
 
-// ─── MANUAL SAVE BUTTON ───────────────────────────────────────────────────────
-async function manualSave(){
-  if(_saveTimer)clearTimeout(_saveTimer);
-  setStatus('Saving…','#f59e0b');
-  try{
-    await DATA_REF.child('data').set(JSON.stringify(db));
-    setStatus('Live ✓ — all data shared','#16a34a');
-    toast('Saved to Firebase ✓');
-  }catch(e){
-    setStatus('⚠ Save failed','#f59e0b');
-    toast('Save error: '+e.message,'err');
-  }
-}
-
-// ─── STATUS INDICATOR ─────────────────────────────────────────────────────────
 function setStatus(msg,col){
   const el=document.getElementById('sync-status');
   const dot=document.getElementById('save-dot');
@@ -1414,9 +1359,8 @@ function setStatus(msg,col){
   if(btn)btn.style.display='inline-block';
 }
 
-// ─── SETUP / SETTINGS OVERLAY — simplified for Firebase ──────────────────────
-let cfg={apiKey:'firebase',binId:'firebase'}; // kept for legacy compat checks
-function loadCfg(){} // no-op — Firebase config is baked in
+let cfg={apiKey:'firebase',binId:'firebase'};
+function loadCfg(){}
 function saveCfg(){}
 function forceCloseSetup(){
   const ov=document.getElementById('setup-overlay');
@@ -1427,7 +1371,6 @@ function showSetup(){
 }
 function saveSetup(){forceCloseSetup();toast('Firebase is already connected','info');}
 
-// ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
 function backupData(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
@@ -1465,7 +1408,6 @@ function recoverFromLocal(){
   saveDB();toast(`Recovered ${Object.keys(db.parts).length} parts — uploading to Firebase…`,'info');
 }
 
-// ─── UNDO ─────────────────────────────────────────────────────────────────────
 const undoStack=[];const UNDO_LIMIT=10;
 function pushUndo(){
   undoStack.push(JSON.stringify(db));
@@ -1480,57 +1422,37 @@ async function undoLast(){
   toast('✓ Last action undone successfully');
 }
 
-// ─── LOCATIONS & CATEGORIES (dynamic, stored in db) ──────────────────────────
-// wsc_local_backup_v1 kept for legacy compat
-
-// ─── MASTER LOCATION LIST — same options on all 3 dropdowns ──────────────────
 const DEFAULT_LOC_AREAS=[
-  // Shelf A — A1 to A20
   'A1','A2','A3','A4','A5','A6','A7','A8','A9','A10',
   'A11','A12','A13','A14','A15','A16','A17','A18','A19','A20',
-  // Shelf B — B1 to B20
   'B1','B2','B3','B4','B5','B6','B7','B8','B9','B10',
   'B11','B12','B13','B14','B15','B16','B17','B18','B19','B20',
-  // Shelf C — C1 to C20
   'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10',
   'C11','C12','C13','C14','C15','C16','C17','C18','C19','C20',
-  // Shelf D — D1 to D20
   'D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
   'D11','D12','D13','D14','D15','D16','D17','D18','D19','D20',
-  // Shelf H — H1 to H4
   'H1','H2','H3','H4',
-  // Cabinets
   'CB-01','CB-02','CB-03','CB-04','CB-05',
   'CB-06','CB-07','CB-08','CB-09','CB-10',
-  // Storage bays
   'D11 - Electrical Bay','Mechanical Rack',
-  // Lab shelves
   'Lab Shelf N','Lab Shelf O','Lab Shelf P',
-  // Project shelves
   'Project Shelf 1 — Shelf 1','Project Shelf 1 — Shelf 2','Project Shelf 1 — Shelf 3',
   'Project Shelf 2 — Shelf 1','Project Shelf 2 — Shelf 2','Project Shelf 2 — Shelf 3',
-  // Pallet rack
   'Pallet Rack — Level 1','Pallet Rack — Level 2','Pallet Rack — Level 3',
-  // Boxes / bins / containers
   'Box 1','Box 2','Box 3','Box 4','Box 5','Box 6',
   'Box 7','Box 8','Box 9','Box 10','Box 11','Box 12',
   'Bin 1','Bin 2','Bin 3','Bin 4','Bin 5','Bin 6',
   'Tray 1','Tray 2','Tray 3',
   'Bag 1','Bag 2','Bag 3',
   'Compartment A','Compartment B','Compartment C','Compartment D',
-  // Workbenches & tool boxes
   'Workbench 1','Workbench 2',
   'Tool Box 1','Tool Box 2',
-  // Wall & floor
   'Wall Storage 1','Wall Storage 2',
   'Workshop Floor','Quarantine','Loose'
 ];
-// All 3 levels use the same master list
 const DEFAULT_LOC_SECTIONS=[...DEFAULT_LOC_AREAS];
 const DEFAULT_LOC_CONTAINERS=[...DEFAULT_LOC_AREAS];
 const DEFAULT_CATS=['PLC','HMI','VFD / Drives','Relays & Contactors','Sensors','Cables & Connectors','Power Supplies','Circuit Breakers','Enclosures & DIN','I/O Modules','Consumables','Other'];
-
-// Keep old DEFAULT_LOCS for backward compat migration
 const DEFAULT_LOCS=[...DEFAULT_LOC_AREAS];
 
 function getLocAreas(){return db.locAreas&&db.locAreas.length?db.locAreas:DEFAULT_LOC_AREAS;}
@@ -1538,7 +1460,6 @@ function getLocSections(){return db.locSections&&db.locSections.length?db.locSec
 function getLocContainers(){return db.locContainers&&db.locContainers.length?db.locContainers:DEFAULT_LOC_CONTAINERS;}
 function getCats(){return db.categories&&db.categories.length?db.categories:DEFAULT_CATS;}
 
-// Format location from part — handles both old string loc and new loc/loc2/loc3
 function formatLoc(p){
   if(p.loc2||p.loc3||p.locCustom){
     return[p.loc,p.loc2,p.loc3,p.locCustom].filter(Boolean).join(' › ');
@@ -1548,14 +1469,12 @@ function formatLoc(p){
 
 function masterLocOpts(sel){
   const s=(v)=>sel===v?' selected':'';
-  // Get any custom locations added via Settings
   const allLocs=new Set([
     ...DEFAULT_LOC_AREAS,
     ...(db.locAreas||[]),
     ...(db.locSections||[]),
     ...(db.locContainers||[])
   ]);
-  // Find custom ones not in the hardcoded groups below
   const hardcoded=new Set([
     ...Array.from({length:20},(_,i)=>`A${i+1}`),
     ...Array.from({length:20},(_,i)=>`B${i+1}`),
@@ -1605,7 +1524,6 @@ function containerOpts(sel){return masterLocOpts(sel);}
 function catOpts(sel,blank='Select…'){return`<option value="">${blank}</option>`+getCats().map(c=>`<option${sel===c?' selected':''}>${c}</option>`).join('');}
 function catFilterOpts(){return`<option value="">All categories</option>`+getCats().map(c=>`<option>${c}</option>`).join('');}
 
-// Keep locOpts for delivery rows (single combined dropdown for quick use)
 function locOpts(sel){
   const all=[...getLocAreas(),...getLocSections(),...getLocContainers()];
   return all.map(l=>`<option${sel===l?' selected':''}>${l}</option>`).join('');
@@ -1615,25 +1533,20 @@ function rebuildLocDropdowns(){populateLocDropdowns();}
 function rebuildCatDropdowns(){populateCatDropdowns();}
 
 function populateLocDropdowns(){
-  // Add Part — all 3 use same master list
   const apLoc=document.getElementById('ap-loc');
   const apLoc2=document.getElementById('ap-loc2');
   const apLoc3=document.getElementById('ap-loc3');
   if(apLoc)apLoc.innerHTML=areaOpts('');
   if(apLoc2)apLoc2.innerHTML=sectionOpts('');
   if(apLoc3)apLoc3.innerHTML=containerOpts('');
-  // Check In — all 3 use same master list
   const ciL=document.getElementById('ci-newloc');
   const ciL2=document.getElementById('ci-newloc2');
   const ciL3=document.getElementById('ci-newloc3');
   if(ciL)ciL.innerHTML=`<option value="">Keep current loc 1</option>`+masterLocOpts('');
   if(ciL2)ciL2.innerHTML=`<option value="">Keep current loc 2</option>`+masterLocOpts('');
   if(ciL3)ciL3.innerHTML=`<option value="">Keep current loc 3</option>`+masterLocOpts('');
-  // Location search dropdown on Search Parts tab — use full master list
   const slocEl=document.getElementById('sloc');
   if(slocEl){
-    slocEl.innerHTML=`<option value="">All locations</option>`+masterLocOpts('').replace(/<option value="">— Select location —<\/option>/,'').replace(/<\/?optgroup[^>]*>/g,match=>match); 
-    // Rebuild cleanly using the master list items
     const allMasterLocs=[
       ...Array.from({length:20},(_,i)=>`A${i+1}`),
       ...Array.from({length:20},(_,i)=>`B${i+1}`),
@@ -1668,9 +1581,6 @@ function populateCatDropdowns(){
   populateBrandDropdowns();
 }
 
-// ─── SMART FREQUENCY TRACKING ─────────────────────────────────────────────────
-// Tracks how often each category/brand/voltage is used for check-in/out
-// stored in db.freq = { cat:{PLC:5, HMI:3}, brand:{Siemens:8}, volt:{24V:12} }
 function trackFreq(type, value){
   if(!value)return;
   if(!db.freq)db.freq={};
@@ -1688,25 +1598,21 @@ function populateBrandDropdowns(){
   const suppliers=freqSort([...new Set(Object.values(db.parts).map(p=>p.sup||'').filter(Boolean))],'supplier');
   const cats=freqSort(getCats(),'cat');
 
-  // For filter selects — sorted by frequency, most used first
   const brandFilterHtml='<option value="">All brands</option>'+brands.map(b=>`<option>${b}</option>`).join('');
   const supFilterHtml='<option value="">All suppliers</option>'+suppliers.map(s=>`<option>${s}</option>`).join('');
   const catFilterHtmlSorted='<option value="">All categories</option>'+cats.map(c=>`<option>${c}</option>`).join('');
 
-  // Populate filter selects
   ['sbrand','slbrand','co-browse-brand','h-brand','ci-browse-brand'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.innerHTML=brandFilterHtml;
   });
   ['h-supplier'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.innerHTML=supFilterHtml;
   });
-  // Smart category filter dropdowns
   ['scat','slcat','co-browse-cat','ci-browse-cat'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.innerHTML=catFilterHtmlSorted;
   });
 
-  // Datalists for manual typing on ap-cat (Add Part) — allows both select and free type
   buildDatalist('dl-brands', brands);
   buildDatalist('dl-cats', cats);
   buildDatalist('dl-suppliers', suppliers.length?suppliers:(db.suppliers||[]).map(s=>s.name));
@@ -1719,10 +1625,9 @@ function buildDatalist(id, items){
   dl.innerHTML=items.map(v=>`<option value="${v}">`).join('');
 }
 
-// Make a select/input combo — converts a <select id="X"> into a type+suggest input
 function makeComboInput(selectId, datalistId, placeholder){
   const sel=document.getElementById(selectId);
-  if(!sel||sel.dataset.combo==='true')return; // already converted
+  if(!sel||sel.dataset.combo==='true')return;
   const parent=sel.parentNode;
   const inp=document.createElement('input');
   inp.id=selectId;
@@ -1733,12 +1638,10 @@ function makeComboInput(selectId, datalistId, placeholder){
   inp.dataset.combo='true';
   parent.replaceChild(inp, sel);
   inp.addEventListener('input', ()=>{
-    // trigger the same onchange logic by dispatching change
     inp.dispatchEvent(new Event('change',{bubbles:true}));
   });
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
 function toast(msg,type='ok'){
   const t=document.getElementById('toast');
   t.textContent=msg;t.className=`toast t-${type} show`;
@@ -1770,20 +1673,17 @@ function normalise(s){return(s||'').toLowerCase().replace(/[\s\-_]/g,'');}
 function findPartWithType(v){
   const vn=normalise(v);
   if(!vn)return null;
-  // 1. Exact match — code, barcode, mfrno
   const exact=Object.values(db.parts).find(p=>
     normalise(p.code)===vn ||
     normalise(p.barcode||'')===vn ||
     normalise(p.mfrno||'')===vn
   );
   if(exact)return{part:exact,matchType:'exact'};
-  // 2. Prefix/normalised match
   const prefix=Object.values(db.parts).find(p=>
     normalise(p.code).startsWith(vn)||
     normalise(p.mfrno||'').startsWith(vn)
   );
   if(prefix)return{part:prefix,matchType:'fuzzy'};
-  // 3. Name search
   const nameMatch=Object.values(db.parts).find(p=>{
     const hay=partHaystack(p);
     return wordMatches(v.trim(), hay);
@@ -1795,7 +1695,42 @@ function findPart(v){
   const r=findPartWithType(v);
   return r?r.part:null;
 }
-// ─── SOUND SYSTEM ─────────────────────────────────────────────────────────────
+
+// ─── FIX: multi-match candidate lookup (replaces single-guess .find() in scans) ───
+function findPartCandidates(v,limit){
+  limit=limit||8;
+  const vn=normalise(v);
+  if(!vn)return[];
+  const exact=[],prefix=[],fuzzy=[];
+  Object.values(db.parts).forEach(p=>{
+    const codeN=normalise(p.code),barN=normalise(p.barcode||''),mfrN=normalise(p.mfrno||'');
+    if(codeN===vn||barN===vn||mfrN===vn){exact.push(p);return;}
+    if(codeN.startsWith(vn)||mfrN.startsWith(vn)){prefix.push(p);return;}
+    if(wordMatches(v.trim(),partHaystack(p)))fuzzy.push(p);
+  });
+  return[...exact,...prefix,...fuzzy].slice(0,limit);
+}
+
+function renderMultiMatchPicker(containerEl,v,cands,pickFnName){
+  containerEl.style.display='block';
+  containerEl.innerHTML=`<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:10px 12px">
+    <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:6px">
+      ${cands.length} parts match "${v}" — select the correct one:
+    </div>
+    ${cands.map(p=>`<div onclick="${pickFnName}('${p.code}')"
+      style="display:flex;align-items:center;gap:10px;padding:6px 8px;cursor:pointer;border-radius:6px;border-bottom:1px solid #fef3c7"
+      onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='transparent'">
+      ${partImgHtml(p,36)}
+      <div><div style="font-weight:600;font-size:13px">${p.name}</div>
+      <div style="font-size:11px;color:#6b7280">${p.code}${p.mfrno?' · '+p.mfrno:''}</div></div>
+    </div>`).join('')}
+  </div>`;
+}
+function ciPickMatch(code){document.getElementById('ci-scan').value=code;ciLook();}
+function coPickMatch(code){document.getElementById('co-scan').value=code;coLook();}
+function coBasketPickMatch(code){document.getElementById('co-scan').value=code;coLook();}
+// ─── END FIX ───
+
 const AudioCtx=window.AudioContext||window.webkitAudioContext;
 let _actx=null;
 function getACtx(){if(!_actx)try{_actx=new AudioCtx();}catch{}return _actx;}
@@ -1813,32 +1748,25 @@ function playTone(freq,duration,type='sine',vol=0.3){
 }
 
 function soundOK(){
-  // Two-tone success beep
   playTone(880,0.1,'sine',0.2);
   setTimeout(()=>playTone(1100,0.15,'sine',0.2),100);
 }
 function soundNotFound(){
-  // Low error buzz
   playTone(220,0.4,'sawtooth',0.3);
   setTimeout(()=>playTone(180,0.3,'sawtooth',0.2),150);
 }
 function soundOutOfStock(){
-  // Triple descending beep
   playTone(600,0.15,'square',0.25);
   setTimeout(()=>playTone(450,0.15,'square',0.25),180);
   setTimeout(()=>playTone(300,0.25,'square',0.25),360);
 }
 function soundBasketAdd(){
-  // Single quick confirm
   playTone(1000,0.08,'sine',0.15);
 }
 
 function nowDT(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function nowD(){return new Date().toLocaleDateString('en-GB');}
 
-// ─── USER LOGIN SYSTEM ────────────────────────────────────────────────────────
-// ─── LOGIN WALL (static HTML — always works) ──────────────────────────────────
-// Toggle password visibility — eye icon button
 function togglePassVis(inputId, btn){
   const inp=document.getElementById(inputId);
   if(!inp)return;
@@ -1866,7 +1794,6 @@ async function lwLogin(){
   const account=db.users[username];
   if(!account){errEl.style.display='block';errEl.textContent=`No account for "${username}" — ask admin to create one`;soundNotFound();return;}
 
-  // Check SHA-256 first, then fall back to legacy djb2 (auto-upgrades old hash)
   const sha256=await hashPass(pass);
   const legacyHash=hashPassLegacy(pass);
   const matchesSHA=account.passHash===sha256;
@@ -1877,13 +1804,11 @@ async function lwLogin(){
     soundNotFound();return;
   }
 
-  // Auto-upgrade legacy djb2 hash to SHA-256 silently
   if(matchesLegacy&&!matchesSHA){
     account.passHash=sha256;
     saveDB();
   }
 
-  // Validate isAdmin from DB directly — don't trust any cached value
   currentUser={username,name:account.name,isAdmin:account.isAdmin===true,loginTime:nowDT()};
   saveUserSession();
   document.getElementById('login-wall').style.display='none';
@@ -1904,41 +1829,30 @@ function showLoginWall(){
     setTimeout(()=>document.getElementById('lw-user').focus(),100);
   }
 }
-// ─── SECURITY ─────────────────────────────────────────────────────────────────
-// IMPORTANT: Change ADMIN_PROMOTION_KEY to something only you know.
-// This key must be entered to grant anyone admin rights — even if someone
-// edits the database directly, they still can't get admin in the UI without this.
 const ADMIN_PROMOTION_KEY='automation2026';
 
-// SHA-256 via Web Crypto — far stronger than old djb2.
-// Old djb2 hashes are still checked as fallback so existing passwords keep working.
 async function hashPass(str){
   try{
     const enc=new TextEncoder().encode(str);
     const buf=await crypto.subtle.digest('SHA-256',enc);
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
   }catch{
-    // Fallback if SubtleCrypto unavailable (should never happen in modern browsers)
     let h=5381;
     for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i);
     return(h>>>0).toString(36);
   }
 }
 
-// Legacy djb2 check — for existing accounts created before this update
 function hashPassLegacy(str){
   let h=5381;
   for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i);
   return(h>>>0).toString(36);
 }
 
-// Re-validate admin status from the live database on every sensitive action
-// Prevents someone who edited isAdmin=true in Firebase from having it honoured in the UI
 function revalidateAdmin(){
   if(!currentUser)return false;
   const acc=db.users&&db.users[currentUser.username];
   if(!acc){currentUser=null;saveUserSession();showLoginWall();return false;}
-  // Sync isAdmin from live db — defeats direct database manipulation
   currentUser.isAdmin=acc.isAdmin===true;
   applyUserSession();
   return currentUser.isAdmin;
@@ -1949,7 +1863,6 @@ let currentUser=null;
 function initUsers(){
   if(!db.users)db.users={};
   if(!Object.keys(db.users).length){
-    // Note: this runs async but initUsers is called before any login so it's fine
     hashPass('workshop2024').then(h=>{
       db.users['admin']={name:'Admin',passHash:h,isAdmin:true,created:nowDT(),createdBy:'system'};
       saveDB();
@@ -1962,12 +1875,10 @@ function loadUserSession(){
     const saved=localStorage.getItem('wsc_user');
     if(saved){
       const s=JSON.parse(saved);
-      // Re-validate against current db.users to ensure account still exists
       if(db.users&&db.users[s.username]){
         currentUser=s;
         applyUserSession();
       }else{
-        // Account may not be loaded yet — store temporarily and validate after Firebase loads
         currentUser=s;
         applyUserSession();
       }
@@ -2015,10 +1926,9 @@ function requireLogin(){
   return true;
 }
 
-// ─── USER MANAGEMENT (admin only) ─────────────────────────────────────────────
 function showUserManager(){
   initUsers();
-  revalidateAdmin(); // re-check admin from live DB — defeats direct Firebase manipulation
+  revalidateAdmin();
   const existing=document.getElementById('user-manager-modal');
   if(existing)existing.remove();
   const users=Object.entries(db.users);
@@ -2027,7 +1937,6 @@ function showUserManager(){
   div.id='user-manager-modal';
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px';
 
-  // Standard users: read-only team list showing who is who + who is admin
   const teamView=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
@@ -2051,7 +1960,6 @@ function showUserManager(){
       </div>`).join('')}
   </div>`;
 
-  // Admin: full management panel
   const adminView=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:620px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
@@ -2126,11 +2034,9 @@ async function createUser(){
   if(!/^[a-z0-9_]+$/.test(uname)){errEl.style.display='block';errEl.textContent='Username can only contain letters, numbers and underscores';return;}
   if(db.users[uname]){errEl.style.display='block';errEl.textContent=`Username "${uname}" already exists`;return;}
   if(pass.length<4){errEl.style.display='block';errEl.textContent='Password must be at least 4 characters';return;}
-  // Admin promotion requires the secret key
   if(isAdminCheck){
     const adminKey=prompt('Enter the admin promotion key to grant admin access:');
     if(adminKey!==ADMIN_PROMOTION_KEY){errEl.style.display='block';errEl.textContent='Incorrect admin promotion key — account created as standard user';
-      // Create as standard user anyway
     }else{
       db.users[uname]={name,passHash:await hashPass(pass),isAdmin:true,created:nowDT(),createdBy:currentUser?currentUser.name:'admin'};
       await saveDB();toast(`Admin account created for ${name}`);showUserManager();return;
@@ -2167,7 +2073,6 @@ async function toggleUserAdmin(uname){
   const isAdminNow=db.users[uname].isAdmin;
   if(isAdminNow&&uname==='admin'){toast('Cannot remove admin from the system admin account','err');return;}
   if(!isAdminNow){
-    // Promoting to admin requires the secret key
     const key=prompt('Enter the admin promotion key to grant admin rights to '+db.users[uname].name+':');
     if(key!==ADMIN_PROMOTION_KEY){toast('Incorrect admin promotion key — no change made','err');return;}
     if(!confirm(`Grant admin rights to "${db.users[uname].name}"? They will be able to see Firebase settings, delete history, and manage all users.`))return;
@@ -2191,7 +2096,6 @@ async function resetUserPassword(uname){
   showUserManager();
 }
 
-// Updated addHist to include user
 function addHist(type,name,code,qty,ref){
   const user=currentUser?currentUser.name:'Unknown';
   db.hist.push({ts:nowDT(),type,name,code,qty,ref:ref||'',user});
@@ -2206,7 +2110,6 @@ function renderAll(){
   renderDash();renderSavedBoms();renderDelSel();renderDelHist();renderOrder();renderHist();doSearch();renderQuotations();
   populateLocDropdowns();populateCatDropdowns();populateBrandDropdowns();
 }
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDash(){
   const all=Object.values(db.parts);
   const low=all.filter(p=>p.qty>0&&p.qty<=p.min);
@@ -2224,7 +2127,6 @@ function renderDash(){
   document.getElementById('d-activity').innerHTML=rec.length
     ?`<table><thead><tr><th>Date/time</th><th>Type</th><th>Part</th><th>Qty</th><th>Ref</th></tr></thead><tbody>${rec.map(h=>`<tr><td style="font-size:11px">${h.ts}</td><td><span class="badge ${h.qty>0?'b-ok':'b-low'}">${h.qty>0?'IN':'OUT'}</span></td><td>${h.name}</td><td style="font-weight:600;color:${h.qty>0?'#166534':'#991b1b'}">${h.qty>0?'+':''}${h.qty}</td><td style="font-size:11px">${h.ref}</td></tr>`).join('')}</tbody></table>`
     :'<div style="color:#9ca3af;font-size:13px">No activity yet</div>';
-  // ── Pending deliveries with overdue detection ──
   const pend=db.deliveries.filter(d=>d.status!=='complete');
   const today=new Date();today.setHours(0,0,0,0);
   const statusBadge={pending:'b-gray',ordered:'b-blue','in-transit':'b-part',partial:'b-low',complete:'b-done'};
@@ -2251,7 +2153,6 @@ function renderDash(){
               ${d.dueDate?`Due: <strong style="color:${isOverdue?'#991b1b':'#92400e'}">${d.dueDate}</strong> · `:''}
               Started ${d.created}
             </div>
-            <!-- Progress bar -->
             <div style="margin-top:6px;display:flex;align-items:center;gap:8px">
               <div style="flex:1;background:#e5e7eb;border-radius:4px;height:6px;max-width:200px">
                 <div style="width:${pct}%;background:${pct===100?'#22c55e':pct>50?'#3b82f6':'#f59e0b'};height:6px;border-radius:4px;transition:width .3s"></div>
@@ -2274,7 +2175,6 @@ function renderDash(){
     }).join('')
     :'<div style="color:#9ca3af;font-size:13px">No pending deliveries</div>';
 
-  // ── Overdue summary at top if any ──
   const overdue=pend.filter(d=>d.dueDate&&new Date(d.dueDate)<today);
   const overdueEl=document.getElementById('d-overdue-banner');
   if(overdueEl){
@@ -2290,24 +2190,35 @@ function renderDash(){
   }
 }
 
-// ─── CHECK IN ─────────────────────────────────────────────────────────────────
+// ─── CHECK IN (FIXED — uses findPartCandidates instead of single-guess find()) ───
 function ciLook(){
   const v=document.getElementById('ci-scan').value;
   if(!v.trim())return;
-  const result=findPartWithType(v);
   document.getElementById('ci-notfound').style.display='none';
   document.getElementById('ci-result').style.display='none';
-  if(!result){
-    document.getElementById('ci-notfound').style.display='block';
+
+  const cands=findPartCandidates(v,8);
+  if(!cands.length){
     soundNotFound();
+    const nf=document.getElementById('ci-notfound');
+    nf.innerHTML=`⚠ No part matches "<strong>${v}</strong>". If this was a barcode scan, it may not be registered on any part yet — try the part number or name instead. <a href="#" onclick="go('addpart');return false" style="color:#991b1b;font-weight:600">Add new part?</a>`;
+    nf.style.display='block';
     return;
   }
+  if(cands.length>1){
+    renderMultiMatchPicker(document.getElementById('ci-notfound'),v,cands,'ciPickMatch');
+    document.getElementById('ci-notfound').style.display='block';
+    return;
+  }
+
+  const p=cands[0];
+  const vn=normalise(v);
+  const isExact=normalise(p.code)===vn||normalise(p.barcode||'')===vn||normalise(p.mfrno||'')===vn;
+  const result={part:p,matchType:isExact?'exact':'fuzzy'};
   soundOK();
 
-  const p=result.part;
   const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
 
-  // Part image
   const imgEl=document.getElementById('ci-part-image');
   if(imgEl)imgEl.innerHTML=partImgHtml(p,72);
 
@@ -2328,7 +2239,6 @@ function ciLook(){
     ].filter(Boolean).join('');
   }
 
-  // Show fuzzy match warning banner
   const fuzzyWarn=document.getElementById('ci-fuzzy-warn');
   if(fuzzyWarn){
     if(isFuzzy){
@@ -2394,21 +2304,17 @@ async function doCI(){
   if(newloc)db.parts[code].loc=newloc;
   if(newloc2)db.parts[code].loc2=newloc2;
   if(newloc3)db.parts[code].loc3=newloc3;
-  // Track purchase history — last 3 suppliers
   if(!db.parts[code].purchaseHist)db.parts[code].purchaseHist=[];
   const sup=notes||(db.parts[code].sup||'Unknown');
   db.parts[code].purchaseHist.unshift({date:nowD(),supplier:sup,qty,ref:notes||''});
   if(db.parts[code].purchaseHist.length>3)db.parts[code].purchaseHist.length=3;
-  // track frequency for smart sorting
   trackFreq('cat',db.parts[code].cat);
   trackFreq('brand',db.parts[code].mfr||'');
   addHist('IN',db.parts[code].name,code,qty,notes);
   await saveDB();
   const locStr=formatLoc(db.parts[code]);
-  // ── Fully clear and reset check-in form ──
   resetCI();
   document.getElementById('ci-scan').value='';
-  // Show success with undo option
   const toastEl=document.getElementById('toast');
   toastEl.innerHTML=`✓ Checked in ${qty}× ${db.parts[code].name}${locStr?' → '+locStr:''} &nbsp;<button onclick="undoLast()" style="background:rgba(255,255,255,.3);border:none;color:inherit;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">↺ Undo</button>`;
   toastEl.className='toast t-ok show';
@@ -2417,7 +2323,7 @@ async function doCI(){
   renderDash();
 }
 
-// ─── CHECK OUT ────────────────────────────────────────────────────────────────
+// ─── CHECK OUT (FIXED — uses findPartCandidates for both quick and basket mode) ───
 let coMode='quick';
 let basket=[];
 
@@ -2433,16 +2339,28 @@ function setCOMode(m){
 function coLook(){
   const v=document.getElementById('co-scan').value;
   if(!v.trim())return;
-  const result=findPartWithType(v);
   if(coMode==='quick'){
     document.getElementById('co-notfound').style.display='none';
     document.getElementById('co-result').style.display='none';
-    if(!result){
-      document.getElementById('co-notfound').style.display='block';
+
+    const cands=findPartCandidates(v,8);
+    if(!cands.length){
       soundNotFound();
+      const nf=document.getElementById('co-notfound');
+      nf.innerHTML=`⚠ No part matches "<strong>${v}</strong>". If this was a barcode scan, it may not be registered on any part yet — try the part number or name instead.`;
+      nf.style.display='block';
       return;
     }
-    const p=result.part;
+    if(cands.length>1){
+      renderMultiMatchPicker(document.getElementById('co-notfound'),v,cands,'coPickMatch');
+      document.getElementById('co-notfound').style.display='block';
+      return;
+    }
+
+    const p=cands[0];
+    const vn=normalise(v);
+    const isExact=normalise(p.code)===vn||normalise(p.barcode||'')===vn||normalise(p.mfrno||'')===vn;
+    const result={part:p,matchType:isExact?'exact':'fuzzy'};
     const isFuzzy=result.matchType==='fuzzy'||result.matchType==='name';
     if(p.qty<=0)soundOutOfStock();
     else soundOK();
@@ -2474,7 +2392,6 @@ function coLook(){
       }else{fuzzyWarn.style.display='none';fuzzyWarn.innerHTML='';}
     }
     document.getElementById('co-qty').textContent=p.qty;
-    // Check allocations — if any, show full blocking modal immediately (same as basket mode)
     const activeAllocsQ=(db.allocations||[]).filter(a=>{
       if(a.status==='released')return false;
       return normalise(a.code)===normalise(p.code)||
@@ -2485,7 +2402,6 @@ function coLook(){
     const freeQty=Math.max(0,p.qty-allocQty);
     if(allocQty>0){
       soundOutOfStock();
-      // Don't show the verify box at all — show the hard stop modal
       document.getElementById('co-result').style.display='none';
       showAllocCheckoutWarning(p.code,1,'',freeQty,allocQty,activeAllocsQ,false);
       return;
@@ -2502,19 +2418,29 @@ function coLook(){
     document.getElementById('co-take').value=1;
     document.getElementById('co-ref').value='';
   } else {
-    // ── BASKET MODE — auto-add on scan ──
+    // ── BASKET MODE — auto-add on scan (FIXED) ──
     document.getElementById('co-notfound-b').style.display='none';
     const lastEl=document.getElementById('co-basket-last');
-    const p=result?result.part:null;
 
-    if(!p){
-      document.getElementById('co-notfound-b').style.display='block';
-      if(lastEl)lastEl.style.display='none';
+    const cands=findPartCandidates(v,8);
+    if(!cands.length){
       soundNotFound();
+      if(lastEl)lastEl.style.display='none';
+      const nf=document.getElementById('co-notfound-b');
+      nf.innerHTML=`⚠ No part matches "<strong>${v}</strong>". If this was a barcode scan, it may not be registered on any part yet — try the part number or name instead.`;
+      nf.style.display='block';
+      document.getElementById('co-scan').value='';
       return;
     }
+    if(cands.length>1){
+      renderMultiMatchPicker(document.getElementById('co-notfound-b'),v,cands,'coBasketPickMatch');
+      document.getElementById('co-notfound-b').style.display='block';
+      if(lastEl)lastEl.style.display='none';
+      document.getElementById('co-scan').value='';
+      return;
+    }
+    const p=cands[0];
 
-    // Out of stock?
     if(p.qty<=0){
       soundOutOfStock();
       if(lastEl){
@@ -2528,13 +2454,11 @@ function coLook(){
       return;
     }
 
-    // Check allocations
     const activeAllocs=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
     const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
     const freeQty=Math.max(0,p.qty-allocQty);
 
     if(allocQty>0){
-      // Play warning sound and show full blocking modal
       soundOutOfStock();
       if(lastEl)lastEl.style.display='none';
       showAllocCheckoutWarning(p.code,1,'',freeQty,allocQty,activeAllocs,true);
@@ -2542,7 +2466,6 @@ function coLook(){
       return;
     }
 
-    // Would adding 1 exceed available stock?
     const alreadyInBasket=(basket.find(b=>b.code===p.code)||{qty:0}).qty;
     if(alreadyInBasket>=p.qty){
       soundOutOfStock();
@@ -2557,14 +2480,12 @@ function coLook(){
       return;
     }
 
-    // ✓ All clear — auto-add 1 to basket
     const ex=basket.find(b=>b.code===p.code);
     if(ex){ex.qty++;}
     else{basket.push({code:p.code,name:p.name,qty:1,loc:p.loc,inStock:p.qty});}
     renderBasket();
     soundBasketAdd();
 
-    // Show last scan feedback
     if(lastEl){
       lastEl.style.display='flex';
       lastEl.style.background='#f0fdf4';
@@ -2573,14 +2494,12 @@ function coLook(){
       lastEl.innerHTML=`${partImgHtml(p,36)}<div><strong>${p.name}</strong> added — ${ex?ex.qty:1} in basket &nbsp;<span style="color:#6b7280;font-size:11px">${p.code} · ${p.qty} in stock</span></div>`;
     }
 
-    // Clear scan field and refocus for next scan
     document.getElementById('co-scan').value='';
     document.getElementById('co-scan').focus();
   }
 }
 
 function updateCOConfirmBtn(){
-  // Tick is for visual confirmation only — button always enabled
   const btn=document.getElementById('co-confirm-btn');
   if(btn){btn.disabled=false;btn.style.opacity='1';btn.style.cursor='pointer';}
 }
@@ -2604,7 +2523,6 @@ async function doCO(){
   if(!p){toast('Part not found','err');return;}
   if(p.qty<qty){toast(`Only ${p.qty} in stock — cannot take ${qty}`,'err');return;}
 
-  // ── Broad allocation search — match by code OR normalised code ──
   const allAllocs=db.allocations||[];
   const activeAllocs=allAllocs.filter(a=>{
     if(a.status==='released')return false;
@@ -2616,7 +2534,6 @@ async function doCO(){
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
 
-  // ── If ANY allocation exists, always show the warning modal ──
   if(allocQty>0){
     showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,activeAllocs,false);
     return;
@@ -2638,8 +2555,6 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px';
   div.innerHTML=`
   <div style="background:#fff;border-radius:14px;padding:0;max-width:520px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5);overflow:hidden">
-
-    <!-- Red header -->
     <div style="background:#991b1b;padding:16px 20px;display:flex;align-items:center;gap:12px">
       <span style="font-size:28px">🚫</span>
       <div>
@@ -2647,8 +2562,6 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
         <div style="font-size:13px;color:#fca5a5;margin-top:3px">${p.name} · ${code}</div>
       </div>
     </div>
-
-    <!-- Stock summary -->
     <div style="padding:14px 20px;background:#fff5f5;border-bottom:1px solid #fca5a5">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
         <div style="background:#fff;border-radius:8px;padding:10px;border:1px solid #fca5a5">
@@ -2664,17 +2577,12 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
           <div style="font-size:11px;color:#6b7280;margin-top:2px">Free to take</div>
         </div>
       </div>
-      <!-- Which projects -->
       <div style="margin-top:10px;font-size:13px">
         <span style="font-weight:700;color:#991b1b">Allocated to:</span>
         ${allocs.map(a=>`<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:8px;margin:2px 4px;font-weight:600;font-size:12px">▣ ${a.build} — ${a.qty} units</span>`).join('')}
       </div>
     </div>
-
-    <!-- Body -->
     <div style="padding:16px 20px">
-
-      <!-- Recent checkouts -->
       ${recent.length?`<div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recent checkouts of this part</div>
         ${recent.map(h=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #f3f4f6">
@@ -2682,11 +2590,8 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
           <span style="color:#6b7280">${h.ts} &nbsp;<strong style="color:#991b1b">${h.qty}</strong></span>
         </div>`).join('')}
       </div>`:''}
-
-      <!-- Required fields -->
       <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:14px">
         <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:10px">📋 To proceed you must answer both questions:</div>
-
         <div style="margin-bottom:10px">
           <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">
             1. When will you replace or return ${dipping>0?dipping:qty} unit${(dipping>0?dipping:qty)!==1?'s':''}? *
@@ -2697,7 +2602,6 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
             oninput="checkAllocProceedBtn()"
             onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'">
         </div>
-
         <div>
           <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">
             2. Do you have a PO or replacement order reference? *
@@ -2708,9 +2612,7 @@ function showAllocCheckoutWarning(code,qty,ref,freeQty,allocQty,allocs,isBasket=
             onfocus="this.style.borderColor='#1e3a5f'" onblur="this.style.borderColor='#d1d5db'">
         </div>
       </div>
-
       <div id="alloc-warn-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600"></div>
-
       <div style="display:flex;gap:8px">
         <button id="alloc-proceed-btn"
           onclick="${isBasket?`confirmAllocBasket('${code}',${qty})`:`confirmAllocCheckout('${code}',${qty},'${(ref||'').replace(/'/g,"\\'")}',${freeQty},${dipping})`}"
@@ -2753,20 +2655,17 @@ async function confirmAllocBasket(code,qty){
   document.getElementById('alloc-warn-modal').remove();
   const p=db.parts[code];
   if(!p)return;
-  // Get actual qty from basket qty input — user may want more than 1
   const realQty=parseInt(document.getElementById('co-b-qty')?.value)||qty;
   const ex=basket.find(b=>b.code===code);
   if(ex){ex.qty+=realQty;ex.replaceDate=replaceDate;ex.replacePO=replacePO;}
   else{basket.push({code,name:p.name,qty:realQty,loc:p.loc,inStock:p.qty,replaceDate,replacePO});}
   renderBasket();
   document.getElementById('co-basket-found') && (document.getElementById('co-basket-found').style.display='none');
-  // Log the override against the allocation record
   (db.allocations||[]).filter(a=>a.code===code&&a.status!=='released').forEach(a=>{
     if(!a.overrides)a.overrides=[];
     a.overrides.push({by:currentUser?currentUser.name:'Unknown',qty:realQty,replaceDate,replacePO,date:nowDT()});
   });
   await saveDB();
-  // update last scan feedback
   const lastEl=document.getElementById('co-basket-last');
   if(lastEl&&p){
     lastEl.style.display='flex';
@@ -2807,10 +2706,8 @@ async function commitCheckout(code,qty,ref,replaceDate,replacePO){
   }
   await saveDB();
   const partName=db.parts[code].name;
-  // ── Fully clear and reset check-out form ──
   resetCO();
   document.getElementById('co-scan').value='';
-  // Show success confirmation with undo option
   const toastEl=document.getElementById('toast');
   toastEl.innerHTML=`✓ Checked out ${qty}× ${partName}${replaceDate?' — replace by '+replaceDate:''} &nbsp;<button onclick="undoLast()" style="background:rgba(255,255,255,.3);border:none;color:inherit;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">↺ Undo</button>`;
   toastEl.className='toast t-ok show';
@@ -2832,7 +2729,6 @@ function addToBasket(){
     toast(`Only ${p.qty} in stock — basket would need ${totalWanted}`,'err');
     return;
   }
-  // Always check allocations
   const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
   const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
   const freeQty=Math.max(0,p.qty-allocQty);
@@ -2871,7 +2767,7 @@ function renderBasket(){
       const p=db.parts[item.code]||{};
       const allocQty=(db.allocations||[]).filter(a=>a.code===item.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
       const freeQty=Math.max(0,(p.qty||0)-allocQty);
-      const hasWarning=item.replaceDate; // was an allocated override
+      const hasWarning=item.replaceDate;
       return`<div style="display:grid;grid-template-columns:44px 1fr 70px 80px 44px;gap:8px;padding:8px 12px;border-top:1px solid #f3f4f6;align-items:center;${hasWarning?'background:#fffbeb;border-left:3px solid #f59e0b':''}">
         <div>${partImgHtml(p,36)}</div>
         <div>
@@ -2902,7 +2798,6 @@ function renderBasket(){
 async function checkoutBasket(){
   if(!basket.length){toast('Basket is empty','err');return;}
   const ref=document.getElementById('co-basket-ref').value.trim();
-  // Check stock AND allocations for every item
   for(const item of basket){
     const p=db.parts[item.code];
     if(!p||p.qty<item.qty){toast(`Not enough stock for ${item.name} — only ${p?p.qty:0} left`,'err');return;}
@@ -2991,7 +2886,6 @@ async function releaseAllocation(code,allocIdx,btn){
   const alloc=allocs[allocIdx];
   if(!alloc)return;
   if(!confirm(`Release ${alloc.qty}× ${alloc.name} from "${alloc.build}" into general stock?`))return;
-  // Add qty back to general stock
   if(db.parts[code])db.parts[code].qty+=alloc.qty;
   alloc.status='released';
   addHist('IN',alloc.name,code,alloc.qty,`Released from project: ${alloc.build}`);
@@ -3002,7 +2896,6 @@ async function releaseAllocation(code,allocIdx,btn){
   doSearch();renderDash();
 }
 
-// ─── FILTER HELPER ────────────────────────────────────────────────────────────
 function matchesVoltage(p,volt){
   if(!volt)return true;
   const searchIn=(p.name+' '+(p.notes||'')+(p.mfrno||'')).toLowerCase();
@@ -3016,7 +2909,6 @@ function matchesSupplier(p,sup){
   if(!sup)return true;
   return (p.sup||'').toLowerCase()===sup.toLowerCase();
 }
-// ─── SMART SEARCH ENGINE ──────────────────────────────────────────────────────
 const ABBREVS={
   'psu':['power supply','psu'],
   'mcb':['circuit breaker','mcb','miniature circuit breaker'],
@@ -3043,9 +2935,7 @@ function expandAbbrevs(word){
   return ABBREVS[w]?[w,...ABBREVS[w]]:[w];
 }
 
-// Unit conversion — returns all equivalent measurement strings
 function measurementVariants(q){
-  // Allow space between number and unit: "5 m", "500 mm"
   const clean=q.trim().replace(/(\d)\s+(mm|cm|m)$/i,'$1$2');
   const match=clean.match(/^([\d.]+)(mm|cm|m)$/i);
   if(!match)return null;
@@ -3057,22 +2947,17 @@ function measurementVariants(q){
   else if(unit==='m')mm=val*1000;
   else return null;
   const cm=mm/10, m=mm/1000;
-  // Return clean number+unit strings — no trailing zeros for whole numbers
   function fmt(n){return n%1===0?n.toString():parseFloat(n.toFixed(4)).toString();}
   return [...new Set([
     fmt(mm)+'mm', fmt(cm)+'cm', fmt(m)+'m'
   ])];
 }
 
-// Check if a measurement word matches inside a text using word boundaries
 function measurementWordMatch(word, text){
   const variants=measurementVariants(word);
   if(!variants)return false;
-  // Use word-boundary regex so "5m" does NOT match inside "0.5m" or "7.5m"
   return variants.some(v=>{
     try{
-      // \b works on word chars — measurements need custom boundary
-      // check that the match is not preceded by a digit or dot
       const escaped=v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const re=new RegExp('(?<![\\d.])'+escaped+'(?![\\d])', 'i');
       return re.test(text);
@@ -3080,7 +2965,6 @@ function measurementWordMatch(word, text){
   });
 }
 
-// Build full searchable text for a part
 function partHaystack(p){
   return [
     p.name, p.code, p.mfrno||'', p.barcode||'',
@@ -3089,30 +2973,24 @@ function partHaystack(p){
   ].join(' ').toLowerCase();
 }
 
-// Check if a single word matches a part
 function wordMatches(word, haystack){
   if(!word)return true;
   const w=word.toLowerCase();
 
-  // 1. Direct substring match (case-insensitive, spaces stripped in word)
   if(haystack.includes(w))return true;
 
-  // 2. Normalised match — ignore dashes/spaces in both
   const wn=normalise(w);
   const hn=normalise(haystack);
   if(hn.includes(wn))return true;
 
-  // 3. Measurement with proper word boundary
   if(measurementWordMatch(w, haystack))return true;
 
-  // 4. Abbreviation expansion
   const expanded=expandAbbrevs(w);
   if(expanded.length>1&&expanded.some(e=>haystack.includes(e.toLowerCase())))return true;
 
   return false;
 }
 
-// Main filter — ALL words must match (AND search)
 function partFilter(p, q, cat, brand, volt){
   if(!q&&!cat&&!brand&&!volt)return true;
   if(cat&&p.cat!==cat)return false;
@@ -3120,7 +2998,6 @@ function partFilter(p, q, cat, brand, volt){
   if(volt){const h=(p.name+' '+(p.notes||'')).toLowerCase();if(!h.includes(volt.toLowerCase()))return false;}
   if(!q)return true;
   const hay=partHaystack(p);
-  // Split on spaces — every word must match somewhere in the part
   const words=q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return words.every(w=>wordMatches(w, hay));
 }
@@ -3172,12 +3049,8 @@ function doSearch(){
 function prefillCI(code){go('checkin');document.getElementById('ci-scan').value=code;ciLook();}
 function showPartHistory(code){
   const p=db.parts[code];if(!p)return;
-
-  // Purchase history (last 3 check-ins)
   const purchHist=p.purchaseHist||[];
   const allInHist=[...(db.hist||[])].filter(h=>h.code===code&&h.qty>0).reverse().slice(0,5);
-
-  // Project usage (check-outs with refs + allocations)
   const outHist=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,8);
   const allocations=(db.allocations||[]).filter(a=>a.code===code);
 
@@ -3194,8 +3067,6 @@ function showPartHistory(code){
       </div>
       <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
-
-    <!-- Quick stats -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
       <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#166534">${p.qty}</div>
@@ -3210,8 +3081,6 @@ function showPartHistory(code){
         <div style="font-size:11px;color:#6b7280">Allocated to projects</div>
       </div>
     </div>
-
-    <!-- Last 3 places ordered from -->
     <div style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
         📦 Last 3 times ordered from
@@ -3232,8 +3101,6 @@ function showPartHistory(code){
       </table>`
       :'<div style="color:#9ca3af;font-size:12px">No incoming history yet</div>'}
     </div>
-
-    <!-- Project usage -->
     <div style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;margin-bottom:8px">📋 Used on projects</div>
       ${outHist.length?`<table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -3252,8 +3119,6 @@ function showPartHistory(code){
       </table>`
       :'<div style="color:#9ca3af;font-size:12px">No checkout history yet</div>'}
     </div>
-
-    <!-- Current project allocations -->
     ${allocations.filter(a=>a.status!=='released').length?`<div>
       <div style="font-weight:700;font-size:13px;margin-bottom:8px">▣ Currently allocated to</div>
       ${allocations.filter(a=>a.status!=='released').map(a=>`
@@ -3276,7 +3141,6 @@ async function addPart(){
   const barcode=document.getElementById('ap-barcode').value.trim();
   if(!code||!name||!cat){toast('Please fill in all required fields (*)','err');return;}
 
-  // ── Duplicate checks ──────────────────────────────────────────────────────
   const dupCode=db.parts[code];
   if(dupCode){
     if(!confirm(`⚠ Part number "${code}" already exists:\n\n"${dupCode.name}"\n\nAre you sure you want to add a second part with this same internal number?`))return;
@@ -3356,7 +3220,6 @@ function printBOMShelfCheck(){
     </tr>`;
   });
 
-  // Also list shortfall
   const needOrder=curBOM.filter(i=>i.matchRejected||(i.matchedCode===null)||(i.matchConfirmed===true&&i.qty>i.inStock&&i.inStock===0));
   const shortfallRows=needOrder.map(item=>`<tr style="background:#fff5f5">
     <td style="padding:6px 10px;text-align:center;color:#991b1b">✗</td>
@@ -3423,7 +3286,6 @@ function printBOMShelfCheck(){
   w.document.close();
 }
 
-// ─── BOM SUB-TABS ─────────────────────────────────────────────────────────────
 function setBomTab(tab){
   document.getElementById('bom-sub-build').style.display=tab==='build'?'block':'none';
   document.getElementById('bom-sub-pick').style.display=tab==='pick'?'block':'none';
@@ -3438,8 +3300,6 @@ function setBomTab(tab){
   if(tab==='pick')renderPickList();
 }
 
-// ─── PICK LIST ────────────────────────────────────────────────────────────────
-// pickSelections[code] = { pulling: bool, qty: number, projLoc: string }
 let pickSelections={};
 
 function renderPickList(){
@@ -3458,7 +3318,6 @@ function renderPickList(){
     return;
   }
 
-  // Split into: available from stock / need to order
   const available=curBOM.filter(i=>i.matchedCode&&i.inStock>0&&i.matchConfirmed!==false&&!i.matchRejected);
   const shortfall=curBOM.filter(i=>!i.matchedCode||i.inStock<=0||i.matchRejected);
   const partial=curBOM.filter(i=>i.matchedCode&&i.inStock>0&&i.inStock<i.qty&&i.matchConfirmed!==false&&!i.matchRejected);
@@ -3472,7 +3331,6 @@ function renderPickList(){
     return;
   }
 
-  // Project location — shared input for all items
   const projLocGlobal=pickSelections['__projLoc']||'';
 
   el.innerHTML=`
@@ -3487,7 +3345,6 @@ function renderPickList(){
     </div>
   </div>`:''}
 
-  <!-- Shared project location -->
   <div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:16px">📍</span>
     <div style="flex:1;min-width:200px">
@@ -3500,14 +3357,12 @@ function renderPickList(){
     <div style="font-size:11px;color:#7c3aed;max-width:180px">This applies to all ticked parts. You can override per-part below.</div>
   </div>
 
-  <!-- Select all -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:6px 10px;background:#f9fafb;border-radius:6px">
     <input type="checkbox" id="pick-all" style="width:16px;height:16px;cursor:pointer" onchange="pickSelectAll(this.checked)">
     <label for="pick-all" style="font-size:13px;font-weight:600;cursor:pointer">Select all available parts</label>
     <span style="font-size:12px;color:#6b7280">${available.length} part${available.length!==1?'s':''} available · ${available.reduce((s,i)=>s+Math.min(i.qty,i.inStock),0)} units total</span>
   </div>
 
-  <!-- Parts table -->
   <div id="pick-print-area">
     ${bomName?`<div id="pick-print-header" style="display:none;margin-bottom:16px">
       <h2 style="font-size:18px;font-weight:700">${bomName} — Stock Pick List</h2>
@@ -3532,7 +3387,6 @@ function renderPickList(){
           const canTake=Math.min(item.qty,item.inStock);
           const sel=pickSelections[item.matchedCode]||{pulling:false,qty:canTake,projLoc:''};
           const isPartial=item.inStock<item.qty;
-          // Check if this part is in any active quotation
           const inQuote=Object.values(db.quotes||{}).some(q=>q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(item.matchedCode))));
           return`<tr style="border-bottom:1px solid #f3f4f6;${sel.pulling?'background:#f0fdf4':''}" id="pick-row-${item.matchedCode}">
             <td style="padding:6px 10px;text-align:center">
@@ -3625,7 +3479,6 @@ function cancelStockPull(){
 async function undoStockPull(){
   if(!confirm('Undo the last stock pull? This will return deducted quantities to stock and remove the allocation records created by that pull.'))return;
   await undoLast();
-  // Reset pick selections so they can re-do
   pickSelections={};
   const btn=document.getElementById('undo-pull-btn');
   if(btn)btn.style.display='none';
@@ -3639,13 +3492,11 @@ async function commitStockPull(){
   const toPull=Object.entries(pickSelections).filter(([code,s])=>code!=='__projLoc'&&s.pulling&&s.qty>0);
   if(!toPull.length){toast('Tick at least one part to pull','err');return;}
 
-  // Check each against current stock + quotations
   const warnings=[];
   for(const [code,sel] of toPull){
     const p=db.parts[code];
     if(!p){warnings.push(`${code} — not found in catalogue`);continue;}
     if(p.qty<sel.qty){warnings.push(`${p.name} — only ${p.qty} in stock, you want ${sel.qty}`);continue;}
-    // Check if in active quotation
     const inQuote=Object.values(db.quotes||{}).some(q=>q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(code))));
     if(inQuote)warnings.push(`⚠ ${p.name} is in an active quotation — pulling from stock may affect that order`);
   }
@@ -3664,10 +3515,8 @@ async function commitStockPull(){
     if(!p||p.qty<sel.qty)continue;
     const projLoc=sel.projLoc||projLocGlobal;
 
-    // Deduct from stock
     p.qty-=sel.qty;
 
-    // Create allocation
     if(!db.allocations)db.allocations=[];
     db.allocations.push({
       code,name:p.name,qty:sel.qty,
@@ -3678,10 +3527,8 @@ async function commitStockPull(){
       status:'allocated'
     });
 
-    // Log in history
     addHist('OUT',p.name,code,-sel.qty,`Internal pull for: ${bomName}${projLoc?' → '+projLoc:''}`);
 
-    // Check if pulling depletes a part that's in a quotation
     const quotesWithPart=Object.entries(db.quotes||{}).filter(([qid,q])=>
       q.companies.some(c=>c.lines.some(l=>normalise(l.code)===normalise(code)))
     );
@@ -3689,7 +3536,6 @@ async function commitStockPull(){
       quoteWarnings.push({part:p.name,code,bomName:q.bomName,splitRef:q.splitRef,qtId:qid});
     });
 
-    // Update BOM inStock
     const bomItem=curBOM.find(i=>i.matchedCode===code);
     if(bomItem)bomItem.inStock=p.qty;
 
@@ -3703,11 +3549,9 @@ async function commitStockPull(){
   renderDash();
 
   toast(`✓ ${pulled} part${pulled!==1?'s':''} pulled from stock for "${bomName}"`);
-  // Show undo button
   const undoBtn=document.getElementById('undo-pull-btn');
   if(undoBtn)undoBtn.style.display='inline-block';
 
-  // Show quotation warnings if any
   if(quoteWarnings.length){
     setTimeout(()=>showPullQuoteWarning(quoteWarnings,bomName),600);
   }
@@ -3753,7 +3597,6 @@ function showPullQuoteWarning(warnings,bomName){
 }
 
 function autoNewQuote(bomName){
-  // Find BOM id from name
   const bomId=Object.keys(db.boms).find(id=>db.boms[id].name===bomName)||
     Object.keys(db.boms).find(id=>db.boms[id].name.includes(bomName.split(' ')[0]));
   openQuoteBuilder(bomId||'');
@@ -3847,7 +3690,6 @@ function bomSug(){
   const q=document.getElementById('bom-q').value.trim();
   const el=document.getElementById('bom-sug');
   if(!q){el.innerHTML='';return;}
-  // Use smart partFilter — same engine as Search Parts
   const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,10);
   if(!res.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af;padding:6px 0">No parts found — try different words or check spelling</div>';return;}
   el.innerHTML=`<div class="sug-wrap">${res.map(p=>`<div class="sug-item" onclick="addToBOM('${p.code}')">
@@ -3858,7 +3700,6 @@ function bomSug(){
 function bomScanAdd(){
   const v=document.getElementById('bom-q').value.trim();
   if(!v)return;
-  // Try exact lookup first, then smart search
   const p=findPart(v)||Object.values(db.parts).find(pt=>partFilter(pt,v,'','',''));
   if(p){addToBOM(p.code);}else{toast('Part not found — try typing part of the name','err');}
 }
@@ -3877,17 +3718,15 @@ function renderBOMRows(){
   el.innerHTML=curBOM.map((item,i)=>{
     const cataloguePart=item.matchedCode?db.parts[item.matchedCode]:null;
     const isExactMatch=item.matchedCode&&item.matchedCode===item.code;
-    // Auto-confirm exact matches
     if(isExactMatch&&item.matchConfirmed!==true&&!item.matchRejected){
       item.matchConfirmed=true;
     }
     const confirmed=item.matchConfirmed===true;
     const inStock=item.inStock||0;
     const need=item.qty-inStock;
-    const orderQty=Math.max(0,need); // how many still need ordering
+    const orderQty=Math.max(0,need);
     const allocQty=item.allocatedQty||0;
 
-    // Status badge — clear and accurate
     let st;
     if(item.matchedCode===null||item.matchRejected){
       st=`<span class="badge b-out">Order all ${item.qty}</span>`;
@@ -3906,7 +3745,6 @@ function renderBOMRows(){
       st='<span class="badge b-ok">In stock ✓</span>';
     }
 
-    // Match confirmation section
     let matchSection='';
     if(item.matchedCode&&!isExactMatch&&cataloguePart){
       matchSection=`<div style="margin-top:6px;background:${confirmed?'#f0fdf4':item.matchRejected?'#fff5f5':'#fffbeb'};border:2px solid ${confirmed?'#86efac':item.matchRejected?'#fca5a5':'#f59e0b'};border-radius:8px;padding:8px 10px">
@@ -3971,7 +3809,6 @@ function confirmBOMMatch(idx, confirmed){
     curBOM[idx].matchRejected=false;
     const p=db.parts[curBOM[idx].matchedCode];
     if(p){
-      // Subtract already-allocated qty so we only count truly free stock
       const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
       curBOM[idx].inStock=Math.max(0,p.qty-allocQty);
       curBOM[idx].allocatedQty=allocQty;
@@ -4066,24 +3903,16 @@ function recalcBOMSummary(){
   sum.innerHTML=html;
 }
 
-// Strip common vendor/supplier prefixes added by import tools
-// e.g. "OMR.NX-SID800" → "NX-SID800", "SE.LC1DT206BL" → "LC1DT206BL"
 function stripVendorPrefix(code){
   if(!code)return'';
-  // Remove known prefixes WITH dot: OMR. SE. RLC. FES. etc
   let stripped=code.replace(/^(OMR|SE|RLC|FES|WAGO|Pfan|ABB|SCH|SIE|PHX|SNY|MIT|YAS|PAN|DAN|LS|IMO|WEG|EUR|AUT|SV|SIE|SNA|FUT|MIT)\./i,'').trim();
-  // Also strip 2-3 char prefixes WITHOUT dot if they look like vendor codes
-  // e.g. SV8VK-S24024 → strip leading letters before a digit run
   if(stripped===code){
-    // Try stripping 2-4 letter prefix before a digit if rest matches pattern
     stripped=code.replace(/^[A-Z]{2,4}(?=[0-9])/,'').trim()||code;
-    // Only use this if the result is shorter and still meaningful (>4 chars)
     if(stripped.length<4)stripped=code;
   }
   return stripped;
 }
 
-// Levenshtein distance for similarity matching
 function levenshtein(a,b){
   const m=a.length,n=b.length;
   const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));
@@ -4092,7 +3921,6 @@ function levenshtein(a,b){
   return dp[m][n];
 }
 
-// Smart part lookup for BOM — strict code matching with vendor prefix stripping + similarity fallback
 function findPartForBOM(item){
   if(!item.code&&!item.name)return null;
 
@@ -4119,7 +3947,6 @@ function findPartForBOM(item){
       );
       if(foundStripped)return foundStripped;
     }
-    // Search notes AND name — catches cross-refs like "FS35056-3-07 TYPE R88A-FI1S103-SE SCHAFFNER"
     if(nc.length>=6){
       const inNotesOrName=Object.values(db.parts).find(p=>{
         const notes=normalise(p.notes||'');
@@ -4131,7 +3958,6 @@ function findPartForBOM(item){
     }
   }
 
-  // Prefix match (min 6 chars)
   const nc=normalise(strippedCode);
   if(nc.length>=6){
     const byPrefix=Object.values(db.parts).find(p=>
@@ -4142,7 +3968,6 @@ function findPartForBOM(item){
     if(byPrefix)return byPrefix;
   }
 
-  // Similarity match — catch typos/prefix variations (max 15% difference on codes ≥8 chars)
   if(nc.length>=8){
     const similar=Object.values(db.parts).find(p=>{
       const pc=normalise(stripVendorPrefix(p.code));
@@ -4154,7 +3979,6 @@ function findPartForBOM(item){
     if(similar)return similar;
   }
 
-  // Exact full name match
   if(item.name){
     const nn=normalise(item.name);
     const byExactName=Object.values(db.parts).find(p=>normalise(p.name)===nn);
@@ -4170,7 +3994,6 @@ function checkStock(){
   curBOM.forEach(item=>{
     const p=findPartForBOM(item);
     if(p){
-      // Subtract parts allocated to projects from available qty
       const allocQty=(db.allocations||[])
         .filter(a=>a.code===p.code&&a.status!=='released')
         .reduce((s,a)=>s+a.qty,0);
@@ -4213,7 +4036,6 @@ function checkStock(){
     </div>${unmatchedMsg}`;
   }
   toast(`Stock checked: ${ok.length} OK, ${short.length} short, ${unmatched.length} not found in catalogue`,'info');
-  // Pre-initialise pickSelections for available parts
   curBOM.filter(i=>i.matchedCode&&i.inStock>0&&!i.matchRejected).forEach(item=>{
     if(!pickSelections[item.matchedCode])
       pickSelections[item.matchedCode]={pulling:false,qty:Math.min(item.qty,item.inStock),projLoc:''};
@@ -4223,15 +4045,10 @@ function checkStock(){
 }
 async function orderShortfall(){
   if(!curBOM.length){toast('Add parts to BOM first — then Check stock levels','err');return;}
-  // Build shortfall list:
-  // - rejected/null match → order full qty
-  // - confirmed match with 0 stock → order full qty
-  // - confirmed match with partial stock → order qty - inStock
-  // - NOT confirmed fuzzy matches → order full qty (can't trust stock count without confirmation)
   const shortList=curBOM.filter(i=>{
-    if(i.matchRejected||i.matchedCode===null)return true; // definitely need to order
-    if(i.matchConfirmed===true&&i.qty>(i.inStock||0))return true; // confirmed but not enough
-    if(i.matchConfirmed!==true&&i.matchedCode&&i.inStock===0)return true; // unconfirmed, 0 stock
+    if(i.matchRejected||i.matchedCode===null)return true;
+    if(i.matchConfirmed===true&&i.qty>(i.inStock||0))return true;
+    if(i.matchConfirmed!==true&&i.matchedCode&&i.inStock===0)return true;
     return false;
   });
   if(!shortList.length){toast('No shortfall — all confirmed parts are in stock','info');return;}
@@ -4239,7 +4056,6 @@ async function orderShortfall(){
   for(const item of shortList){
     const lookupCode=item.matchedCode||item.code;
     const p=db.parts[lookupCode]||findPartForBOM(item);
-    // Order only the gap if confirmed, full qty if not confirmed or no match
     const shortQty=item.matchConfirmed===true?Math.max(0,item.qty-(item.inStock||0)):item.qty;
     if(shortQty>0&&!db.order.find(o=>o.code===item.code)){
       db.order.push({
@@ -4346,7 +4162,6 @@ function bomToDelivery(bomId){
 async function startDelivery(){
   const id=document.getElementById('del-sel').value;
   if(!id){toast('Select a BOM first','err');return;}
-  // if there's already an open delivery for this BOM, just load it
   const existing=db.deliveries.find(d=>d.bomId===id&&d.status!=='complete');
   if(existing){showDelivery(existing);toast('Loaded existing delivery record — continue from where you left off','info');return;}
   const b=db.boms[id];
@@ -4362,12 +4177,12 @@ async function startDelivery(){
     dueDate,assignTo,po,supplier,
     items:b.parts.map(p=>({
       code:p.code,name:p.name,
-      expected:p.qty,       // total ordered
-      alreadyReceived:0,    // cumulative received so far
-      receiving:p.qty,      // qty to receive this session
+      expected:p.qty,
+      alreadyReceived:0,
+      receiving:p.qty,
       loc:'',
       checked:false,
-      done:false            // true = fully received, locked
+      done:false
     }))
   };
   if(!db.allocations)db.allocations=[];
@@ -4390,7 +4205,6 @@ function showDelivery(del){
     del.assignTo?`<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">&#128196; ${del.assignTo}</span>`:'',
     del.po?`<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">PO: ${del.po}</span>`:'',
     del.supplier?`<span style="background:#f0fdf4;color:#166534;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">${del.supplier}</span>`:'',
-    // PO edit if missing
     !del.po?`<div style="display:flex;gap:6px;align-items:center">
       <input id="del-po-add" placeholder="Add PO number…" style="width:160px;font-size:12px;padding:4px 8px">
       <button onclick="addPOtoDel('${del.id}')" style="font-size:12px;padding:3px 10px" class="btn-amber">Add PO</button>
@@ -4411,7 +4225,6 @@ async function updateDelStatus(delId,val){
   if(!del)return;
   del.status=val;await saveDB();renderDash();renderDelHist();
 }
-// Updated del-row grid to fit new columns
 function renderDelRows(del){
   const dIdx=db.deliveries.findIndex(d=>d.id===del.id);
   if(dIdx<0)return;
@@ -4422,7 +4235,6 @@ function renderDelRows(del){
     const receiving=item.receiving!==undefined?item.receiving:remaining;
     const forProject=item.forProject!==undefined?item.forProject:receiving;
     const forStock=Math.max(0,receiving-forProject);
-    // Pull part from catalogue for image + mfrno
     const catPart=db.parts[item.code]||Object.values(db.parts).find(p=>
       normalise(p.code)===normalise(item.code)||
       normalise(p.mfrno||'')===normalise(item.code)||
@@ -4430,10 +4242,8 @@ function renderDelRows(del){
     );
     const imgHtml=catPart?partImgHtml(catPart,44):`<div style="width:44px;height:44px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div>`;
 
-    // Catalogue stock location
     const stockLoc=catPart?formatLoc(catPart)||catPart.loc||'':'';
 
-    // 3-level location picker - ONLY for project-allocated parts
     const projLoc1=item.projLoc1||'';
     const projLoc2=item.projLoc2||'';
     const projLoc3=item.projLoc3||'';
@@ -4492,7 +4302,6 @@ function renderDelRows(del){
       <div style="font-weight:600">${item.expected}</div>
       <div style="color:#6b7280;font-size:13px">${item.alreadyReceived||0}</div>
 
-      <!-- Split: Receiving / For Project / For Stock -->
       <div style="display:grid;grid-template-columns:1fr;gap:4px">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
           <label style="font-size:11px;color:#6b7280;white-space:nowrap">Receiving:</label>
@@ -4504,7 +4313,6 @@ function renderDelRows(del){
           <input type="number" id="proj-${dIdx}-${i}" value="${forProject}" min="0" style="width:54px;font-size:12px;border-color:#c4b5fd"
             onchange="delUpdateProject(${dIdx},${i},parseInt(this.value)||0)">
         </div>
-        <!-- TO STOCK — show return location as reminder, no picker needed -->
         <div style="background:${forStock>0?'#eff6ff':'#f9fafb'};border:1px solid ${forStock>0?'#bfdbfe':'#e5e7eb'};border-radius:6px;padding:5px 7px;margin-top:2px">
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:11px;color:#1d4ed8;white-space:nowrap;font-weight:700">📦 To stock:</span>
@@ -4546,11 +4354,9 @@ function delSetLoc(dIdx,itemIdx,level,val){
 function delUpdateReceiving(dIdx,itemIdx,val){
   const item=db.deliveries[dIdx].items[itemIdx];
   item.receiving=val;
-  // Adjust forProject if it exceeds new receiving qty
   if((item.forProject||0)>val)item.forProject=val;
-  else if(item.forProject===undefined)item.forProject=val; // default all to project
+  else if(item.forProject===undefined)item.forProject=val;
   saveDB();
-  // Update stock display
   const stockEl=document.getElementById(`stock-${dIdx}-${itemIdx}`);
   if(stockEl)stockEl.textContent=Math.max(0,val-(item.forProject||0));
   const projEl=document.getElementById(`proj-${dIdx}-${itemIdx}`);
@@ -4567,8 +4373,7 @@ function delUpdateProject(dIdx,itemIdx,val){
   const projEl=document.getElementById(`proj-${dIdx}-${itemIdx}`);
   if(projEl)projEl.value=item.forProject;
 }
-// ─── DELIVERY CONTINUOUS SCAN RECEIVE ────────────────────────────────────────
-let _delScanLog=[]; // running log of scanned items this session
+let _delScanLog=[];
 let _delScanActiveDel=null;
 
 function delScanLook(){
@@ -4577,13 +4382,11 @@ function delScanLook(){
   document.getElementById('del-scan-notfound').style.display='none';
   if(!v)return;
 
-  // Find the active delivery
   const activeTitle=document.getElementById('del-title').textContent;
   const del=db.deliveries.find(d=>(d.bomName+(d.ref?' — '+d.ref:''))===activeTitle&&d.status!=='complete');
   if(!del){toast('No active delivery — create one above first','err');return;}
   _delScanActiveDel=del;
 
-  // Try to find the part in catalogue
   const result=findPartWithType(v);
   const p=result?result.part:null;
   if(!p){
@@ -4591,7 +4394,6 @@ function delScanLook(){
     soundNotFound();return;
   }
 
-  // Check if it's on this BOM
   const bomItem=del.items.find(i=>
     normalise(i.code)===normalise(p.code)||
     normalise(i.code)===normalise(p.mfrno||'')||
@@ -4599,13 +4401,11 @@ function delScanLook(){
   );
   const remaining=bomItem?Math.max(0,bomItem.expected-(bomItem.alreadyReceived||0)):null;
 
-  // Show part card with image
   document.getElementById('del-scan-img').innerHTML=partImgHtml(p,72);
   document.getElementById('del-scan-name').textContent=p.name;
   document.getElementById('del-scan-info').textContent=
     `${p.code}${p.mfrno?' · Mfr: '+p.mfrno:''} · ${formatLoc(p)||p.loc||'No location'}`;
 
-  // BOM match info
   const matchEl=document.getElementById('del-scan-bom-match');
   if(bomItem){
     if(bomItem.done){
@@ -4619,7 +4419,6 @@ function delScanLook(){
     matchEl.innerHTML=`<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:8px;font-size:12px">⚠ Not on this BOM — will go to general stock only</span>`;
   }
 
-  // Pre-fill qty with remaining needed, default project qty to remaining
   const suggestQty=remaining||1;
   document.getElementById('del-scan-qty').value=suggestQty;
   document.getElementById('del-scan-proj').value=bomItem&&!bomItem.done?suggestQty:0;
@@ -4627,7 +4426,6 @@ function delScanLook(){
   delScanUpdateStock();
   document.getElementById('del-scan-result').style.display='block';
   soundOK();
-  // Focus qty field so user can adjust then hit Enter
   setTimeout(()=>document.getElementById('del-scan-qty').select(),50);
 }
 
@@ -4649,14 +4447,11 @@ async function delScanAdd(){
 
   pushUndo();
 
-  // Add to general stock
   if(forStock>0){
     p.qty+=forStock;
-    // preserve existing location — scan receive doesn't set location (done in del-rows)
     addHist('IN',p.name,code,forStock,`BOM delivery: ${del.bomName}${del.po?' PO:'+del.po:''}${del.assignTo?' → '+del.assignTo:''} (to stock)`);
   }
 
-  // Auto-allocate to project
   if(forProject>0&&del.assignTo){
     if(!db.allocations)db.allocations=[];
     db.allocations.push({
@@ -4671,7 +4466,6 @@ async function delScanAdd(){
     addHist('IN',p.name,code,forProject,`BOM delivery: ${del.bomName}${del.po?' PO:'+del.po:''} → allocated to ${del.assignTo}`);
   }
 
-  // Update BOM delivery item tracking
   const bomItemIdx=del.items.findIndex(i=>
     normalise(i.code)===normalise(code)||
     normalise(i.code)===normalise(p.mfrno||'')||
@@ -4685,21 +4479,17 @@ async function delScanAdd(){
     if(item.alreadyReceived>=item.expected)item.done=true;
   }
 
-  // Update delivery status
   const allDone=del.items.every(i=>i.done);
   if(allDone)del.status='complete';
   else if(del.items.some(i=>i.alreadyReceived>0))del.status='partial';
 
   await saveDB();
 
-  // Add to running log
   _delScanLog.unshift({name:p.name,code,qty,forProject,forStock,img:p.img||''});
   renderDelScanLog();
 
-  // Show success toast
   toast(`✓ ${qty}× ${p.name}${forProject>0?` — ${forProject} → ${del.assignTo}`:''} ${forStock>0?`— ${forStock} → stock`:''}`)
 
-  // Clear scan and refocus for next part
   delScanClear();
   renderDelRows(del);
   renderDash();
@@ -4733,8 +4523,6 @@ function renderDelScanLog(){
 }
 
 async function confirmDelivery(){
-  const del=db.deliveries.find(d=>d.id===document.getElementById('del-title').dataset.delId||(d.status!=='complete'&&document.getElementById('del-active').style.display!=='none'));
-  // find the delivery that is currently shown
   const activeTitle=document.getElementById('del-title').textContent;
   const activeDel=db.deliveries.find(d=>
     (d.bomName+(d.ref?' — '+d.ref:''))===activeTitle && d.status!=='complete'
@@ -4750,10 +4538,8 @@ async function confirmDelivery(){
     const forProject=Math.min(item.forProject!==undefined?item.forProject:qty, qty);
     const forStock=Math.max(0,qty-forProject);
 
-    // Add to general stock
     if(db.parts[item.code]){
       db.parts[item.code].qty+=forStock;
-      // Save all 3 location levels + custom tag back to the catalogue part
       if(item.loc)db.parts[item.code].loc=item.loc;
       if(item.loc2)db.parts[item.code].loc2=item.loc2;
       if(item.loc3)db.parts[item.code].loc3=item.loc3;
@@ -4762,7 +4548,6 @@ async function confirmDelivery(){
     const note=`Delivery: ${activeDel.bomName}${activeDel.po?' PO:'+activeDel.po:''}${activeDel.assignTo?' → '+activeDel.assignTo:''}`;
     if(forStock>0)addHist('IN',item.name,item.code,forStock,note+' (to stock)');
 
-    // Record project allocation for the project portion
     if(!db.allocations)db.allocations=[];
     if(forProject>0){
       const projLocStr=[item.projLoc1,item.projLoc2,item.projLoc3,item.projLocCustom].filter(Boolean).join(' › ');
@@ -4777,15 +4562,13 @@ async function confirmDelivery(){
       addHist('IN',item.name,item.code,forProject,note+' (for project)'+(projLocStr?' → '+projLocStr:''));
     }
 
-    // Track split on item for display
     item.stockQty=(item.stockQty||0)+forStock;
     item.projectQty=(item.projectQty||0)+forProject;
 
-    // update item tracking
     item.alreadyReceived=(item.alreadyReceived||0)+qty;
     item.checked=false;
     item.receiving=Math.max(0,item.expected-item.alreadyReceived);
-    item.forProject=undefined; // reset for next batch
+    item.forProject=undefined;
     if(item.alreadyReceived>=item.expected)item.done=true;
   }
   const allDone=activeDel.items.every(i=>i.done);
@@ -4798,9 +4581,9 @@ async function confirmDelivery(){
     activeDel.confirmed=nowDT();
     const remaining=activeDel.items.filter(i=>!i.done).length;
     toast(`${chk.length} item${chk.length!==1?'s':''} checked in. ${remaining} still outstanding — delivery stays open.`,'info');
-    showDelivery(activeDel); // refresh rows
+    showDelivery(activeDel);
   }
-  await saveDB(); // immediate — allocations must be in Firebase before checkout
+  await saveDB();
   renderDash();renderDelHist();
 }
 
@@ -4833,7 +4616,6 @@ function renderDelHist(){
     const isOverdue=d.dueDate&&new Date(d.dueDate)<today&&d.status!=='complete';
     const dIdx=db.deliveries.findIndex(x=>x.id===d.id);
 
-    // Outstanding items table
     const outstandingRows=outstanding.map(item=>`
       <tr style="font-size:12px">
         <td style="padding:5px 8px;font-weight:500">${item.name}</td>
@@ -4857,8 +4639,6 @@ function renderDelHist(){
       </tr>`).join('');
 
     return`<div id="del-card-${d.id}" style="border:1px solid ${isOverdue?'#fca5a5':'#e5e7eb'};border-radius:10px;margin-bottom:10px;overflow:hidden;${isOverdue?'background:#fff5f5':''}">
-
-      <!-- HEADER ROW -->
       <div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;background:${isOverdue?'#fee2e2':'#f9fafb'};border-bottom:1px solid #e5e7eb">
         <div style="flex:1;min-width:200px">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -4871,7 +4651,6 @@ function renderDelHist(){
             ${d.supplier?`<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">📦 ${d.supplier}</span>`:''}
             ${d.assignTo?`<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-size:11px">For: ${d.assignTo}</span>`:''}
           </div>
-          <!-- Progress bar -->
           <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
             <div style="width:140px;background:#e5e7eb;border-radius:4px;height:7px">
               <div style="width:${pct}%;background:${pct===100?'#22c55e':pct>50?'#3b82f6':'#f59e0b'};height:7px;border-radius:4px"></div>
@@ -4880,8 +4659,6 @@ function renderDelHist(){
             ${outstanding.length?`<span style="font-size:12px;color:#92400e;font-weight:600">${outstanding.length} still outstanding</span>`:''}
           </div>
         </div>
-
-        <!-- ACTIONS -->
         <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;flex-shrink:0">
           ${d.status!=='complete'?`<button onclick="showDelivery(db.deliveries.find(x=>x.id==='${d.id}'))" class="btn-green" style="font-size:12px;padding:4px 10px">✓ Check in items</button>`:''}
           <button onclick="toggleDelDetail('${d.id}')" style="font-size:12px;padding:4px 10px" class="btn-blue">▼ Details</button>
@@ -4889,10 +4666,8 @@ function renderDelHist(){
         </div>
       </div>
 
-      <!-- EXPANDABLE DETAIL PANEL -->
       <div id="del-detail-${d.id}" style="display:none;padding:14px">
 
-        <!-- Date / status / supplier editors -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
           <div>
             <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Expected delivery date</label>
@@ -4930,7 +4705,6 @@ function renderDelHist(){
         </div>
 
         ${outstanding.length?`
-        <!-- OUTSTANDING ITEMS -->
         <div style="margin-bottom:12px">
           <div style="font-weight:600;font-size:13px;color:#92400e;margin-bottom:6px">⏳ Still to be delivered (${outstanding.length} item${outstanding.length!==1?'s':''})</div>
           <div style="overflow-x:auto;border:1px solid #fcd34d;border-radius:8px">
@@ -4949,7 +4723,6 @@ function renderDelHist(){
         </div>`:''}
 
         ${receivedRows?`
-        <!-- RECEIVED ITEMS -->
         <details style="margin-bottom:4px">
           <summary style="font-size:12px;color:#6b7280;cursor:pointer;padding:4px 0">✓ Show ${d.items.filter(i=>i.done).length} completed items</summary>
           <div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;margin-top:6px">
@@ -5018,7 +4791,6 @@ function renderAllocations(){
   if(q)allocs=allocs.filter(a=>(a.build+a.code+a.name+(a.po||'')).toLowerCase().includes(q));
   if(filterStatus)allocs=allocs.filter(a=>(a.status||'allocated')===filterStatus);
 
-  // Summary stats
   const active=db.allocations.filter(a=>a.status!=='released');
   const projects=[...new Set(active.map(a=>a.build))];
   const totalParts=active.reduce((s,a)=>s+a.qty,0);
@@ -5035,7 +4807,6 @@ function renderAllocations(){
     return;
   }
 
-  // Group by project
   const byProject={};
   allocs.forEach(a=>{
     if(!byProject[a.build])byProject[a.build]=[];
@@ -5046,7 +4817,6 @@ function renderAllocations(){
     const active=items.filter(i=>i.status!=='released');
     const released=items.filter(i=>i.status==='released');
     return`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
-      <!-- Project header -->
       <div style="padding:12px 14px;background:#f5f0ff;border-bottom:1px solid #e9d5ff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
           <span style="font-weight:700;font-size:14px;color:#6d28d9">▣ ${project}</span>
@@ -5058,7 +4828,6 @@ function renderAllocations(){
           </button>
         </div>
       </div>
-      <!-- Parts table -->
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:#faf5ff">
@@ -5077,7 +4846,6 @@ function renderAllocations(){
             const isReleased=a.status==='released';
             const stockLoc=p?formatLoc(p)||p.loc||'':'';
 
-            // Project location — editable inline
             const projLoc=a.projectLoc||'';
             const projLocCell=isReleased
               ?`<span style="font-size:12px;color:#9ca3af">${projLoc||'—'}</span>`
@@ -5175,7 +4943,7 @@ async function clearReleasedAllocs(){
   const active=db.allocations.filter(a=>a.status!=='released');
   if(!released.length){toast('No released allocations to clear','info');return;}
   if(!confirm(`Clear ${released.length} released allocation record${released.length!==1?'s':''}?\n\nOnly released records will be removed. The ${active.length} active allocation${active.length!==1?'s':''} still holding stock will NOT be affected.\n\nStock has already been returned for all released items — this just cleans up the history.`))return;
-  db.allocations=active; // keep only active ones
+  db.allocations=active;
   await saveDB();
   renderAllocations();
   toast(`${released.length} released record${released.length!==1?'s':''} cleared`);
@@ -5302,27 +5070,22 @@ async function doManualAlloc(){
     status:'allocated'
   });
   addEventHist('ALLOC',`${qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
-  await saveDB(); // save immediately so checkout blocking works straight away
+  await saveDB();
   document.getElementById('alloc-modal').remove();
   renderAllocations();
   renderDash();
   toast(`${qty}× ${p.name} allocated to "${project}"`);
 }
-// Get usage stats for a part from history
 function getPartUsage(code){
   const hist=[...(db.hist||[])].filter(h=>h.code===code);
   const outs=hist.filter(h=>h.qty<0);
   const ins=hist.filter(h=>h.qty>0&&(h.ref||'').toLowerCase().includes('deliver'));
-  // last checked out
   const lastOut=outs.length?outs[outs.length-1].ts:null;
-  // last ordered (delivery check-in)
   const lastIn=ins.length?ins[ins.length-1].ts:null;
-  // usage count — how many times checked out
   const useCount=outs.length;
   return{lastOut,lastIn,useCount};
 }
 
-// Usage badge — colour by frequency
 function usageBadge(useCount){
   if(useCount>=10)return{label:'High use',bg:'#dcfce7',col:'#166534',dot:'#22c55e'};
   if(useCount>=4) return{label:'Regular',bg:'#dbeafe',col:'#1e40af',dot:'#3b82f6'};
@@ -5334,11 +5097,9 @@ function renderOrder(){
   const el=document.getElementById('order-content');
   if(!db.order.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">Order list is empty. Generate from a BOM, add low-stock items, or click "+ Add line".</div>';return;}
 
-  // Split order into BOM/project items and low-stock replenishment items
   const bomItems=db.order.filter(o=>o.bom);
   const lowItems=db.order.filter(o=>!o.bom);
 
-  // Group BOM items by supplier
   const bomGroups={};
   const bomNoSup=[];
   bomItems.forEach((o,idx)=>{
@@ -5350,7 +5111,6 @@ function renderOrder(){
   });
   if(bomNoSup.length)bomGroups['— No supplier assigned —']=bomNoSup;
 
-  // Group low-stock items by supplier
   const lowGroups={};
   const lowNoSup=[];
   lowItems.forEach((o,idx)=>{
@@ -5376,20 +5136,15 @@ function renderOrder(){
     const usage=p?getPartUsage(o.code):null;
     const badge=usage?usageBadge(usage.useCount):null;
 
-    // Allocation info — is it held for projects?
     const code=p?p.code:o.code;
     const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
     const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
     const freeQty=curQty!==null?Math.max(0,curQty-allocQty):null;
     const allocBuilds=[...new Set(activeAllocs.map(a=>a.build))];
 
-    // Last 3 times this was received (ordered from)
     const last3in=[...(db.hist||[])].filter(h=>h.code===code&&h.qty>0).reverse().slice(0,3);
-
-    // Last 3 times checked out (who used it)
     const last3out=[...(db.hist||[])].filter(h=>h.code===code&&h.qty<0).reverse().slice(0,3);
 
-    // Stock info pill
     const stockPill=curQty!==null
       ?`<div style="font-size:11px;margin-top:4px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
           <span style="background:#f3f4f6;padding:1px 7px;border-radius:8px;color:#374151">Stock: <strong>${curQty}</strong></span>
@@ -5399,14 +5154,12 @@ function renderOrder(){
           ${maxQty?`<span style="background:#dcfce7;padding:1px 6px;border-radius:8px;color:#166534">Max: ${maxQty}</span>`:''}
         </div>`:'';
 
-    // Allocation detail — which projects
     const allocLine=allocQty>0?`<div style="margin-top:4px;padding:5px 8px;background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;font-size:11px">
       <span style="color:#991b1b;font-weight:600">▣ Held for:</span>
       ${allocBuilds.map(b=>`<span style="background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:8px;margin-left:4px;font-weight:600">${b}</span>`).join('')}
       <span style="color:#9ca3af;margin-left:6px">— consider if reorder is still needed</span>
     </div>`:'';
 
-    // Last 3 ordered from
     const last3inHtml=last3in.length?`<div style="margin-top:5px">
       <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Last ordered from:</div>
       ${last3in.map(h=>`<div style="font-size:11px;display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:1px solid #f9fafb">
@@ -5417,7 +5170,6 @@ function renderOrder(){
       </div>`).join('')}
     </div>`:'<div style="font-size:11px;color:#9ca3af;margin-top:4px">No order history yet</div>';
 
-    // Last 3 used by
     const last3outHtml=last3out.length?`<div style="margin-top:5px">
       <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Last taken by:</div>
       ${last3out.map(h=>`<div style="font-size:11px;display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:1px solid #f9fafb">
@@ -5428,14 +5180,12 @@ function renderOrder(){
       </div>`).join('')}
     </div>`:'';
 
-    // Usage dot
     const usagePill=badge?`<div style="display:flex;align-items:center;gap:4px;margin-top:4px">
       <div style="width:8px;height:8px;border-radius:50%;background:${badge.dot};flex-shrink:0"></div>
       <span style="font-size:10px;font-weight:600;color:${badge.col}">${badge.label}</span>
       ${usage.useCount?`<span style="font-size:10px;color:#9ca3af">(${usage.useCount}× checked out)</span>`:''}
     </div>`:'';
 
-    // Collapsible history section
     const histId=`ord-hist-${i}`;
     const histSection=`<div style="margin-top:5px">
       <button onclick="toggleOrderHist('${histId}')" style="font-size:10px;padding:1px 8px;color:#6b7280;border-color:#e5e7eb;background:#f9fafb">
@@ -5498,14 +5248,12 @@ function renderOrder(){
       <th style="width:36px;border-bottom:1px solid #e5e7eb"></th>
     </tr></thead>`;
 
-  // Legend
   const legend=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">
     <span style="color:#6b7280;font-weight:600">Usage:</span>
     ${[{label:'High use (10+)',dot:'#22c55e'},{label:'Regular (4–9)',dot:'#3b82f6'},{label:'Occasional (1–3)',dot:'#f59e0b'},{label:'Not yet used',dot:'#d1d5db'}]
       .map(b=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:${b.dot};display:inline-block"></span>${b.label}</span>`).join('')}
   </div>`;
 
-  // Helper to render a supplier group with tick-select
   function renderSupGroup(sup,items,sectionId){
     const supTotal=items.reduce((a,{o})=>a+((o.cost||0)*(o.qty||1)),0);
     const isReal=!sup.startsWith('—');
@@ -5530,7 +5278,6 @@ function renderOrder(){
 
   let html=legend;
 
-  // Section 1: BOM / Project items
   if(bomItems.length){
     html+=`<div style="margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f5f0ff;border-radius:8px;margin-bottom:10px;border-left:4px solid #6d28d9">
@@ -5544,7 +5291,6 @@ function renderOrder(){
     </div>`;
   }
 
-  // Section 2: Low stock replenishment
   if(lowItems.length){
     html+=`<div style="margin-bottom:18px">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:10px;border-left:4px solid #f59e0b">
@@ -5590,7 +5336,6 @@ async function addLowStock(){
   let n=0;
   for(const p of low){
     if(!db.order.find(o=>o.code===p.code)){
-      // Reorder to max if set, otherwise to min*2
       const reorderQty=p.max?Math.max(p.max-p.qty,1):Math.max(p.min*2-p.qty,1);
       db.order.push({code:p.code,name:p.name,qty:reorderQty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
       n++;
@@ -5618,7 +5363,6 @@ function addBlankOrderLine(){
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
-// Stored for safe deletion without inline JSON
 let _lastHistRows=[];
 
 function renderHist(){
@@ -5642,24 +5386,20 @@ function renderHist(){
     return true;
   }
 
-  // Look up part details for brand/supplier matching on history entries
   function partMeta(code){return db.parts[code]||{};}
 
   const EVENT_TYPES=['BOM_LOAD','QUOTE_ACCEPT','EMAIL','JOB_CLOSE'];
   const isEventType=type&&EVENT_TYPES.includes(type);
   const isStockType=type&&!EVENT_TYPES.includes(type);
 
-  // Stock movements
   const stockData=(!isEventType?[...db.hist]:[]).reverse().filter(h=>{
     const tm=!f||(h.name+h.code+(h.ref||'')).toLowerCase().includes(f);
     const tp=!type||h.type===type;
     if(!tm||!tp||!inRange(h.ts))return false;
-    // Brand filter — check against part catalogue
     if(filterBrand){
       const pm=partMeta(h.code);
       if(!(pm.mfr||'').toLowerCase().includes(filterBrand))return false;
     }
-    // Supplier filter
     if(filterSup){
       const pm=partMeta(h.code);
       if(!(pm.sup||'').toLowerCase().includes(filterSup))return false;
@@ -5667,15 +5407,12 @@ function renderHist(){
     return true;
   });
 
-  // Events (BOM loads, quotes accepted, emails)
   const evData=(!isStockType?[...(db.eventHist||[])]:[]).reverse().filter(e=>{
     const tm=!f||(e.title+e.detail).toLowerCase().includes(f);
     const tp=!type||e.type===type;
-    // brand/supplier don't apply to events but text search still covers them
     return tm&&tp&&inRange(e.ts)&&(!filterBrand)&&(!filterSup||f);
   });
 
-  // Merge and sort by timestamp descending
   const allRows=[
     ...stockData.map(h=>({kind:'stock',...h})),
     ...evData.map(e=>({kind:'event',...e}))
@@ -5759,11 +5496,9 @@ async function deleteHistRow(rowIdx){
   if(!r)return;
   if(!confirm('Delete this history entry?'))return;
   if(r.kind==='stock'){
-    // find and remove from db.hist by matching ts+code+qty
     const idx=db.hist.findIndex(h=>h.ts===r.ts&&h.code===r.code&&h.qty===r.qty);
     if(idx>-1)db.hist.splice(idx,1);
   }else{
-    // find and remove from db.eventHist by matching ts+title
     const idx=(db.eventHist||[]).findIndex(e=>e.ts===r.ts&&e.title===r.title);
     if(idx>-1)db.eventHist.splice(idx,1);
   }
@@ -5771,8 +5506,6 @@ async function deleteHistRow(rowIdx){
   renderHist();
   toast('History entry deleted');
 }
-
-// Firebase real-time listener handles all sync — no polling needed
 
 // ─── DEMO DATA ────────────────────────────────────────────────────────────────
 function loadDemoData(){
@@ -5802,11 +5535,9 @@ function loadDemoData(){
 }
 
 // ─── QUOTATIONS ───────────────────────────────────────────────────────────────
-// db.quotes = { qt_id: { bomId, bomName, created, companies:[{id,name,email,color,lines:[{code,name,qty,unitPrice,totalPrice,notes,status}],status:'draft'|'sent'|'quoted'|'accepted'}] } }
-
 const QT_COLORS=['#1e40af','#166534','#92400e','#6d28d9','#991b1b','#0f766e','#c2410c','#1d4ed8'];
-let qtBOMLines=[];   // lines loaded in the modal
-let qtCompanies=[];  // companies in the modal session
+let qtBOMLines=[];
+let qtCompanies=[];
 
 function openQuoteBuilder(preloadBomId){
   if(!Object.keys(db.boms).length&&!curBOM.length){toast('Save a BOM first','err');return;}
@@ -5817,7 +5548,6 @@ function openQuoteBuilder(preloadBomId){
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
   document.getElementById('qt-existing-splits').style.display='none';
-  // Pre-select BOM — from arg, or from current BOM builder
   const savedId=preloadBomId||Object.keys(db.boms).find(id=>db.boms[id].name===document.getElementById('bom-name').value)||'';
   if(savedId){sel.value=savedId;loadQtBOM();}
   else if(curBOM.length){qtBOMLines=curBOM.map(l=>({...l,inStock:db.parts[l.code]?db.parts[l.code].qty:0}));}
@@ -5830,7 +5560,6 @@ function loadQtBOM(){
   const id=document.getElementById('qt-bom-sel').value;
   if(!id)return;
   qtBOMLines=db.boms[id].parts.map(l=>({...l,inStock:db.parts[l.code]?db.parts[l.code].qty:0}));
-  // Show existing splits for this BOM
   const existing=Object.values(db.quotes||{}).filter(q=>q.bomId===id);
   const exEl=document.getElementById('qt-existing-splits');
   const listEl=document.getElementById('qt-splits-list');
@@ -5877,7 +5606,6 @@ function renderQtSplitTable(){
   if(!qtBOMLines.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Select a BOM above to load its lines</div>';return;}
   if(!qtCompanies.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Add at least one supplier above</div>';return;}
   const bomId=document.getElementById('qt-bom-sel').value;
-  // mark parts already in previous splits
   const alreadyQuoted={};
   Object.values(db.quotes||{}).filter(q=>q.bomId===bomId).forEach(q=>{
     q.companies.forEach(co=>co.lines.forEach(l=>{
@@ -5948,14 +5676,12 @@ function renderQuotations(){
     document.getElementById('qt-comparison').innerHTML='<div style="color:#9ca3af;font-size:13px">No accepted prices yet.</div>';
     return;
   }
-  // Group by BOM
   const byBOM={};
   Object.entries(db.quotes).forEach(([qtId,qt])=>{
     const key=qt.bomId||qt.bomName;
     if(!byBOM[key])byBOM[key]={bomName:qt.bomName,bomId:qt.bomId,splits:[]};
     byBOM[key].splits.push({qtId,...qt});
   });
-  // Filter — match if BOM name, split ref, or any supplier name contains the query
   const groups=Object.values(byBOM).filter(group=>{
     if(!q)return true;
     if(group.bomName.toLowerCase().includes(q))return true;
@@ -5969,7 +5695,6 @@ function renderQuotations(){
     return;
   }
   el.innerHTML=groups.map(group=>{
-    // within a BOM, also filter splits by query if BOM name didn't match
     const bomMatches=!q||group.bomName.toLowerCase().includes(q);
     const visibleSplits=bomMatches?group.splits:group.splits.filter(qt=>
       (qt.splitRef||'').toLowerCase().includes(q)||
@@ -6019,7 +5744,6 @@ function renderCoCard(qtId,co){
         <button onclick="exportQuoteEmail('${qtId}','${co.id}')" style="font-size:12px;padding:4px 10px;background:#6d28d9;color:#fff;border-color:#6d28d9">Draft email</button>
         ${co.status==='draft'?`<button onclick="markSent('${qtId}','${coIdx}')" class="btn-amber" style="font-size:12px;padding:4px 10px">Mark sent</button>`:''}
         ${co.status==='sent'||co.status==='quoted'?`<button onclick="markAccepted('${qtId}','${coIdx}')" class="btn-green" style="font-size:12px;padding:4px 10px">Accept quote</button>`:''}
-        ${co.status==='quoted'?'':''}
       </div>
     </div>
     <div class="qt-company-body">
@@ -6049,7 +5773,6 @@ async function updateQuoteLine(qtId,coIdx,li,field,val){
     const u=parseFloat(val)||0;
     line.totalPrice=(u*line.qty).toFixed(2);
   }
-  // auto-set company status to 'quoted' if any price entered
   const co=db.quotes[qtId].companies[coIdx];
   if(field==='unitPrice'&&val)co.status='quoted';
   await saveDB();
@@ -6074,7 +5797,6 @@ async function markAccepted(qtId,coIdx){
 function addBlankCompany(){toast('Use "New quotation from BOM" to assign lines to a company','info');}
 
 function renderComparison(){
-  // Show accepted quotes or best prices per part across all quotations
   const accepted=[];
   Object.values(db.quotes||{}).forEach(qt=>{
     qt.companies.filter(c=>c.status==='accepted').forEach(co=>{
@@ -6126,7 +5848,6 @@ function exportQuoteEmail(qtId,coId){
   const body=`Dear ${co.name},\n\nWe would like to request a quotation for the following items for our project: ${qt.bomName}\n\nPlease provide your best unit prices, availability, and lead times for the parts listed below.\n\n${linesList}\n\nPlease reply to this email with your quotation at your earliest convenience. If you require any further specifications or drawings, please let us know.\n\nKind regards,\n[Your name]\n[Your company]\n[Phone number]`;
   const subject=`Quotation Request — ${qt.bomName} — ${nowD()}`;
   const mailto=`mailto:${co.email||''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  // Show in a copyable box
   showEmailModal(co.name,co.email,subject,body,mailto);
 }
 
@@ -6152,7 +5873,6 @@ function showEmailModal(coName,email,subject,body,mailto){
   </div>`;
   document.body.appendChild(div);
 }
-
 
 // ─── STOCK ALERT MODAL ────────────────────────────────────────────────────────
 let stockModalType='low';
@@ -6232,9 +5952,7 @@ function openSmSupplierSplit(){
   const codes=smGetSelected();
   if(!codes.length){toast('Tick at least one item first','err');return;}
   document.getElementById('sm-split-panel').style.display='block';
-  // Pre-populate from db.suppliers (all saved suppliers)
   smSuppliers=(db.suppliers||[]).map((s,i)=>({id:'sup_db_'+i,name:s.name,email:s.email||''}));
-  // Also add any suppliers from part records that aren't already in the list
   codes.forEach(code=>{
     const p=db.parts[code];
     if(p&&p.sup&&p.sup.trim()){
@@ -6255,7 +5973,6 @@ function smAddSupplier(){
   if(smSuppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){toast('Already added','err');return;}
   const newSup={id:'sup_'+Date.now(),name,email};
   smSuppliers.push(newSup);
-  // Also persist to db.suppliers so it appears in Settings and future sessions
   if(!db.suppliers)db.suppliers=[];
   if(!db.suppliers.find(s=>s.name.toLowerCase()===name.toLowerCase())){
     db.suppliers.push({name,email,phone:''});
@@ -6276,7 +5993,6 @@ function renderSmSupList(){
       <span style="font-weight:600">${s.name}</span>${s.email?`<span style="color:#9ca3af">${s.email}</span>`:''}
       <button onclick="smSuppliers=smSuppliers.filter(x=>x.id!=='${s.id}');renderSmSupList()" style="border:none;background:none;cursor:pointer;color:#9ca3af;font-size:14px;padding:0">&times;</button>
     </div>`).join('')}</div>`;
-  // build assign rows
   const codes=smGetSelected();
   document.getElementById('sm-sup-assign-area').style.display='block';
   document.getElementById('sm-assign-rows').innerHTML=codes.map(code=>{
@@ -6303,16 +6019,13 @@ function smSendEmails(){
     const selEl=document.getElementById(`sm-assign-${code}`);
     const supId=selEl?selEl.value:'';
     let sup=smSuppliers.find(s=>s.id===supId);
-    // Auto-match by supplier name on part record
     if(!sup&&p.sup)sup=smSuppliers.find(s=>s.name.toLowerCase()===p.sup.toLowerCase());
-    // Fall back to first supplier
     if(!sup)sup=smSuppliers[0];
     if(!groups[sup.id])groups[sup.id]={sup,parts:[]};
     groups[sup.id].parts.push({...p,reorderQty:Math.max((p.max||p.min*2)-p.qty,1)});
   });
   const groupList=Object.values(groups);
   if(!groupList.length){toast('No items to email','err');return;}
-  // Show email modal for each supplier group
   groupList.forEach(({sup,parts})=>{
     const lines=parts.map(p=>`  • ${p.name} (${p.mfrno||p.code}) — Reorder qty: ${p.reorderQty}${p.cost?` — Last price: £${p.cost}`:''}` ).join('\n');
     const body=`Dear ${sup.name},\n\nPlease supply the following items as a matter of priority:\n\n${lines}\n\nKindly confirm availability, unit prices, and expected delivery date.\n\nKind regards,\n[Your name]\n[Company]\n[Phone]`;
@@ -6352,7 +6065,6 @@ function renderCIBrowse(){
 function browseAddToCheckin(code){
   document.getElementById('ci-scan').value=code;
   ciLook();
-  // scroll to result
   const r=document.getElementById('ci-result');
   if(r)r.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -6386,11 +6098,9 @@ function renderCOBrowse(){
 function browseAddToCheckout(code){
   const p=db.parts[code];if(!p||p.qty<=0)return;
   if(coMode==='basket'){
-    // Check allocations first
     const activeAllocs=(db.allocations||[]).filter(a=>a.code===code&&a.status!=='released');
     const allocQty=activeAllocs.reduce((s,a)=>s+a.qty,0);
     if(allocQty>0){
-      // Put in scan bar and use coLook so the warning shows properly
       document.getElementById('co-scan').value=code;coLook();
       return;
     }
@@ -6419,7 +6129,6 @@ function renderSettings(){
       <input value="${c}" style="flex:1;font-size:13px" onchange="editCat(${i},this.value)">
       <button onclick="removeCat(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
     </div>`).join('');
-  // Supplier list
   if(!db.suppliers)db.suppliers=[];
   if(!db.brandSuppliers)db.brandSuppliers={};
   const supListEl=document.getElementById('sup-list');
@@ -6435,7 +6144,6 @@ function renderSettings(){
         </div>`).join('')
       :'<div style="color:#9ca3af;font-size:13px">No suppliers yet — add your main suppliers below</div>';
   }
-  // Brand → Supplier assignments
   const brandSupEl=document.getElementById('brand-sup-list');
   if(brandSupEl){
     const entries=Object.entries(db.brandSuppliers||{});
@@ -6447,7 +6155,6 @@ function renderSettings(){
         </div>`).join('')
       :'<div style="color:#9ca3af;font-size:12px;margin-bottom:4px">No brand assignments yet</div>';
   }
-  // Populate brand supplier select
   const brandSupSelect=document.getElementById('new-brand-sup');
   if(brandSupSelect){
     brandSupSelect.innerHTML='<option value="">Select supplier…</option>'+(db.suppliers||[]).map(s=>`<option>${s.name}</option>`).join('');
@@ -6499,7 +6206,6 @@ async function removeBrandSupplier(brand){
   toast('Assignment removed');
 }
 
-// Get default supplier for a part (from part.sup or brand assignment)
 function getDefaultSupplier(p){
   if(p.sup)return p.sup;
   if(db.brandSuppliers&&p.mfr&&db.brandSuppliers[p.mfr])return db.brandSuppliers[p.mfr];
@@ -6637,7 +6343,6 @@ let editingCode='';
 function openEditPart(code){
   editingCode=code;const p=db.parts[code];if(!p)return;
   _pendingImg=p.img||'';
-  // populate dynamic dropdowns first
   document.getElementById('ep-loc').innerHTML=`<option value="">Area / unit…</option>`+areaOpts(p.loc).replace('<option value="">Area / unit…</option>','');
   document.getElementById('ep-loc2').innerHTML=`<option value="">Section / shelf…</option>`+sectionOpts(p.loc2).replace('<option value="">Section / shelf…</option>','');
   document.getElementById('ep-loc3').innerHTML=`<option value="">Bin / box…</option>`+containerOpts(p.loc3).replace('<option value="">Bin / box…</option>','');
@@ -6655,7 +6360,6 @@ function openEditPart(code){
   document.getElementById('ep-loc').value=p.loc||'';
   document.getElementById('ep-loc2').value=p.loc2||'';
   document.getElementById('ep-loc3').value=p.loc3||'';
-  // Load image
   if(p.img){showImagePreview('ep',p.img);}
   else{removePartImage('ep');}
   document.getElementById('edit-part-modal').classList.add('open');
@@ -6693,13 +6397,12 @@ async function deletePartConfirm(){
 }
 
 // ─── PART IMAGE HANDLING ──────────────────────────────────────────────────────
-let _pendingImg = ''; // base64 image waiting to be saved
+let _pendingImg = '';
 
 function handlePartImage(file, prefix){
   if(!file||!file.type.startsWith('image/'))return;
   const reader=new FileReader();
   reader.onload=e=>{
-    // Resize to max 300x300 using canvas
     const img=new Image();
     img.onload=()=>{
       const MAX=300;
@@ -6737,7 +6440,6 @@ function removePartImage(prefix){
   if(preview){preview.src='';preview.style.display='none';}
   if(placeholder)placeholder.style.display='flex';
   if(removeBtn)removeBtn.style.display='none';
-  // If editing existing part, clear the img field
   if(prefix==='ep'&&editingCode&&db.parts[editingCode]){
     db.parts[editingCode].img='';
   }
@@ -6747,10 +6449,9 @@ function partImgHtml(p, size=48){
   if(!p||!p.img)return`<div style="width:${size}px;height:${size}px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.45)}px;flex-shrink:0">📦</div>`;
   return`<img src="${p.img}" alt="${p.name}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;flex-shrink:0">`;
 }
-let impCols=[];   // column headers from file
-let impSrc='gen'; // 'sw' | 'ep' | 'gen'
+let impCols=[];
+let impSrc='gen';
 
-// App fields we want to map to
 const APP_FIELDS=[
   {id:'partno',  label:'Part number *',  required:true},
   {id:'desc',    label:'Description / name *', required:true},
@@ -6761,7 +6462,6 @@ const APP_FIELDS=[
   {id:'notes',   label:'Notes / spec',  required:false},
 ];
 
-// Known column name patterns for auto-detection
 const COL_PATTERNS={
   partno: /part.?no|part.?num|article.?no|article.?num|order.?no|mlfb|drawing.?no|item.?no|partnumber|artnr|art\.nr/i,
   desc:   /desc|name|bezeich|denom|function|type|component/i,
@@ -6811,7 +6511,6 @@ function readXML(file){
     try{
       const parser=new DOMParser();
       const xml=parser.parseFromString(e.target.result,'text/xml');
-      // Try EPLAN XML structure (Articles / Article nodes)
       let items=[...xml.querySelectorAll('Article,Item,Row,BOMItem,Part,PART,COMPONENT')];
       if(!items.length){toast('No recognisable rows found in XML. Try exporting as CSV instead.','err');return;}
       const rows=[];
@@ -6830,7 +6529,6 @@ function readXML(file){
 }
 
 function detectSourceAndRender(filename){
-  // Detect source software
   const allText=impCols.join(' ').toLowerCase();
   if(/betriebsmittelkennzeichen|einbauort|artikel|eplan/i.test(allText)){
     impSrc='ep';
@@ -6896,13 +6594,11 @@ function doImport(){
     const name=String(row[m.desc]||'').trim();
     const qty=parseInt(row[m.qty])||1;
     if(!code||!name){skipped++;return;}
-    // Try to match against existing stock catalogue
     const existing=db.parts[code]||Object.values(db.parts).find(p=>p.name.toLowerCase()===name.toLowerCase());
     const inStock=existing?existing.qty:0;
     const cat=existing?existing.cat:'Other';
     const notes=[m.mfr?String(row[m.mfr]||''):'',m.notes?String(row[m.notes]||''):''].filter(Boolean).join(' | ');
     const sup=m.supplier?String(row[m.supplier]||''):'';
-    // Add to curBOM (merge if already there)
     const ex=curBOM.find(x=>x.code===code);
     if(ex){ex.qty+=qty;}
     else{
@@ -6920,17 +6616,14 @@ function doImport(){
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// Step 1: Hide setup overlay
 (function(){
   const ov=document.getElementById('setup-overlay');
   if(ov){ov.classList.remove('visible');ov.classList.add('hidden');ov.style.display='none';}
 })();
 
-// Step 2: Populate dropdowns
 populateCatDropdowns();
 populateLocDropdowns();
 
-// Step 3: Show local data instantly while Firebase connects
 const _localOnStart=readLocal();
 if(_localOnStart){
   db=_localOnStart;
@@ -6939,20 +6632,16 @@ if(_localOnStart){
   populateBrandDropdowns();
 }
 
-// Step 5: Load user session — hide wall if already logged in
 loadUserSession();
 if(currentUser){
   const wall=document.getElementById('login-wall');
   if(wall)wall.style.display='none';
 }
-// Otherwise login wall is visible by default from HTML
 
-// Step 6: Load Firebase config in background
 loadFirebaseConfig().then(ok=>{
   if(ok){
     startFirebaseListener();
     startPresence();
-    // Re-validate session after Firebase loads
     if(currentUser&&db.users){
       const acc=db.users[currentUser.username];
       if(!acc){currentUser=null;saveUserSession();showLoginWall();}
