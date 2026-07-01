@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev79</title>
+<title>Workshop Stock Control v2.1 Rev80</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -311,12 +311,13 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 79 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 80 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="undoLast()" id="undo-btn" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Undo last action">&#8630; Undo</button>
+      <button onclick="redoLast()" id="redo-btn" style="display:none;font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Redo last undone action">&#8631; Redo</button>
       <button onclick="backupData()" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Download a backup of all your data">&#128190; Backup</button>
       <button onclick="document.getElementById('restore-input').click()" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff" title="Restore from a backup file">&#8657; Restore</button>
       <input type="file" id="restore-input" accept=".json" style="display:none" onchange="restoreData(this.files[0])">
@@ -559,7 +560,10 @@ tr:hover td{background:#f9fafb}
           <option>48V</option><option>12V</option><option>5V</option>
         </select>
       </div>
-      <div style="flex:0 0 auto;display:flex;align-items:flex-end"><button onclick="doSearch()">Search</button></div>
+      <div style="flex:0 0 auto;display:flex;align-items:flex-end;gap:6px">
+        <button onclick="doSearch()">Search</button>
+        <button onclick="clearSearch()" style="color:#991b1b;border-color:#fca5a5" title="Clear search and filters">✕ Clear</button>
+      </div>
     </div>
     <div style="margin-bottom:12px">
       <label>Search by location</label>
@@ -1410,18 +1414,34 @@ function recoverFromLocal(){
   saveDB();toast(`Recovered ${Object.keys(db.parts).length} parts — uploading to Firebase…`,'info');
 }
 
-const undoStack=[];const UNDO_LIMIT=10;
+const undoStack=[];const redoStack=[];const UNDO_LIMIT=10;
 function pushUndo(){
   undoStack.push(JSON.stringify(db));
   if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+  redoStack.length=0;
   const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
+  const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='none';
 }
 async function undoLast(){
   if(!undoStack.length){toast('Nothing to undo yet — actions are saved as you go','err');return;}
   if(!confirm('Undo the last action? This will reverse the last check-in, check-out, or stock change.'))return;
+  redoStack.push(JSON.stringify(db));
+  if(redoStack.length>UNDO_LIMIT)redoStack.shift();
   db=JSON.parse(undoStack.pop());
   await saveDB();renderAll();
+  const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='inline-block';
+  if(!undoStack.length){const btn=document.getElementById('undo-btn');if(btn)btn.style.display='none';}
   toast('✓ Last action undone successfully');
+}
+async function redoLast(){
+  if(!redoStack.length){toast('Nothing to redo','err');return;}
+  undoStack.push(JSON.stringify(db));
+  if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+  db=JSON.parse(redoStack.pop());
+  await saveDB();renderAll();
+  const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
+  if(!redoStack.length){const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='none';}
+  toast('✓ Action redone');
 }
 
 const DEFAULT_LOC_AREAS=[
@@ -3023,6 +3043,14 @@ function partFilter(p, q, cat, brand, volt){
 }
 
 
+function clearSearch(){
+  document.getElementById('sq').value='';
+  document.getElementById('scat').value='';
+  document.getElementById('sbrand').value='';
+  document.getElementById('svolt').value='';
+  document.getElementById('sloc').value='';
+  doSearch();
+}
 function doSearch(){
   const q=(document.getElementById('sq').value||'').trim();
   const cat=document.getElementById('scat').value;
