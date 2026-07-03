@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev88</title>
+<title>Workshop Stock Control v2.1 Rev89</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -317,7 +317,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 88 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 89 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1000,6 +1000,7 @@ tr:hover td{background:#f9fafb}
 
 <!-- ORDER LIST -->
 <div class="panel" id="panel-orders">
+  <div id="order-flagged-panel"></div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <div>
@@ -2245,9 +2246,10 @@ function sb(p){if(p.qty<=0)return'<span class="badge b-out">Out of stock</span>'
 
 // ─── TRACKED vs UNTRACKED (hardware/consumables reorder-flag) ─────────────────
 function isTracked(p){return p&&p.tracked!==false;}
+function isFlagged(p){return p&&p.needsReorder===true;}
 function stockStatusBadge(p){
   if(!isTracked(p))return p.needsReorder?'<span class="badge b-low">🔴 Flagged for reorder</span>':'<span class="badge b-gray">Not tracked</span>';
-  return sb(p);
+  return(p.needsReorder?'<span class="badge b-low">🔴 Flagged</span> ':'')+sb(p);
 }
 function reorderToggleHtml(p){
   return`<label class="toggle-sw" title="Slide to flag this for reorder" onclick="event.stopPropagation()">
@@ -2255,16 +2257,28 @@ function reorderToggleHtml(p){
     <span class="toggle-sw-slider"></span>
   </label>`;
 }
+// Shows qty number (if tracked) plus the reorder slider — the slider is always available,
+// so any part — tracked or not — can be manually flagged to jump to the top of Low Stock.
+function qtyOrFlagCell(p){
+  if(!isTracked(p))return reorderToggleHtml(p);
+  const color=p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534';
+  return`<div style="display:flex;align-items:center;gap:6px;justify-content:center">
+    <span style="font-weight:700;color:${color}">${p.qty}</span>
+    ${reorderToggleHtml(p)}
+  </div>`;
+}
 async function toggleNeedsReorder(code,val){
   const p=db.parts[code];if(!p)return;
   p.needsReorder=val;
   await saveDB();
-  toast(val?`🔴 ${p.name} flagged for reorder`:`✓ ${p.name} marked as restocked`);
+  toast(val?`🔴 ${p.name} flagged for reorder`:`✓ ${p.name} unflagged`);
   renderDash();
   const slPanel=document.getElementById('panel-stocklevels');
   if(slPanel&&slPanel.classList.contains('active'))renderSL();
   const sPanel=document.getElementById('panel-search');
   if(sPanel&&sPanel.classList.contains('active'))doSearch();
+  const oPanel=document.getElementById('panel-orders');
+  if(oPanel&&oPanel.classList.contains('active'))renderOrder();
   if(document.getElementById('stock-modal').classList.contains('open'))renderStockModalBody();
 }
 function renderAll(){
@@ -2273,9 +2287,10 @@ function renderAll(){
 }
 function renderDash(){
   const all=Object.values(db.parts);
-  const low=all.filter(p=>isTracked(p)&&p.qty>0&&p.qty<=p.min);
-  const out=all.filter(p=>isTracked(p)&&p.qty<=0);
-  const flagged=all.filter(p=>!isTracked(p)&&p.needsReorder);
+  const flagged=all.filter(p=>isFlagged(p));
+  const flaggedCodes=new Set(flagged.map(p=>p.code));
+  const low=all.filter(p=>isTracked(p)&&p.qty>0&&p.qty<=p.min&&!flaggedCodes.has(p.code));
+  const out=all.filter(p=>isTracked(p)&&p.qty<=0&&!flaggedCodes.has(p.code));
   const totalUnits=all.reduce((s,p)=>s+(isTracked(p)?(p.qty||0):0),0);
   document.getElementById('m-tot').innerHTML=`${all.length}<div style="font-size:11px;font-weight:400;color:#6b7280;margin-top:2px">${totalUnits.toLocaleString()} total units</div>`;
   document.getElementById('m-low').textContent=low.length+flagged.length;
@@ -2283,7 +2298,7 @@ function renderDash(){
   document.getElementById('m-boms').textContent=Object.keys(db.boms).length;
   const alerts=[...flagged,...out,...low];
   document.getElementById('d-alerts').innerHTML=alerts.length
-    ?`<table><thead><tr><th></th><th>Part name</th><th>Part no.</th><th>Location</th><th>Qty</th><th>Min</th><th>Status</th><th></th></tr></thead><tbody>${alerts.map(p=>`<tr style="${!isTracked(p)?'background:#fff5f5':''}"><td style="padding:4px 6px">${partImgHtml(p,40)}</td><td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td><td style="font-size:12px;font-family:monospace">${p.code}</td><td>${p.loc}</td><td>${isTracked(p)?`<span style="font-weight:700">${p.qty}</span>`:reorderToggleHtml(p)}</td><td>${isTracked(p)?p.min:'—'}</td><td>${stockStatusBadge(p)}</td><td><button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:2px 8px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button></td></tr>`).join('')}</tbody></table>`
+    ?`<table><thead><tr><th></th><th>Part name</th><th>Part no.</th><th>Location</th><th>Qty</th><th>Min</th><th>Status</th><th></th></tr></thead><tbody>${alerts.map(p=>`<tr style="${isFlagged(p)?'background:#fff5f5':''}"><td style="padding:4px 6px">${partImgHtml(p,40)}</td><td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td><td style="font-size:12px;font-family:monospace">${p.code}</td><td>${p.loc}</td><td>${qtyOrFlagCell(p)}</td><td>${isTracked(p)?p.min:'—'}</td><td>${stockStatusBadge(p)}</td><td><button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:2px 8px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button></td></tr>`).join('')}</tbody></table>`
     :'<div style="color:#9ca3af;font-size:13px;padding:4px 0">No alerts — all stock levels OK</div>';
   const rec=[...db.hist].reverse().slice(0,8);
   document.getElementById('d-activity').innerHTML=rec.length
@@ -3201,7 +3216,7 @@ function doSearch(){
     <th style="width:60px"></th>
     <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
   </tr></thead><tbody>${
-    res.length?res.map(p=>`<tr>
+    res.length?res.map(p=>`<tr style="${isFlagged(p)?'background:#fff5f5':''}">
       <td style="padding:6px">${partImgHtml(p,48)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}</td>
@@ -3209,7 +3224,7 @@ function doSearch(){
       <td style="font-size:12px">${p.mfr||'—'}</td>
       <td><span class="chip">${p.cat}</span></td>
       <td style="font-size:12px">${formatLoc(p)||'—'}</td>
-      <td style="font-weight:600;text-align:center;color:${isTracked(p)?(p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'):'#6b7280'}">${isTracked(p)?p.qty:reorderToggleHtml(p)}</td>
+      <td style="text-align:center">${qtyOrFlagCell(p)}</td>
       <td>${stockStatusBadge(p)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button onclick="prefillCI('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-green">In</button>
@@ -5273,7 +5288,63 @@ function usageBadge(useCount){
   return{label:'Not yet used',bg:'#f3f4f6',col:'#6b7280',dot:'#d1d5db'};
 }
 
+// Shows every part currently flagged 🔴 for reorder (tracked or untracked) that isn't
+// already on the order list, so they can be pulled straight in from the Order List screen.
+function renderOrderFlaggedPanel(){
+  const el=document.getElementById('order-flagged-panel');
+  if(!el)return;
+  const flagged=Object.values(db.parts).filter(p=>isFlagged(p)&&!db.order.find(o=>o.code===p.code));
+  if(!flagged.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="card" style="border:2px solid #f59e0b;background:#fffbeb;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:700;font-size:14px;color:#92400e">🔴 Flagged for reorder (${flagged.length})</div>
+        <div style="font-size:12px;color:#78350f;margin-top:2px">Sliders switched on from Search, Stock Levels, or the Low Stock popup — not yet on your order list.</div>
+      </div>
+      <button onclick="addAllFlaggedToOrder()" class="btn-amber" style="font-size:12px;font-weight:700">+ Add all ${flagged.length} to order list</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto">
+      ${flagged.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;background:#fff;border:1px solid #fcd34d;border-radius:7px">
+        ${partImgHtml(p,36)}
+        <div style="flex:1;min-width:120px">
+          <div style="font-weight:600;font-size:13px">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</div>
+          <div style="font-size:11px;color:#9ca3af">${p.code}${p.sup?' · '+p.sup:''}${isTracked(p)?' · '+p.qty+' in stock':' · not tracked'}</div>
+        </div>
+        <input type="number" id="ofp-qty-${p.code}" value="1" min="1" style="width:60px;font-size:13px">
+        <button onclick="addFlaggedToOrder('${p.code}')" class="btn-green" style="font-size:12px;padding:4px 10px">+ Add</button>
+        <button onclick="toggleNeedsReorder('${p.code}',false)" style="font-size:11px;padding:4px 8px;color:#6b7280" title="Not needed after all — unflag">✕ Unflag</button>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+async function addFlaggedToOrder(code){
+  const p=db.parts[code];if(!p)return;
+  const qtyInput=document.getElementById('ofp-qty-'+code);
+  const qty=Math.max(1,parseInt(qtyInput?qtyInput.value:1)||1);
+  const existing=db.order.find(o=>o.code===code);
+  if(existing){existing.qty+=qty;}
+  else{db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});}
+  p.needsReorder=false;
+  await saveDB();
+  renderOrder();
+  toast(`${qty}× ${p.name} added to order list`);
+}
+async function addAllFlaggedToOrder(){
+  const flagged=Object.values(db.parts).filter(p=>isFlagged(p)&&!db.order.find(o=>o.code===p.code));
+  if(!flagged.length)return;
+  for(const p of flagged){
+    const qtyInput=document.getElementById('ofp-qty-'+p.code);
+    const qty=Math.max(1,parseInt(qtyInput?qtyInput.value:1)||1);
+    db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
+    p.needsReorder=false;
+  }
+  await saveDB();
+  renderOrder();
+  toast(`${flagged.length} flagged part${flagged.length!==1?'s':''} added to order list`);
+}
+
 function renderOrder(){
+  renderOrderFlaggedPanel();
   const el=document.getElementById('order-content');
   if(!db.order.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px">Order list is empty. Generate from a BOM, add low-stock items, or click "+ Add line".</div>';return;}
 
@@ -5513,20 +5584,22 @@ function sendSupplierEmail(sup,indices){
   saveDB();
 }
 async function addLowStock(){
-  const low=Object.values(db.parts).filter(p=>isTracked(p)&&p.qty<=p.min);
-  const flagged=Object.values(db.parts).filter(p=>!isTracked(p)&&p.needsReorder);
+  const flagged=Object.values(db.parts).filter(p=>isFlagged(p));
+  const flaggedCodes=new Set(flagged.map(p=>p.code));
+  const low=Object.values(db.parts).filter(p=>isTracked(p)&&p.qty<=p.min&&!flaggedCodes.has(p.code));
   let n=0;
+  for(const p of flagged){
+    if(!db.order.find(o=>o.code===p.code)){
+      const qty=isTracked(p)?Math.max((p.max||p.min*2)-p.qty,1):1;
+      db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
+      p.needsReorder=false;
+      n++;
+    }
+  }
   for(const p of low){
     if(!db.order.find(o=>o.code===p.code)){
       const reorderQty=p.max?Math.max(p.max-p.qty,1):Math.max(p.min*2-p.qty,1);
       db.order.push({code:p.code,name:p.name,qty:reorderQty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
-      n++;
-    }
-  }
-  for(const p of flagged){
-    if(!db.order.find(o=>o.code===p.code)){
-      db.order.push({code:p.code,name:p.name,qty:1,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
-      p.needsReorder=false;
       n++;
     }
   }
@@ -5578,7 +5651,7 @@ function renderOrderAddResults(){
   let list=Object.values(db.parts);
 
   if(oaFilter==='low'){
-    list=list.filter(p=>(isTracked(p)&&p.qty<=p.min)||(!isTracked(p)&&p.needsReorder));
+    list=list.filter(p=>isFlagged(p)||(isTracked(p)&&p.qty<=p.min));
   }else if(oaFilter==='most'){
     list=list.filter(p=>getPartUsage(p.code).useCount>0)
       .sort((a,b)=>getPartUsage(b.code).useCount-getPartUsage(a.code).useCount);
@@ -5631,7 +5704,7 @@ async function addPartToOrderFromModal(code){
   }else{
     db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
   }
-  if(!isTracked(p)&&p.needsReorder)p.needsReorder=false;
+  if(isFlagged(p))p.needsReorder=false;
   await saveDB();
   renderOrder();
   renderOrderAddResults();
@@ -6156,6 +6229,13 @@ let stockModalType='low';
 let smSuppliers=[];
 let smAllList=[];
 let smCheckedSet=new Set();
+let smFlaggedInViewCodes=[];
+function smTickFlaggedInView(){
+  document.querySelectorAll('.sm-chk').forEach(cb=>{
+    if(smFlaggedInViewCodes.includes(cb.dataset.code)){cb.checked=true;smCheckedSet.add(cb.dataset.code);}
+  });
+  toast(`${smFlaggedInViewCodes.length} flagged item${smFlaggedInViewCodes.length!==1?'s':''} ticked`);
+}
 
 function openStockModal(type){
   stockModalType=type;
@@ -6166,8 +6246,13 @@ function openStockModal(type){
   document.getElementById('sm-sup-assign-area').style.display='none';
   const all=Object.values(db.parts);
   smAllList=type==='out'
-    ?all.filter(p=>isTracked(p)&&p.qty<=0)
-    :[...all.filter(p=>!isTracked(p)&&p.needsReorder), ...all.filter(p=>isTracked(p)&&p.qty>0&&p.qty<=p.min)];
+    ?all.filter(p=>isTracked(p)&&p.qty<=0&&!isFlagged(p))
+    :(()=>{
+      const flagged=all.filter(p=>isFlagged(p));
+      const flaggedCodes=new Set(flagged.map(p=>p.code));
+      const low=all.filter(p=>isTracked(p)&&p.qty>0&&p.qty<=p.min&&!flaggedCodes.has(p.code));
+      return[...flagged,...low];
+    })();
   document.getElementById('stock-modal-title').textContent=type==='out'
     ?`Out of stock — ${smAllList.length} part${smAllList.length!==1?'s':''}`
     :`Low stock — ${smAllList.length} part${smAllList.length!==1?'s':''}`;
@@ -6196,20 +6281,34 @@ function renderStockModalBody(){
   if(!smAllList.length){body.innerHTML='<div style="color:#9ca3af">None at the moment — all levels OK.</div>';return;}
   if(!list.length){body.innerHTML=`<div style="color:#9ca3af;padding:14px 0;text-align:center">No parts match this filter${smCheckedSet.size?' — '+smCheckedSet.size+' item(s) still selected from other filters':''}.</div>`;return;}
 
-  body.innerHTML=`<div id="stock-print-area">
+  // If a supplier filter is active, call out any flagged items from that supplier so they don't get missed
+  const flaggedInView=list.filter(p=>isFlagged(p));
+  smFlaggedInViewCodes=flaggedInView.map(p=>p.code);
+  const supplierBanner=sup&&flaggedInView.length
+    ?`<div style="background:#fee2e2;border:2px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:20px">🔴</span>
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:700;font-size:13px;color:#991b1b">${flaggedInView.length} item${flaggedInView.length!==1?'s':''} flagged for reorder from ${sup}</div>
+          <div style="font-size:11px;color:#7f1d1d">Tick them below (or use the button), then "Add selected to order list".</div>
+        </div>
+        <button onclick="smTickFlaggedInView()" style="font-size:12px;background:#991b1b;color:#fff;border-color:#991b1b">✓ Tick all flagged from ${sup}</button>
+      </div>`
+    :'';
+
+  body.innerHTML=`${supplierBanner}<div id="stock-print-area">
     <p style="font-size:11px;color:#6b7280;margin-bottom:8px">Printed: ${nowDT()}${cat||sup?` · Filtered: ${[cat,sup].filter(Boolean).join(' · ')}`:''}${smCheckedSet.size?` · ${smCheckedSet.size} selected total`:''}</p>
     <table><thead><tr>
       <th style="width:28px"><input type="checkbox" onchange="smSelectAll(this.checked)" style="width:15px;height:15px"></th>
       <th></th><th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Location</th>
       <th>Qty</th><th>Min</th><th>Max</th><th>Supplier</th><th>Reorder qty</th><th class="no-print"></th>
-    </tr></thead><tbody>${list.map((p,i)=>`<tr style="${!isTracked(p)?'background:#fff5f5':''}">
+    </tr></thead><tbody>${list.map((p,i)=>`<tr style="${isFlagged(p)?'background:#fff5f5':''}">
       <td><input type="checkbox" class="sm-chk" data-code="${p.code}" ${smCheckedSet.has(p.code)?'checked':''} onchange="this.checked?smCheckedSet.add('${p.code}'):smCheckedSet.delete('${p.code}')" style="width:15px;height:15px"></td>
       <td style="padding:4px 6px" class="no-print">${partImgHtml(p,40)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px">${p.mfrno||'—'}</td>
       <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td>
       <td>${p.loc}</td>
-      <td>${isTracked(p)?`<span style="font-weight:700;color:${p.qty<=0?'#991b1b':'#92400e'}">${p.qty}</span>`:reorderToggleHtml(p)}</td>
+      <td>${qtyOrFlagCell(p)}</td>
       <td>${isTracked(p)?p.min:'—'}</td><td>${isTracked(p)?(p.max||'—'):'—'}</td>
       <td style="font-size:12px">${p.sup||'—'}</td>
       <td style="font-weight:600;color:#166534">${isTracked(p)?Math.max((p.max||p.min*2)-p.qty,1):'—'}</td>
@@ -6238,7 +6337,7 @@ async function reorderSelected(){
     if(p&&!db.order.find(o=>o.code===code)){
       const qty=isTracked(p)?Math.max((p.max||p.min*2)-p.qty,1):1;
       db.order.push({code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});n++;
-      if(!isTracked(p))p.needsReorder=false;
+      if(isFlagged(p))p.needsReorder=false;
     }
   }
   await saveDB();
@@ -6607,13 +6706,13 @@ function renderSL(){
     </tr></thead><tbody>${res.map(p=>{
       const allocs=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
       const allocQty=allocs.reduce((s,a)=>s+a.qty,0);
-      return`<tr>
+      return`<tr style="${isFlagged(p)?'background:#fff5f5':''}">
         <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
         <td style="font-size:12px;font-family:monospace;font-weight:600">${p.code}</td>
         <td style="font-size:12px;color:#374151">${p.mfrno||'—'}</td>
         <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td>
         <td style="font-size:12px">${formatLoc(p)||'—'}</td>
-        <td>${isTracked(p)?`<input type="number" value="${p.qty}" min="0" style="width:70px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)">`:reorderToggleHtml(p)}</td>
+        <td>${isTracked(p)?`<div style="display:flex;align-items:center;gap:6px"><input type="number" value="${p.qty}" min="0" style="width:64px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)">${reorderToggleHtml(p)}</div>`:reorderToggleHtml(p)}</td>
         <td style="text-align:center">
           ${allocQty>0
             ?`<div style="text-align:center">
@@ -6732,7 +6831,7 @@ function showSupplierRefs(code){
 function epTrackedChanged(){
   const tracked=document.getElementById('ep-tracked').checked;
   document.getElementById('ep-qty-block').style.display=tracked?'grid':'none';
-  document.getElementById('ep-reorder-flag-wrap').style.display=tracked?'none':'flex';
+  document.getElementById('ep-reorder-flag-wrap').style.display='flex';
 }
 function openEditPart(code){
   editingCode=code;const p=db.parts[code];if(!p)return;
