@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev89</title>
+<title>Workshop Stock Control v2.1 Rev90</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -317,7 +317,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 89 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 90 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -2252,10 +2252,13 @@ function stockStatusBadge(p){
   return(p.needsReorder?'<span class="badge b-low">🔴 Flagged</span> ':'')+sb(p);
 }
 function reorderToggleHtml(p){
-  return`<label class="toggle-sw" title="Slide to flag this for reorder" onclick="event.stopPropagation()">
-    <input type="checkbox" ${p.needsReorder?'checked':''} onchange="toggleNeedsReorder('${p.code}',this.checked)">
-    <span class="toggle-sw-slider"></span>
-  </label>`;
+  return`<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap" onclick="event.stopPropagation()">
+    <label class="toggle-sw" title="Slide to red-flag this part for the order list">
+      <input type="checkbox" ${p.needsReorder?'checked':''} onchange="toggleNeedsReorder('${p.code}',this.checked)">
+      <span class="toggle-sw-slider"></span>
+    </label>
+    <span style="font-size:10px;color:${p.needsReorder?'#991b1b':'#6b7280'};font-weight:${p.needsReorder?700:400}">${p.needsReorder?'🔴 flagged to order':'slide to flag to order'}</span>
+  </span>`;
 }
 // Shows qty number (if tracked) plus the reorder slider — the slider is always available,
 // so any part — tracked or not — can be manually flagged to jump to the top of Low Stock.
@@ -2412,7 +2415,8 @@ function ciLook(){
       `<span style="color:#9ca3af">Location</span><span style="font-weight:600">${locStr}</span>`,
       p.mfr?`<span style="color:#9ca3af">Brand</span><span>${p.mfr}</span>`:'',
       p.sup?`<span style="color:#9ca3af">Supplier</span><span>${p.sup}</span>`:'',
-      p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:''
+      p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:'',
+      `<span style="color:#9ca3af">Reorder</span><span>${reorderToggleHtml(p)}</span>`
     ].filter(Boolean).join('');
   }
 
@@ -2553,7 +2557,8 @@ function coLook(){
         p.mfrno?`<span style="color:#9ca3af">Mfr part no.</span><span style="font-weight:600">${p.mfrno}</span>`:'',
         `<span style="color:#9ca3af">Location</span><span style="font-weight:600">${locStr}</span>`,
         p.mfr?`<span style="color:#9ca3af">Brand</span><span>${p.mfr}</span>`:'',
-        p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:''
+        p.notes?`<span style="color:#9ca3af">Notes</span><span>${p.notes}</span>`:'',
+        `<span style="color:#9ca3af">Reorder</span><span>${reorderToggleHtml(p)}</span>`
       ].filter(Boolean).join('');
     }
     const fuzzyWarn=document.getElementById('co-fuzzy-warn');
@@ -6460,17 +6465,18 @@ function renderCIBrowse(){
   if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
-    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Stock</th><th></th>
+    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Stock</th><th>Reorder</th><th></th>
   </tr></thead><tbody>${res.length?res.map(p=>`<tr>
     <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
-    <td style="font-weight:700;text-align:center;color:#166534">${p.qty}</td>
+    <td style="font-weight:700;text-align:center;color:#166534">${isTracked(p)?p.qty:'—'}</td>
+    <td>${reorderToggleHtml(p)}</td>
     <td><button onclick="browseAddToCheckin('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-green">Check in</button>
     <button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:3px 9px;margin-left:4px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button></td>
-  </tr>`).join(''):'<tr><td colspan="7" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="8" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckin(code){
@@ -6494,17 +6500,18 @@ function renderCOBrowse(){
   if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px">No parts in catalogue yet</div>';return;}
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:6px">${res.length} of ${total} parts${q?' matching "'+q+'"':''}</div>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table><thead style="position:sticky;top:0;background:#f9fafb"><tr>
-    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">In stock</th><th></th>
-  </tr></thead><tbody>${res.length?res.map(p=>`<tr style="${p.qty<=0?'opacity:.5':''}">
+    <th style="width:56px"></th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">In stock</th><th>Reorder</th><th></th>
+  </tr></thead><tbody>${res.length?res.map(p=>`<tr style="${isTracked(p)&&p.qty<=0?'opacity:.5':''}">
     <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
     <td><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' | '+p.mfrno:''}</div></td>
     <td style="font-size:12px">${p.mfr||'—'}</td>
     <td><span class="chip">${p.cat}</span></td>
     <td style="font-size:12px">${formatLoc(p)||p.loc||'—'}</td>
-    <td style="font-weight:700;text-align:center;color:${p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'}">${p.qty}</td>
-    <td>${p.qty>0?`<button onclick="browseAddToCheckout('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-amber">Take</button>`:'<span style="font-size:11px;color:#9ca3af">None</span>'}
+    <td style="font-weight:700;text-align:center;color:${isTracked(p)?(p.qty<=0?'#991b1b':p.qty<=p.min?'#92400e':'#166534'):'#6b7280'}">${isTracked(p)?p.qty:'—'}</td>
+    <td>${reorderToggleHtml(p)}</td>
+    <td>${(!isTracked(p)||p.qty>0)?`<button onclick="browseAddToCheckout('${p.code}')" style="font-size:11px;padding:3px 9px" class="btn-amber">Take</button>`:'<span style="font-size:11px;color:#9ca3af">None</span>'}
     <button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:3px 9px;margin-left:4px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button></td>
-  </tr>`).join(''):'<tr><td colspan="7" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
+  </tr>`).join(''):'<tr><td colspan="8" style="color:#9ca3af;text-align:center;padding:12px">No parts match — try fewer words</td></tr>'}</tbody></table></div>`;
 }
 
 function browseAddToCheckout(code){
