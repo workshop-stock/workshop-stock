@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev95</title>
+<title>Workshop Stock Control v2.1 Rev97</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -227,6 +227,8 @@ tr:hover td{background:#f9fafb}
     <h1>Workshop Stock Control &mdash; Electrical / PLC / HMI / Automation</h1>
   </div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button onclick="undoLast()" id="undo-btn-top" style="font-size:12px;padding:5px 12px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.35);color:#fff;font-weight:600" title="Undo last action">&#8630; Undo</button>
+    <button onclick="redoLast()" id="redo-btn-top" style="display:none;font-size:12px;padding:5px 12px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.35);color:#fff;font-weight:600" title="Redo last undone action">&#8631; Redo</button>
     <div style="display:flex;align-items:center;gap:6px">
       <div id="save-dot" style="width:8px;height:8px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>
       <span id="sync-status" style="font-size:11px;opacity:.85">Not connected</span>
@@ -317,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 95 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 97 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1585,8 +1587,8 @@ function pushUndo(){
   undoStack.push(JSON.stringify(db));
   if(undoStack.length>UNDO_LIMIT)undoStack.shift();
   redoStack.length=0;
-  const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
-  const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='none';
+  ['undo-btn','undo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='inline-block';});
+  ['redo-btn','redo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='none';});
 }
 async function undoLast(){
   if(!undoStack.length){toast('Nothing to undo yet — actions are saved as you go','err');return;}
@@ -1595,8 +1597,8 @@ async function undoLast(){
   if(redoStack.length>UNDO_LIMIT)redoStack.shift();
   db=JSON.parse(undoStack.pop());
   await saveDB();renderAll();
-  const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='inline-block';
-  if(!undoStack.length){const btn=document.getElementById('undo-btn');if(btn)btn.style.display='none';}
+  ['redo-btn','redo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='inline-block';});
+  if(!undoStack.length){['undo-btn','undo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='none';});}
   toast('✓ Last action undone successfully');
 }
 async function redoLast(){
@@ -1605,8 +1607,8 @@ async function redoLast(){
   if(undoStack.length>UNDO_LIMIT)undoStack.shift();
   db=JSON.parse(redoStack.pop());
   await saveDB();renderAll();
-  const btn=document.getElementById('undo-btn');if(btn)btn.style.display='inline-block';
-  if(!redoStack.length){const rbtn=document.getElementById('redo-btn');if(rbtn)rbtn.style.display='none';}
+  ['undo-btn','undo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='inline-block';});
+  if(!redoStack.length){['redo-btn','redo-btn-top'].forEach(id=>{const btn=document.getElementById(id);if(btn)btn.style.display='none';});}
   toast('✓ Action redone');
 }
 
@@ -4118,14 +4120,24 @@ function rejectBOMMatch(idx){
   toast('Marked as no match — will appear in shortfall','info');
 }
 
-// ─── LINK UNMATCHED BOM CODE TO AN EXISTING STOCK PART ────────────────────────
+// ─── LINK UNMATCHED BOM/DELIVERY CODE TO AN EXISTING STOCK PART ───────────────
 // Fixes the "BOM software spelled the part number wrong" problem permanently — the wrong
 // code gets saved as an alias on the correct part, so it keeps auto-matching from then on.
-let _linkAliasBomIdx=null;
+let _linkAliasCtx=null; // {type:'bom', idx} or {type:'delivery', dIdx, itemIdx}
+
 function openLinkAliasModal(bomIdx){
-  _linkAliasBomIdx=bomIdx;
   const item=curBOM[bomIdx];
   if(!item)return;
+  _linkAliasCtx={type:'bom',idx:bomIdx};
+  _openLinkAliasModalUI(item.code,item.name);
+}
+function openLinkAliasModalDelivery(dIdx,itemIdx){
+  const item=db.deliveries[dIdx].items[itemIdx];
+  if(!item)return;
+  _linkAliasCtx={type:'delivery',dIdx,itemIdx};
+  _openLinkAliasModalUI(item.code,item.name);
+}
+function _openLinkAliasModalUI(code,name){
   const existing=document.getElementById('link-alias-modal');
   if(existing)existing.remove();
   const div=document.createElement('div');
@@ -4133,10 +4145,10 @@ function openLinkAliasModal(bomIdx){
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
   div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h2 style="font-size:16px;font-weight:700;margin:0">🔗 Link "${item.code}" to a stock part</h2>
+      <h2 style="font-size:16px;font-weight:700;margin:0">🔗 Link "${code}" to a stock part</h2>
       <button onclick="document.getElementById('link-alias-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
-    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">This BOM used the code "<strong>${item.code}</strong>" for "<strong>${item.name}</strong>" — pick the matching internal part below. That code will always resolve to the part you choose from now on. You can unlink it any time from that part's Edit screen.</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">This used the code "<strong>${code}</strong>" for "<strong>${name}</strong>" — pick the matching internal part below. That code will always resolve to the part you choose from now on — in BOMs, deliveries, Check In/Out, Search, everywhere. You can unlink it any time from that part's Edit screen.</p>
     <input id="la-search" placeholder="Search stock parts by name or code…" oninput="renderLinkAliasResults()" style="margin-bottom:10px">
     <div id="la-results"></div>
   </div>`;
@@ -4157,25 +4169,45 @@ function renderLinkAliasResults(){
   </div>`).join('');
 }
 async function confirmLinkAlias(stockCode){
-  const item=curBOM[_linkAliasBomIdx];
+  const ctx=_linkAliasCtx;
   const p=db.parts[stockCode];
-  if(!item||!p)return;
-  if(!confirm(`Link BOM code "${item.code}" to "${p.name}" (${p.code})?\n\nFuture BOMs using "${item.code}" will automatically match this part.`))return;
+  if(!ctx||!p)return;
+
+  let originalCode,originalName;
+  if(ctx.type==='bom'){
+    const item=curBOM[ctx.idx];
+    if(!item)return;
+    originalCode=item.code;originalName=item.name;
+  }else{
+    const item=db.deliveries[ctx.dIdx]&&db.deliveries[ctx.dIdx].items[ctx.itemIdx];
+    if(!item)return;
+    originalCode=item.code;originalName=item.name;
+  }
+
+  if(!confirm(`Link code "${originalCode}" to "${p.name}" (${p.code})?\n\nFuture BOMs and deliveries using "${originalCode}" will automatically match this part.`))return;
   pushUndo();
   if(!p.aliases)p.aliases=[];
-  if(!p.aliases.some(a=>normalise(a)===normalise(item.code)))p.aliases.push(item.code);
-  const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
-  item.matchedCode=p.code;
-  item.inStock=Math.max(0,p.qty-allocQty);
-  item.allocatedQty=allocQty;
-  item.matchConfirmed=true;
-  item.matchRejected=false;
-  await saveDB();
+  if(!p.aliases.some(a=>normalise(a)===normalise(originalCode)))p.aliases.push(originalCode);
+
+  if(ctx.type==='bom'){
+    const item=curBOM[ctx.idx];
+    const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+    item.matchedCode=p.code;
+    item.inStock=Math.max(0,p.qty-allocQty);
+    item.allocatedQty=allocQty;
+    item.matchConfirmed=true;
+    item.matchRejected=false;
+    await saveDB();
+    renderBOMRows();
+    recalcBOMSummary();
+  }else{
+    await saveDB();
+    renderDelRows(db.deliveries[ctx.dIdx]);
+  }
+
   const modal=document.getElementById('link-alias-modal');
   if(modal)modal.remove();
-  renderBOMRows();
-  recalcBOMSummary();
-  toast(`✓ Linked — "${item.code}" will now always match ${p.name}`);
+  toast(`✓ Linked — "${originalCode}" will now always match ${p.name}`);
 }
 
 function recalcBOMSummary(){
@@ -4679,7 +4711,10 @@ function renderDelRows(del){
           style="font-size:11px;padding:3px 4px;border:1px solid #c4b5fd;border-radius:4px"
           onchange="delSetProjLoc(${dIdx},${i},'custom',this.value)">
         ${projLocStr?`<div style="font-size:10px;color:#6d28d9;font-weight:700;margin-top:2px">📍 ${projLocStr}</div>`:'<div style="font-size:10px;color:#9ca3af;margin-top:2px">Where will the project store these parts?</div>'}
-        ${projLocStr?`<button type="button" onclick="delCopyLocToAll(${dIdx},${i})" style="font-size:10px;margin-top:4px;padding:3px 8px;background:#fff;color:#6d28d9;border-color:#c4b5fd">📋 Copy this location to all items in this delivery</button>`:''}
+        ${projLocStr?`<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#6d28d9;margin-top:4px;cursor:pointer">
+          <input type="checkbox" onchange="if(this.checked){delCopyLocToAll(${dIdx},${i});this.checked=false;}" style="width:14px;height:14px;cursor:pointer">
+          ☑ Tick to copy this location to all items in this delivery
+        </label>`:''}
       </div>
     </div>`;
 
@@ -4716,6 +4751,7 @@ function renderDelRows(del){
           <div style="font-weight:600">${item.name}</div>
           <div style="font-size:11px;color:#9ca3af">${item.code}${catPart&&catPart.mfrno?` · <span style="color:#1e40af;font-weight:600">${catPart.mfrno}</span>`:''}</div>
           ${item.alreadyReceived>0?`<div style="font-size:11px;color:#166534">${item.alreadyReceived} already received</div>`:'<div style="font-size:11px;color:#991b1b;font-weight:600">🔴 Not received yet</div>'}
+          ${!catPart?`<button type="button" onclick="openLinkAliasModalDelivery(${dIdx},${i})" style="font-size:10px;margin-top:4px;padding:3px 7px;background:#fffbeb;color:#92400e;border-color:#fcd34d">🔗 Link to a stock part</button>`:''}
         </div>
       </div>
       <div><div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.03em">Ordered</div><div style="font-weight:600">${item.expected}</div></div>
@@ -4765,7 +4801,6 @@ function delSetProjLoc(dIdx,itemIdx,level,val){
 async function delCopyLocToAll(dIdx,srcItemIdx){
   const del=db.deliveries[dIdx];
   const src=del.items[srcItemIdx];
-  if(!confirm(`Apply this location to all ${del.items.length-1} other item${del.items.length-1!==1?'s':''} in this delivery? You can still change any individually afterwards.\n\n(This can be reversed with the Undo button on the dashboard.)`))return;
   pushUndo();
   del.items.forEach((it,i)=>{
     if(i===srcItemIdx)return;
