@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev90</title>
+<title>Workshop Stock Control v2.1 Rev92</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -317,7 +317,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 90 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 92 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1421,29 +1421,84 @@ async function manualSave(){
 
 const SESSION_ID='ses_'+Math.random().toString(36).slice(2,8);
 let presenceRef=null;
+let presenceData={};
 
 function startPresence(){
   if(!fbdb)return;
   presenceRef=fbdb.ref('presence/'+SESSION_ID);
-  presenceRef.set({online:true,ts:Date.now()});
+  updatePresenceInfo();
   presenceRef.onDisconnect().remove();
   fbdb.ref('presence').on('value',snap=>{
-    const count=snap.numChildren();
-    const badge=document.getElementById('active-users-badge');
-    const dashBadge=document.getElementById('active-users-dash');
-    if(badge){badge.style.display=count>1?'inline-block':'none';badge.textContent=`${count} users online`;}
-    if(dashBadge){dashBadge.textContent=count>1?`${count} users online now`:'';}
+    presenceData=snap.val()||{};
+    renderPresenceBadges();
   });
+}
+
+// Attaches the logged-in user's name to their presence session — called on login/logout
+function updatePresenceInfo(){
+  if(!presenceRef)return;
+  presenceRef.set({
+    online:true,
+    ts:Date.now(),
+    name:currentUser?currentUser.name:'',
+    isAdmin:!!(currentUser&&currentUser.isAdmin===true)
+  });
+}
+
+function renderPresenceBadges(){
+  const sessions=Object.values(presenceData);
+  const count=sessions.length;
+  const isAdmin=currentUser&&currentUser.isAdmin===true;
+  const badge=document.getElementById('active-users-badge');
+  const dashBadge=document.getElementById('active-users-dash');
+  if(badge){
+    badge.style.display=count>1?'inline-block':'none';
+    badge.textContent=`👥 ${count} online`;
+    if(isAdmin){
+      badge.style.cursor='pointer';
+      badge.title='Click to see who (admin only)';
+      badge.onclick=showOnlineUsers;
+    }else{
+      badge.style.cursor='default';
+      badge.title='';
+      badge.onclick=null;
+    }
+  }
+  if(dashBadge){
+    dashBadge.innerHTML=count>1
+      ?(isAdmin
+        ?`<span style="cursor:pointer;text-decoration:underline" onclick="showOnlineUsers()">👥 ${count} users online now — click to see who</span>`
+        :`👥 ${count} users online now`)
+      :'';
+  }
+}
+
+function showOnlineUsers(){
+  if(!currentUser||currentUser.isAdmin!==true){toast('Admin access required','err');return;}
+  const sessions=Object.values(presenceData);
+  const named=sessions.filter(s=>s.name).sort((a,b)=>a.name.localeCompare(b.name));
+  const anon=sessions.length-named.length;
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-size:16px;font-weight:700;margin:0">👥 Currently online</h2>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    ${named.length?named.map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;background:${s.isAdmin?'#f0fdf4':'#fff'}">
+      <div style="width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+      <div style="flex:1;font-weight:600;font-size:13px">${s.name}${s.isAdmin?' 🔐':''}</div>
+    </div>`).join(''):'<div style="color:#9ca3af;font-size:13px;padding:6px 0">No one signed in right now</div>'}
+    ${anon>0?`<div style="font-size:12px;color:#9ca3af;margin-top:8px">+ ${anon} browser tab${anon!==1?'s':''} open but not signed in</div>`:''}
+  </div>`;
+  document.body.appendChild(div);
 }
 
 function updateUserCount(){
   if(!fbdb)return;
   fbdb.ref('presence').once('value',snap=>{
-    const count=snap.numChildren();
-    const badge=document.getElementById('active-users-badge');
-    const dashBadge=document.getElementById('active-users-dash');
-    if(badge){badge.style.display=count>1?'inline-block':'none';badge.textContent=`${count} users online`;}
-    if(dashBadge){dashBadge.textContent=count>1?`${count} users online now`:'';}
+    presenceData=snap.val()||{};
+    renderPresenceBadges();
   });
 }
 
@@ -1932,6 +1987,7 @@ async function lwLogin(){
   saveUserSession();
   document.getElementById('login-wall').style.display='none';
   applyUserSession();
+  updatePresenceInfo();
   soundOK();
   toast(`Welcome, ${account.name}${account.isAdmin?' 🔐':''}!`,'info');
   account.lastLogin=nowDT();
@@ -2039,6 +2095,7 @@ function logoutUser(){
   currentUser=null;
   saveUserSession();
   applyUserSession();
+  updatePresenceInfo();
   saveDB();
   toast(`${name} signed out`,'info');
   showLoginWall();
@@ -2114,7 +2171,10 @@ function showUserManager(){
         </div>`).join('')}
     </div>
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px">
-      <div style="font-weight:600;font-size:13px;margin-bottom:10px">📋 Recent login activity</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-weight:600;font-size:13px">📋 Recent login activity</div>
+        <button onclick="showOnlineUsers()" style="font-size:12px;background:#166534;color:#fff;border-color:#166534">👥 See who's online now</button>
+      </div>
       ${(()=>{
         const events=[...(db.eventHist||[])].filter(e=>e.type==='LOGIN'||e.type==='LOGOUT').reverse().slice(0,15);
         if(!events.length)return'<div style="font-size:12px;color:#9ca3af">No login activity recorded yet</div>';
