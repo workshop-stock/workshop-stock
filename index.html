@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev97</title>
+<title>Workshop Stock Control v2.1 Rev98</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 97 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 98 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -4712,8 +4712,8 @@ function renderDelRows(del){
           onchange="delSetProjLoc(${dIdx},${i},'custom',this.value)">
         ${projLocStr?`<div style="font-size:10px;color:#6d28d9;font-weight:700;margin-top:2px">📍 ${projLocStr}</div>`:'<div style="font-size:10px;color:#9ca3af;margin-top:2px">Where will the project store these parts?</div>'}
         ${projLocStr?`<label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#6d28d9;margin-top:4px;cursor:pointer">
-          <input type="checkbox" onchange="if(this.checked){delCopyLocToAll(${dIdx},${i});this.checked=false;}" style="width:14px;height:14px;cursor:pointer">
-          ☑ Tick to copy this location to all items in this delivery
+          <input type="checkbox" ${item.syncLoc?'checked':''} onchange="delToggleCopyLoc(${dIdx},${i},this.checked)" style="width:14px;height:14px;cursor:pointer">
+          ${item.syncLoc?'✓ Applied to all items — untick to just clear this marker':'☐ Tick to copy this location to all items in this delivery'}
         </label>`:''}
       </div>
     </div>`;
@@ -4802,6 +4802,7 @@ async function delCopyLocToAll(dIdx,srcItemIdx){
   const del=db.deliveries[dIdx];
   const src=del.items[srcItemIdx];
   pushUndo();
+  src.syncLoc=true;
   del.items.forEach((it,i)=>{
     if(i===srcItemIdx)return;
     it.projLoc1=src.projLoc1;
@@ -4816,6 +4817,21 @@ async function delCopyLocToAll(dIdx,srcItemIdx){
   toastEl.className='toast t-ok show';
   clearTimeout(toastEl._tid);
   toastEl._tid=setTimeout(()=>toastEl.classList.remove('show'),5000);
+}
+
+// The checkbox next to a project location — ticking copies that location to every other
+// item (and stays ticked as a visible confirmation); unticking just clears the marker,
+// it does not undo the copy — use the main Undo button for that if needed.
+async function delToggleCopyLoc(dIdx,itemIdx,checked){
+  const del=db.deliveries[dIdx];
+  const item=del.items[itemIdx];
+  if(checked){
+    await delCopyLocToAll(dIdx,itemIdx);
+  }else{
+    item.syncLoc=false;
+    await saveDB();
+    renderDelRows(del);
+  }
 }
 
 function delSetLoc(dIdx,itemIdx,level,val){
