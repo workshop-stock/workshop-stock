@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev94</title>
+<title>Workshop Stock Control v2.1 Rev95</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -317,7 +317,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 94 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 95 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -4650,7 +4650,8 @@ function renderDelRows(del){
     const catPart=db.parts[item.code]||Object.values(db.parts).find(p=>
       normalise(p.code)===normalise(item.code)||
       normalise(p.mfrno||'')===normalise(item.code)||
-      normalise(stripVendorPrefix(p.code))===normalise(item.code)
+      normalise(stripVendorPrefix(p.code))===normalise(item.code)||
+      (p.aliases||[]).some(a=>normalise(a)===normalise(item.code))
     );
     const imgHtml=catPart?partImgHtml(catPart,44):`<div style="width:44px;height:44px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div>`;
 
@@ -4838,7 +4839,8 @@ function delScanLook(){
   const bomItem=del.items.find(i=>
     normalise(i.code)===normalise(p.code)||
     normalise(i.code)===normalise(p.mfrno||'')||
-    normalise(stripVendorPrefix(i.code))===normalise(p.code)
+    normalise(stripVendorPrefix(i.code))===normalise(p.code)||
+    (p.aliases||[]).some(a=>normalise(a)===normalise(i.code))
   );
   const remaining=bomItem?Math.max(0,bomItem.expected-(bomItem.alreadyReceived||0)):null;
 
@@ -4910,7 +4912,8 @@ async function delScanAdd(){
   const bomItemIdx=del.items.findIndex(i=>
     normalise(i.code)===normalise(code)||
     normalise(i.code)===normalise(p.mfrno||'')||
-    normalise(stripVendorPrefix(i.code))===normalise(code)
+    normalise(stripVendorPrefix(i.code))===normalise(code)||
+    (p.aliases||[]).some(a=>normalise(a)===normalise(i.code))
   );
   if(bomItemIdx>=0){
     const item=del.items[bomItemIdx];
