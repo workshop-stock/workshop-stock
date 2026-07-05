@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev93</title>
+<title>Workshop Stock Control v2.1 Rev94</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -317,7 +317,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 93 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 94 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -341,7 +341,7 @@ tr:hover td{background:#f9fafb}
     <div class="card"><div class="sec">Recent activity</div><div id="d-activity"><div style="color:#9ca3af;font-size:13px">Loading…</div></div></div>
   </div>
   <div id="d-overdue-banner" style="display:none"></div>
-  <div class="card"><div class="sec">Pending deliveries</div><div id="d-deliveries"></div></div>
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div class="sec" style="margin:0">Pending deliveries</div><button onclick="showOutstandingItems()" class="btn-amber" style="font-size:12px">📞 Outstanding items — by supplier</button></div><div id="d-deliveries"></div></div>
 </div>
 
 <!-- STOCK ALERT MODAL -->
@@ -663,6 +663,15 @@ tr:hover td{background:#f9fafb}
       <div style="font-size:11px;color:#6b7280;margin:3px 0 8px">Keep one internal code, but log every supplier's own part number and price for it — e.g. Adaptive Automation, RS, Misumi, Total Source.</div>
       <div id="ep-suppliers-list"></div>
       <button type="button" onclick="epAddSupplierRow()" style="font-size:12px;background:#fff;color:#6d28d9;border-color:#c4b5fd">+ Add supplier</button>
+    </div>
+    <div style="margin-bottom:14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px">
+      <label style="color:#92400e;font-weight:700">🔗 Also known as — codes that should match this part</label>
+      <div style="font-size:11px;color:#6b7280;margin:3px 0 8px">When a BOM import or barcode uses a wrong/different code for this exact part, link it here — that code will always resolve to this part from then on, and can be unlinked any time.</div>
+      <div id="ep-aliases-list"></div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="ep-new-alias" placeholder="Type a code to link…" style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter'){event.preventDefault();epAddAlias();}">
+        <button type="button" onclick="epAddAlias()" style="font-size:12px;background:#fff;color:#92400e;border-color:#fcd34d">+ Link code</button>
+      </div>
     </div>
     <div style="margin-bottom:10px">
       <label>Storage location — Area &rsaquo; Section &rsaquo; Container</label>
@@ -997,7 +1006,10 @@ tr:hover td{background:#f9fafb}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <div class="sec" style="margin:0">All delivery records</div>
-      <input id="del-search" placeholder="Search by BOM, PO, supplier…" oninput="renderDelHist()" style="width:220px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="showOutstandingItems()" class="btn-amber" style="font-size:12px">📞 Outstanding items — by supplier</button>
+        <input id="del-search" placeholder="Search by BOM, PO, supplier…" oninput="renderDelHist()" style="width:220px">
+      </div>
     </div>
     <div id="del-hist"></div>
   </div>
@@ -1853,7 +1865,8 @@ function findPartWithType(v){
     normalise(p.code)===vn ||
     normalise(p.barcode||'')===vn ||
     normalise(p.mfrno||'')===vn ||
-    (p.altSuppliers||[]).some(a=>normalise(a.partNo||'')===vn)
+    (p.altSuppliers||[]).some(a=>normalise(a.partNo||'')===vn) ||
+    (p.aliases||[]).some(a=>normalise(a)===vn)
   );
   if(exact)return{part:exact,matchType:'exact'};
   const prefix=Object.values(db.parts).find(p=>
@@ -1883,7 +1896,8 @@ function findPartCandidates(v,limit){
   Object.values(db.parts).forEach(p=>{
     const codeN=normalise(p.code),barN=normalise(p.barcode||''),mfrN=normalise(p.mfrno||'');
     const altPartNos=(p.altSuppliers||[]).map(a=>normalise(a.partNo||''));
-    if(codeN===vn||barN===vn||mfrN===vn||altPartNos.includes(vn)){exact.push(p);return;}
+    const aliasNos=(p.aliases||[]).map(a=>normalise(a));
+    if(codeN===vn||barN===vn||mfrN===vn||altPartNos.includes(vn)||aliasNos.includes(vn)){exact.push(p);return;}
     if(codeN.startsWith(vn)||mfrN.startsWith(vn)||altPartNos.some(a=>a.startsWith(vn))){prefix.push(p);return;}
     if(wordMatches(v.trim(),partHaystack(p)))fuzzy.push(p);
   });
@@ -3218,7 +3232,8 @@ function partHaystack(p){
     p.mfr||'', p.cat||'', p.sup||'', p.notes||'',
     p.loc||'', p.loc2||'', p.loc3||'',
     p.grade||'', p.headType||'',
-    ...(p.altSuppliers||[]).map(a=>(a.sup||'')+' '+(a.partNo||''))
+    ...(p.altSuppliers||[]).map(a=>(a.sup||'')+' '+(a.partNo||'')),
+    ...(p.aliases||[])
   ].join(' ').toLowerCase();
 }
 
@@ -3328,6 +3343,10 @@ function showPartHistory(code){
       </div>
       <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
+    ${(p.aliases||[]).length?`<div style="margin-bottom:12px;padding:8px 10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:7px;font-size:12px">
+      <strong style="color:#92400e">🔗 Also matches these codes:</strong> ${p.aliases.map(a=>`<span style="font-family:monospace;background:#fff;padding:1px 7px;border-radius:6px;margin-left:4px">${a}</span>`).join('')}
+      <span style="color:#9ca3af"> — manage via Edit part</span>
+    </div>`:''}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
       <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#166534">${p.qty}</div>
@@ -4050,6 +4069,11 @@ function renderBOMRows(){
         ${item.inStock!==undefined?`<span style="font-size:11px;font-weight:700;color:${inStock>0?'#166534':'#991b1b'}">${inStock>0?inStock+' in stock':'None in stock'}</span>`:''}
         ${allocQty>0?`<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:6px;font-size:10px;font-weight:600">⚠ ${allocQty} allocated</span>`:''}
       </div>`;
+    }else if(item.matchedCode===null){
+      matchSection=`<div style="margin-top:6px;background:#fff5f5;border:2px dashed #fca5a5;border-radius:8px;padding:8px 10px">
+        <div style="font-size:11px;color:#991b1b;margin-bottom:6px">⚠ No catalogue match found for this code — will be ordered as new unless linked to an existing part.</div>
+        <button onclick="openLinkAliasModal(${i})" style="font-size:12px;background:#fff;color:#92400e;border-color:#fcd34d">🔗 Link this code to a stock part</button>
+      </div>`;
     }
 
     return`<div class="bom-row" style="${item.matchedCode===null||item.matchRejected?'background:#fff5f5':confirmed&&inStock>0&&orderQty===0?'background:#f0fdf4':''}">
@@ -4092,6 +4116,66 @@ function rejectBOMMatch(idx){
   renderBOMRows();
   recalcBOMSummary();
   toast('Marked as no match — will appear in shortfall','info');
+}
+
+// ─── LINK UNMATCHED BOM CODE TO AN EXISTING STOCK PART ────────────────────────
+// Fixes the "BOM software spelled the part number wrong" problem permanently — the wrong
+// code gets saved as an alias on the correct part, so it keeps auto-matching from then on.
+let _linkAliasBomIdx=null;
+function openLinkAliasModal(bomIdx){
+  _linkAliasBomIdx=bomIdx;
+  const item=curBOM[bomIdx];
+  if(!item)return;
+  const existing=document.getElementById('link-alias-modal');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='link-alias-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 style="font-size:16px;font-weight:700;margin:0">🔗 Link "${item.code}" to a stock part</h2>
+      <button onclick="document.getElementById('link-alias-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">This BOM used the code "<strong>${item.code}</strong>" for "<strong>${item.name}</strong>" — pick the matching internal part below. That code will always resolve to the part you choose from now on. You can unlink it any time from that part's Edit screen.</p>
+    <input id="la-search" placeholder="Search stock parts by name or code…" oninput="renderLinkAliasResults()" style="margin-bottom:10px">
+    <div id="la-results"></div>
+  </div>`;
+  document.body.appendChild(div);
+  document.getElementById('la-search').focus();
+}
+function renderLinkAliasResults(){
+  const q=(document.getElementById('la-search').value||'').trim();
+  const el=document.getElementById('la-results');
+  if(!el)return;
+  if(!q){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">Type to search…</div>';return;}
+  const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,15);
+  if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">No matches — check spelling or add it via Add Part first</div>';return;}
+  el.innerHTML=res.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e5e7eb;border-radius:7px;margin-bottom:6px">
+    ${partImgHtml(p,36)}
+    <div style="flex:1"><div style="font-weight:600;font-size:13px">${p.name}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' · '+p.mfrno:''}</div></div>
+    <button onclick="confirmLinkAlias('${p.code}')" class="btn-green" style="font-size:12px">Link</button>
+  </div>`).join('');
+}
+async function confirmLinkAlias(stockCode){
+  const item=curBOM[_linkAliasBomIdx];
+  const p=db.parts[stockCode];
+  if(!item||!p)return;
+  if(!confirm(`Link BOM code "${item.code}" to "${p.name}" (${p.code})?\n\nFuture BOMs using "${item.code}" will automatically match this part.`))return;
+  pushUndo();
+  if(!p.aliases)p.aliases=[];
+  if(!p.aliases.some(a=>normalise(a)===normalise(item.code)))p.aliases.push(item.code);
+  const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+  item.matchedCode=p.code;
+  item.inStock=Math.max(0,p.qty-allocQty);
+  item.allocatedQty=allocQty;
+  item.matchConfirmed=true;
+  item.matchRejected=false;
+  await saveDB();
+  const modal=document.getElementById('link-alias-modal');
+  if(modal)modal.remove();
+  renderBOMRows();
+  recalcBOMSummary();
+  toast(`✓ Linked — "${item.code}" will now always match ${p.name}`);
 }
 
 function recalcBOMSummary(){
@@ -4193,6 +4277,12 @@ function findPartForBOM(item){
   const strippedCode=stripVendorPrefix(rawCode);
   const rawMfr=item.mfrno||item.sup||'';
   const strippedMfr=stripVendorPrefix(rawMfr);
+
+  // Manually-linked aliases take priority — these were confirmed by a person, so trust them over any
+  // fuzzy/similarity guess. Covers cases where a CAD/BOM tool consistently exports a wrong part number.
+  const aliasCandidates=[rawCode,rawMfr].filter(Boolean).map(normalise);
+  const aliasMatch=Object.values(db.parts).find(p=>(p.aliases||[]).some(a=>aliasCandidates.includes(normalise(a))));
+  if(aliasMatch)return aliasMatch;
 
   const codesToTry=[rawCode,strippedCode,rawMfr,strippedMfr].filter(Boolean);
 
@@ -4674,7 +4764,8 @@ function delSetProjLoc(dIdx,itemIdx,level,val){
 async function delCopyLocToAll(dIdx,srcItemIdx){
   const del=db.deliveries[dIdx];
   const src=del.items[srcItemIdx];
-  if(!confirm(`Apply this location to all ${del.items.length-1} other item${del.items.length-1!==1?'s':''} in this delivery? You can still change any individually afterwards.`))return;
+  if(!confirm(`Apply this location to all ${del.items.length-1} other item${del.items.length-1!==1?'s':''} in this delivery? You can still change any individually afterwards.\n\n(This can be reversed with the Undo button on the dashboard.)`))return;
+  pushUndo();
   del.items.forEach((it,i)=>{
     if(i===srcItemIdx)return;
     it.projLoc1=src.projLoc1;
@@ -4684,7 +4775,11 @@ async function delCopyLocToAll(dIdx,srcItemIdx){
   });
   await saveDB();
   renderDelRows(del);
-  toast('Location applied to all items — adjust any individually if needed');
+  const toastEl=document.getElementById('toast');
+  toastEl.innerHTML=`✓ Location applied to all items &nbsp;<button onclick="undoLast()" style="background:rgba(255,255,255,.3);border:none;color:inherit;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px">↺ Undo</button>`;
+  toastEl.className='toast t-ok show';
+  clearTimeout(toastEl._tid);
+  toastEl._tid=setTimeout(()=>toastEl.classList.remove('show'),5000);
 }
 
 function delSetLoc(dIdx,itemIdx,level,val){
@@ -4943,6 +5038,85 @@ async function addPOtoDel(delId){
   showDelivery(del);renderDelHist();
   toast(`PO ${po} added to delivery`);
 }
+// ─── OUTSTANDING ITEMS ACROSS ALL DELIVERIES — for chasing suppliers by phone ──
+function showOutstandingItems(){
+  const existing=document.getElementById('outstanding-modal');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='outstanding-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:820px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 style="font-size:16px;font-weight:700;margin:0">📞 Outstanding items — across all deliveries</h2>
+      <button onclick="document.getElementById('outstanding-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">Everything still short across every open delivery — filter by supplier before you ring them, with the PO number right there.</p>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Filter by supplier</label>
+      <select id="oi-filter-sup" onchange="renderOutstandingItemsList()" style="max-width:280px"><option value="">All suppliers</option></select>
+    </div>
+    <div id="oi-list"></div>
+  </div>`;
+  document.body.appendChild(div);
+  const sups=[...new Set(db.deliveries.map(d=>d.supplier).filter(Boolean))].sort();
+  document.getElementById('oi-filter-sup').innerHTML='<option value="">All suppliers</option>'+sups.map(s=>`<option>${s}</option>`).join('');
+  renderOutstandingItemsList();
+}
+
+function renderOutstandingItemsList(){
+  const el=document.getElementById('oi-list');
+  if(!el)return;
+  const sup=(document.getElementById('oi-filter-sup')||{value:''}).value;
+  const rows=[];
+  db.deliveries.filter(d=>d.status!=='complete').forEach(d=>{
+    if(sup&&d.supplier!==sup)return;
+    d.items.filter(i=>!i.done).forEach(i=>{
+      rows.push({
+        delId:d.id,bomName:d.bomName,po:d.po||'',supplier:d.supplier||'',assignTo:d.assignTo||'',
+        dueDate:d.dueDate||'',name:i.name,code:i.code,
+        expected:i.expected,received:i.alreadyReceived||0,outstanding:i.expected-(i.alreadyReceived||0)
+      });
+    });
+  });
+  if(!rows.length){
+    el.innerHTML=`<div style="color:#9ca3af;font-size:13px;padding:20px;text-align:center">${sup?`Nothing outstanding from ${sup} right now.`:'Nothing outstanding right now — all caught up!'}</div>`;
+    return;
+  }
+  const today=new Date();today.setHours(0,0,0,0);
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="background:#fffbeb">
+      <th style="padding:7px 8px;text-align:left">Part</th>
+      <th style="padding:7px 8px;text-align:left">PO</th>
+      <th style="padding:7px 8px;text-align:left">Supplier</th>
+      <th style="padding:7px 8px;text-align:left">Project / job</th>
+      <th style="padding:7px 8px;text-align:center">Ordered</th>
+      <th style="padding:7px 8px;text-align:center">Received</th>
+      <th style="padding:7px 8px;text-align:center">Outstanding</th>
+      <th style="padding:7px 8px;text-align:left">Due</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const p=db.parts[r.code];
+      const isOverdue=r.dueDate&&new Date(r.dueDate)<today;
+      return`<tr style="border-bottom:1px solid #f3f4f6;${isOverdue?'background:#fff5f5':''}">
+        <td style="padding:7px 8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            ${p?partImgHtml(p,32):''}
+            <div><div style="font-weight:600">${r.name}</div><div style="font-size:11px;color:#9ca3af">${r.code}</div></div>
+          </div>
+        </td>
+        <td style="padding:7px 8px;font-weight:700;color:#92400e">${r.po||'—'}</td>
+        <td style="padding:7px 8px">${r.supplier||'—'}</td>
+        <td style="padding:7px 8px;font-size:12px">${r.assignTo||'—'}</td>
+        <td style="padding:7px 8px;text-align:center">${r.expected}</td>
+        <td style="padding:7px 8px;text-align:center;color:#166534;font-weight:600">${r.received}</td>
+        <td style="padding:7px 8px;text-align:center;font-weight:800;color:#991b1b">${r.outstanding}</td>
+        <td style="padding:7px 8px;font-size:12px;${isOverdue?'color:#991b1b;font-weight:700':''}">${r.dueDate||'—'}${isOverdue?' ⚠':''}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>
+  <div style="margin-top:10px;font-size:12px;color:#6b7280">${rows.length} outstanding line${rows.length!==1?'s':''}${sup?` from ${sup}`:''} · ${rows.reduce((s,r)=>s+r.outstanding,0)} units total</div>`;
+}
+
 function renderDelHist(){
   const el=document.getElementById('del-hist');
   const q=((document.getElementById('del-search')||{value:''}).value||'').toLowerCase();
@@ -6937,6 +7111,36 @@ function renderEpSupplierRows(){
     </div>`).join('');
 }
 
+// ─── LINKED ALIASES — mis-typed / wrong codes from BOM software that should still match this part ───
+let epAliasRows=[];
+function epAddAlias(){
+  const inp=document.getElementById('ep-new-alias');
+  const val=(inp.value||'').trim();
+  if(!val)return;
+  if(epAliasRows.some(a=>normalise(a)===normalise(val))){toast('That code is already linked','err');return;}
+  epAliasRows.push(val);
+  inp.value='';
+  renderEpAliases();
+}
+function epRemoveAlias(i){
+  if(!confirm(`Unlink "${epAliasRows[i]}"? Future BOMs using that code will no longer auto-match this part.`))return;
+  epAliasRows.splice(i,1);
+  renderEpAliases();
+}
+function renderEpAliases(){
+  const el=document.getElementById('ep-aliases-list');
+  if(!el)return;
+  if(!epAliasRows.length){
+    el.innerHTML='<div style="font-size:12px;color:#9ca3af;padding:4px 0">No linked codes yet.</div>';
+    return;
+  }
+  el.innerHTML=epAliasRows.map((a,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#fff;border:1px solid #fcd34d;border-radius:6px;margin-bottom:5px">
+      <span style="font-family:monospace;font-size:12px;flex:1">${a}</span>
+      <button type="button" onclick="epRemoveAlias(${i})" style="font-size:11px;padding:2px 8px;color:#991b1b;border-color:#fca5a5">Unlink</button>
+    </div>`).join('');
+}
+
 // Small chip shown next to a part's name when it has alt-supplier cross-references — click to view all
 function supplierRefBadge(p){
   if(!p||!p.altSuppliers||!p.altSuppliers.length)return'';
@@ -7011,6 +7215,8 @@ function openEditPart(code){
   document.getElementById('ep-grade').value=p.grade||'';
   epSupplierRows=JSON.parse(JSON.stringify(p.altSuppliers||[]));
   renderEpSupplierRows();
+  epAliasRows=[...(p.aliases||[])];
+  renderEpAliases();
   document.getElementById('ep-loc').value=p.loc||'';
   document.getElementById('ep-loc2').value=p.loc2||'';
   document.getElementById('ep-loc3').value=p.loc3||'';
@@ -7036,6 +7242,7 @@ async function saveEditPart(){
   p.headType=document.getElementById('ep-headtype').value.trim();
   p.grade=document.getElementById('ep-grade').value.trim();
   p.altSuppliers=epSupplierRows.filter(r=>(r.sup||'').trim()||(r.partNo||'').trim());
+  p.aliases=epAliasRows.filter(a=>(a||'').trim());
   p.tracked=document.getElementById('ep-tracked').checked;
   p.needsReorder=document.getElementById('ep-needs-reorder').checked;
   p.loc=document.getElementById('ep-loc').value;
