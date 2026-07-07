@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev98</title>
+<title>Workshop Stock Control v2.1 Rev99</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 98 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 99 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -3455,13 +3455,15 @@ async function addPart(){
     cost: parseFloat(document.getElementById('ap-cost').value)||0,
     notes: document.getElementById('ap-notes').value.trim(),
     datasheet: document.getElementById('ap-datasheet').value.trim(),
+    headType: document.getElementById('ap-headtype').value.trim(),
+    grade: document.getElementById('ap-grade').value.trim(),
     tracked: document.getElementById('ap-tracked').checked,
     needsReorder: false,
     img: _pendingImg||''
   };
   await saveDB();
   toast(`Part "${name}" added to catalogue`);
-  ['ap-code','ap-name','ap-mfrno','ap-barcode','ap-mfr','ap-sup','ap-notes','ap-datasheet'].forEach(id=>document.getElementById(id).value='');
+  ['ap-code','ap-name','ap-mfrno','ap-barcode','ap-mfr','ap-sup','ap-notes','ap-datasheet','ap-headtype','ap-grade'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ap-tracked').checked=true;
   document.getElementById('ap-qty').value=0;
   document.getElementById('ap-min').value=1;
