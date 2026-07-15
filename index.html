@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev100</title>
+<title>Workshop Stock Control v2.1 Rev101</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 100 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 101 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1711,8 +1711,8 @@ function masterLocOpts(sel){
 function areaOpts(sel){return masterLocOpts(sel);}
 function sectionOpts(sel){return masterLocOpts(sel);}
 function containerOpts(sel){return masterLocOpts(sel);}
-function catOpts(sel,blank='Select…'){return`<option value="">${blank}</option>`+getCats().map(c=>`<option${sel===c?' selected':''}>${c}</option>`).join('');}
-function catFilterOpts(){return`<option value="">All categories</option>`+getCats().map(c=>`<option>${c}</option>`).join('');}
+function catOpts(sel,blank='Select…'){return`<option value="">${blank}</option>`+[...getCats()].sort((a,b)=>a.localeCompare(b)).map(c=>`<option${sel===c?' selected':''}>${c}</option>`).join('');}
+function catFilterOpts(){return`<option value="">All categories</option>`+[...getCats()].sort((a,b)=>a.localeCompare(b)).map(c=>`<option>${c}</option>`).join('');}
 
 function locOpts(sel){
   const all=[...getLocAreas(),...getLocSections(),...getLocContainers()];
@@ -1784,9 +1784,9 @@ function freqSort(items, type){
 }
 
 function populateBrandDropdowns(){
-  const brands=freqSort([...new Set(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean))],'brand');
-  const suppliers=freqSort([...new Set(Object.values(db.parts).map(p=>p.sup||'').filter(Boolean))],'supplier');
-  const cats=freqSort(getCats(),'cat');
+  const brands=[...new Set(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const suppliers=[...new Set(Object.values(db.parts).map(p=>p.sup||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const cats=[...getCats()].sort((a,b)=>a.localeCompare(b));
 
   const brandFilterHtml='<option value="">All brands</option>'+brands.map(b=>`<option>${b}</option>`).join('');
   const supFilterHtml='<option value="">All suppliers</option>'+suppliers.map(s=>`<option>${s}</option>`).join('');
@@ -4151,18 +4151,36 @@ function _openLinkAliasModalUI(code,name){
       <button onclick="document.getElementById('link-alias-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
     <p style="font-size:13px;color:#6b7280;margin-bottom:12px">This used the code "<strong>${code}</strong>" for "<strong>${name}</strong>" — pick the matching internal part below. That code will always resolve to the part you choose from now on — in BOMs, deliveries, Check In/Out, Search, everywhere. You can unlink it any time from that part's Edit screen.</p>
-    <input id="la-search" placeholder="Search stock parts by name or code…" oninput="renderLinkAliasResults()" style="margin-bottom:10px">
+    <input id="la-search" value="${code}" placeholder="Search stock parts by name or code…" oninput="renderLinkAliasResults()" style="margin-bottom:10px">
     <div id="la-results"></div>
   </div>`;
   document.body.appendChild(div);
-  document.getElementById('la-search').focus();
+  const searchInput=document.getElementById('la-search');
+  searchInput.focus();
+  searchInput.select();
+  renderLinkAliasResults();
 }
 function renderLinkAliasResults(){
   const q=(document.getElementById('la-search').value||'').trim();
   const el=document.getElementById('la-results');
   if(!el)return;
   if(!q){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">Type to search…</div>';return;}
-  const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,15);
+  const qn=normalise(q);
+  let res=Object.values(db.parts).filter(p=>partFilter(p,q,'','',''));
+  // Also catch cases where the typed text is a longer code with something appended (e.g. a BOM
+  // code with cable length tacked on) that starts with an existing stock part's code — the normal
+  // word-search above only checks the reverse direction, so this fills that gap.
+  if(qn.length>=4){
+    const already=new Set(res.map(p=>p.code));
+    const prefixMatches=Object.values(db.parts).filter(p=>{
+      if(already.has(p.code))return false;
+      const pcn=normalise(p.code);
+      const pmn=normalise(p.mfrno||'');
+      return(pcn.length>=4&&qn.startsWith(pcn))||(pmn.length>=4&&qn.startsWith(pmn));
+    });
+    res=[...res,...prefixMatches];
+  }
+  res=res.slice(0,15);
   if(!res.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">No matches — check spelling or add it via Add Part first</div>';return;}
   el.innerHTML=res.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #e5e7eb;border-radius:7px;margin-bottom:6px">
     ${partImgHtml(p,36)}
