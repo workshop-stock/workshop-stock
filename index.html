@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev101</title>
+<title>Workshop Stock Control v2.1 Rev103</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 101 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 103 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1783,9 +1783,23 @@ function freqSort(items, type){
   return [...items].sort((a,b)=>(counts[b]||0)-(counts[a]||0));
 }
 
+// Merges case-variant duplicates (e.g. "Omron" / "OMRON" / "omron") into one entry — keeps
+// whichever exact casing is used on the most parts, since filtering is already case-insensitive
+// underneath, this just cleans up the dropdown list itself. Doesn't touch stored part data.
+function dedupeCaseInsensitive(allValues){
+  const counts={};
+  allValues.forEach(v=>{if(v)counts[v]=(counts[v]||0)+1;});
+  const byLower={};
+  Object.keys(counts).forEach(v=>{
+    const key=v.toLowerCase();
+    if(!byLower[key]||counts[v]>counts[byLower[key]])byLower[key]=v;
+  });
+  return Object.values(byLower);
+}
+
 function populateBrandDropdowns(){
-  const brands=[...new Set(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const suppliers=[...new Set(Object.values(db.parts).map(p=>p.sup||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const brands=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
+  const suppliers=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.sup||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
   const cats=[...getCats()].sort((a,b)=>a.localeCompare(b));
 
   const brandFilterHtml='<option value="">All brands</option>'+brands.map(b=>`<option>${b}</option>`).join('');
@@ -1805,8 +1819,8 @@ function populateBrandDropdowns(){
 
   buildDatalist('dl-brands', brands);
   buildDatalist('dl-cats', cats);
-  buildDatalist('dl-suppliers', suppliers.length?suppliers:(db.suppliers||[]).map(s=>s.name));
-  buildDatalist('dl-suppliers-order', (db.suppliers||[]).map(s=>s.name));
+  buildDatalist('dl-suppliers', suppliers.length?suppliers:dedupeCaseInsensitive((db.suppliers||[]).map(s=>s.name)));
+  buildDatalist('dl-suppliers-order', dedupeCaseInsensitive((db.suppliers||[]).map(s=>s.name)));
 }
 
 function buildDatalist(id, items){
@@ -1871,11 +1885,12 @@ function findPartWithType(v){
     (p.aliases||[]).some(a=>normalise(a)===vn)
   );
   if(exact)return{part:exact,matchType:'exact'};
-  const prefix=Object.values(db.parts).find(p=>
-    normalise(p.code).startsWith(vn)||
-    normalise(p.mfrno||'').startsWith(vn)||
-    (p.altSuppliers||[]).some(a=>normalise(a.partNo||'').startsWith(vn))
-  );
+  const prefix=Object.values(db.parts).find(p=>{
+    const pcn=normalise(p.code),pmn=normalise(p.mfrno||'');
+    return pcn.startsWith(vn)||pmn.startsWith(vn)||
+      (p.altSuppliers||[]).some(a=>normalise(a.partNo||'').startsWith(vn))||
+      (pcn.length>=4&&vn.startsWith(pcn))||(pmn.length>=4&&vn.startsWith(pmn));
+  });
   if(prefix)return{part:prefix,matchType:'fuzzy'};
   const nameMatch=Object.values(db.parts).find(p=>{
     const hay=partHaystack(p);
@@ -1900,7 +1915,8 @@ function findPartCandidates(v,limit){
     const altPartNos=(p.altSuppliers||[]).map(a=>normalise(a.partNo||''));
     const aliasNos=(p.aliases||[]).map(a=>normalise(a));
     if(codeN===vn||barN===vn||mfrN===vn||altPartNos.includes(vn)||aliasNos.includes(vn)){exact.push(p);return;}
-    if(codeN.startsWith(vn)||mfrN.startsWith(vn)||altPartNos.some(a=>a.startsWith(vn))){prefix.push(p);return;}
+    if(codeN.startsWith(vn)||mfrN.startsWith(vn)||altPartNos.some(a=>a.startsWith(vn))||
+       (codeN.length>=4&&vn.startsWith(codeN))||(mfrN.length>=4&&vn.startsWith(mfrN))){prefix.push(p);return;}
     if(wordMatches(v.trim(),partHaystack(p)))fuzzy.push(p);
   });
   return[...exact,...prefix,...fuzzy].slice(0,limit);
@@ -3268,6 +3284,21 @@ function partFilter(p, q, cat, brand, volt){
   return words.every(w=>wordMatches(w, hay));
 }
 
+// Catches the "BOM/search text is a stock code plus something extra tacked on the end" pattern —
+// e.g. searching "E3Z-G61 2M" (cable length appended) should still surface stock part "E3Z-G61"
+// as a close match, not zero results. Excludes parts already found by the normal word-search.
+function closeCodeMatches(q, excludeCodes, limit){
+  const qn=normalise(q);
+  if(qn.length<4)return[];
+  const exclude=new Set(excludeCodes||[]);
+  return Object.values(db.parts).filter(p=>{
+    if(exclude.has(p.code))return false;
+    const pcn=normalise(p.code);
+    const pmn=normalise(p.mfrno||'');
+    return(pcn.length>=4&&qn!==pcn&&qn.startsWith(pcn))||(pmn.length>=4&&qn!==pmn&&qn.startsWith(pmn));
+  }).slice(0,limit||5);
+}
+
 
 function clearSearch(){
   document.getElementById('sq').value='';
@@ -3296,18 +3327,15 @@ function doSearch(){
     }
     return true;
   }).sort((a,b)=>a.name.localeCompare(b.name));
+  const closeRes=q?closeCodeMatches(q,res.map(p=>p.code),5):[];
   const hint=q?`${res.length} of ${total} parts match "<strong>${q}</strong>"`:`Showing all ${total} parts — type anything to filter`;
-  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
-  <div class="s-results-scroll" style="overflow-x:auto;max-height:600px;overflow-y:auto">
-  <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
-    <th style="width:60px"></th>
-    <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
-  </tr></thead><tbody>${
-    res.length?res.map(p=>`<tr style="${isFlagged(p)?'background:#fff5f5':''}">
+  const rowHtml=(p,isClose)=>`<tr style="${isClose?'background:#fffbeb':isFlagged(p)?'background:#fff5f5':''}">
       <td style="padding:6px">${partImgHtml(p,48)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}</td>
-      <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}${getAllocTag(p.code)}</td>
+      <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}${getAllocTag(p.code)}
+        ${isClose?`<div style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:6px;margin-top:3px;display:inline-block;font-weight:600" title="Your search had extra text (e.g. a cable length) beyond this part's code — check it's the right variant">≈ Close match — verify variant</div>`:''}
+      </td>
       <td style="font-size:12px">${p.mfr||'—'}</td>
       <td><span class="chip">${p.cat}</span></td>
       <td style="font-size:12px">${formatLoc(p)||'—'}</td>
@@ -3318,7 +3346,15 @@ function doSearch(){
         <button onclick="showPartHistory('${p.code}')" style="font-size:11px;padding:3px 7px;background:#f5f0ff;color:#6d28d9;border-color:#c4b5fd">History</button>
         <button onclick="openEditPart('${p.code}')" style="font-size:11px;padding:3px 7px" class="btn-blue">Edit</button>
       </td>
-    </tr>`).join('')
+    </tr>`;
+  el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
+  <div class="s-results-scroll" style="overflow-x:auto;max-height:600px;overflow-y:auto">
+  <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
+    <th style="width:60px"></th>
+    <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
+  </tr></thead><tbody>${
+    res.length||closeRes.length?
+      res.map(p=>rowHtml(p,false)).join('')+closeRes.map(p=>rowHtml(p,true)).join('')
     :`<tr><td colspan="10" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
   }</tbody></table></div>`;
   const newScrollBox=el.querySelector('.s-results-scroll');
