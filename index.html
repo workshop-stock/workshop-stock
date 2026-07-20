@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev103</title>
+<title>Workshop Stock Control v2.1 Rev104</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 103 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 104 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -657,7 +657,7 @@ tr:hover td{background:#f9fafb}
       <div><label>Unit cost (£) (primary)</label><input type="number" id="ep-cost" step="0.01"></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
-      <div><label>Head type / style (fasteners)</label><input id="ep-headtype" list="dl-headtypes" placeholder="e.g. SCH, CSH, BH, HEX…"></div>
+      <div><label>Type / style (bolts, nuts, washers)</label><input id="ep-headtype" list="dl-headtypes" placeholder="e.g. SCH, Nut, Plain Washer, Spring Washer…"></div>
       <div><label>Material / grade (fasteners)</label><input id="ep-grade" list="dl-grades" placeholder="e.g. A2 Stainless, A4-80, Zinc"></div>
     </div>
     <div style="margin-bottom:14px;background:#f5f0ff;border:1px solid #c4b5fd;border-radius:8px;padding:12px">
@@ -756,7 +756,7 @@ tr:hover td{background:#f9fafb}
       <div><label>Specification / notes</label><input id="ap-notes" placeholder="Voltage, current rating…"></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
-      <div><label>Head type / style (fasteners)</label><input id="ap-headtype" list="dl-headtypes" placeholder="e.g. SCH, CSH, BH, HEX…"></div>
+      <div><label>Type / style (bolts, nuts, washers)</label><input id="ap-headtype" list="dl-headtypes" placeholder="e.g. SCH, Nut, Plain Washer, Spring Washer…"></div>
       <div><label>Material / grade (fasteners)</label><input id="ap-grade" list="dl-grades" placeholder="e.g. A2 Stainless, A4-80, Zinc"></div>
     </div>
     <datalist id="dl-headtypes">
@@ -766,6 +766,12 @@ tr:hover td{background:#f9fafb}
       <option value="HEX — Hex Head">
       <option value="PH — Pan Head">
       <option value="CH — Cheese Head">
+      <option value="Nut">
+      <option value="Slot Nut">
+      <option value="Plain Washer">
+      <option value="Spring Washer">
+      <option value="Serrated Washer">
+      <option value="Penny Washer">
     </datalist>
     <datalist id="dl-grades">
       <option value="A2 Stainless">
