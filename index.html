@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev104</title>
+<title>Workshop Stock Control v2.1 Rev105</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 104 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 105 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -5301,6 +5301,7 @@ function renderDelHist(){
           ${d.status!=='complete'?`<button onclick="showDelivery(db.deliveries.find(x=>x.id==='${d.id}'))" class="btn-green" style="font-size:12px;padding:4px 10px">✓ Check in items</button>`:''}
           <button onclick="toggleDelDetail('${d.id}')" style="font-size:12px;padding:4px 10px" class="btn-blue">▼ Details</button>
           ${!d.po?`<button onclick="promptAddPO('${d.id}')" class="btn-amber" style="font-size:12px;padding:4px 8px">+ PO</button>`:`<button onclick="promptAddPO('${d.id}')" style="font-size:12px;padding:4px 8px">Edit PO</button>`}
+          <button onclick="deleteDeliveryRecord('${d.id}')" class="btn-red" style="font-size:12px;padding:4px 8px">🗑 Delete</button>
         </div>
       </div>
 
@@ -5414,6 +5415,24 @@ function promptAddPO(delId){
   del.po=po.trim();
   saveDB();renderDelHist();
   if(del.po)toast(`PO ${del.po} saved`);
+}
+
+async function deleteDeliveryRecord(delId){
+  const del=db.deliveries.find(d=>d.id===delId);
+  if(!del)return;
+  const received=del.items.filter(i=>i.done).length;
+  const partial=del.items.filter(i=>!i.done&&(i.alreadyReceived||0)>0).length;
+  const warnMsg=(received>0||partial>0)
+    ?`\n\n⚠ ${received} item(s) fully received and ${partial} partially received on this delivery. Deleting the record does NOT undo those stock check-ins or allocations — it only removes this tracking record and any outstanding/unreceived lines from view.`
+    :'';
+  if(!confirm(`Delete the delivery record "${del.bomName}${del.ref?' — '+del.ref:''}"${del.po?' (PO: '+del.po+')':''}?${warnMsg}\n\nThis can be undone with the Undo button.`))return;
+  pushUndo();
+  db.deliveries=db.deliveries.filter(d=>d.id!==delId);
+  await saveDB();
+  renderDelHist();
+  renderDash();
+  document.getElementById('del-active').style.display='none';
+  toast('Delivery record deleted');
 }
 
 // ─── ALLOCATIONS ──────────────────────────────────────────────────────────────
