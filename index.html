@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev105</title>
+<title>Workshop Stock Control v2.1 Rev107</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 105 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 107 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -647,6 +647,7 @@ tr:hover td{background:#f9fafb}
       <div><label>Part name</label><input id="ep-name"></div>
       <div><label>Manufacturer</label><input id="ep-mfr"></div>
     </div>
+    <div style="margin-bottom:10px"><label>🏷️ Tags / also called (comma-separated — helps search find it regardless of who's looking)</label><input id="ep-tags" placeholder="e.g. monkey wrench, pipe grips, stillsons"></div>
     <div class="g3" style="margin-bottom:10px" id="ep-qty-block">
       <div><label>Current qty</label><input type="number" id="ep-qty" min="0"></div>
       <div><label>Min stock level</label><input type="number" id="ep-min" min="0"></div>
@@ -730,6 +731,7 @@ tr:hover td{background:#f9fafb}
       <div><label>Part name / description *</label><input id="ap-name" placeholder="e.g. Siemens S7-1200 CPU 1214C DC/DC/DC"></div>
       <div><label>Manufacturer / brand</label><input id="ap-mfr" placeholder="e.g. Siemens, ABB, Schneider"></div>
     </div>
+    <div style="margin-bottom:10px"><label>🏷️ Tags / also called (comma-separated — helps search find it regardless of who's looking)</label><input id="ap-tags" placeholder="e.g. monkey wrench, pipe grips, stillsons"></div>
     <div class="g3" style="margin-bottom:10px">
       <div><label>Category *</label>
         <select id="ap-cat">
@@ -3257,7 +3259,8 @@ function partHaystack(p){
     p.loc||'', p.loc2||'', p.loc3||'',
     p.grade||'', p.headType||'',
     ...(p.altSuppliers||[]).map(a=>(a.sup||'')+' '+(a.partNo||'')),
-    ...(p.aliases||[])
+    ...(p.aliases||[]),
+    ...(p.tags||[])
   ].join(' ').toLowerCase();
 }
 
@@ -3391,6 +3394,10 @@ function showPartHistory(code){
       <strong style="color:#92400e">🔗 Also matches these codes:</strong> ${p.aliases.map(a=>`<span style="font-family:monospace;background:#fff;padding:1px 7px;border-radius:6px;margin-left:4px">${a}</span>`).join('')}
       <span style="color:#9ca3af"> — manage via Edit part</span>
     </div>`:''}
+    ${(p.tags||[]).length?`<div style="margin-bottom:12px;padding:8px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:7px;font-size:12px">
+      <strong style="color:#166534">🏷️ Also called:</strong> ${p.tags.map(t=>`<span style="background:#fff;padding:1px 8px;border-radius:8px;margin-left:4px">${t}</span>`).join('')}
+      <span style="color:#9ca3af"> — manage via Edit part</span>
+    </div>`:''}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
       <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#166534">${p.qty}</div>
@@ -3499,13 +3506,14 @@ async function addPart(){
     datasheet: document.getElementById('ap-datasheet').value.trim(),
     headType: document.getElementById('ap-headtype').value.trim(),
     grade: document.getElementById('ap-grade').value.trim(),
+    tags: document.getElementById('ap-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
     tracked: document.getElementById('ap-tracked').checked,
     needsReorder: false,
     img: _pendingImg||''
   };
   await saveDB();
   toast(`Part "${name}" added to catalogue`);
-  ['ap-code','ap-name','ap-mfrno','ap-barcode','ap-mfr','ap-sup','ap-notes','ap-datasheet','ap-headtype','ap-grade'].forEach(id=>document.getElementById(id).value='');
+  ['ap-code','ap-name','ap-mfrno','ap-barcode','ap-mfr','ap-sup','ap-notes','ap-datasheet','ap-headtype','ap-grade','ap-tags'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ap-tracked').checked=true;
   document.getElementById('ap-qty').value=0;
   document.getElementById('ap-min').value=1;
@@ -7354,6 +7362,7 @@ function openEditPart(code){
   document.getElementById('ep-datasheet').value=p.datasheet||'';
   document.getElementById('ep-headtype').value=p.headType||'';
   document.getElementById('ep-grade').value=p.grade||'';
+  document.getElementById('ep-tags').value=(p.tags||[]).join(', ');
   epSupplierRows=JSON.parse(JSON.stringify(p.altSuppliers||[]));
   renderEpSupplierRows();
   epAliasRows=[...(p.aliases||[])];
@@ -7382,6 +7391,7 @@ async function saveEditPart(){
   p.datasheet=document.getElementById('ep-datasheet').value.trim();
   p.headType=document.getElementById('ep-headtype').value.trim();
   p.grade=document.getElementById('ep-grade').value.trim();
+  p.tags=document.getElementById('ep-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
   p.altSuppliers=epSupplierRows.filter(r=>(r.sup||'').trim()||(r.partNo||'').trim());
   p.aliases=epAliasRows.filter(a=>(a||'').trim());
   p.tracked=document.getElementById('ep-tracked').checked;
