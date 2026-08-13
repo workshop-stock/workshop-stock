@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev111</title>
+<title>Workshop Stock Control v2.1 Rev112</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 111 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 112 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -689,21 +689,17 @@ tr:hover td{background:#f9fafb}
     <div style="margin-bottom:14px"><label>🔗 Datasheet / tech sheet link (URL)</label><input id="ep-datasheet" placeholder="https://…"></div>
 
     <div style="margin-bottom:14px">
-      <label>Part image (drag &amp; drop or click to upload)</label>
+      <label>Part images (drag &amp; drop or click to upload, multiple allowed — first one is used as the main thumbnail everywhere)</label>
+      <div id="ep-img-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       <div id="ep-img-zone" onclick="document.getElementById('ep-img-file').click()"
         ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
         ondragleave="this.style.borderColor='#d1d5db'"
-        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImage(event.dataTransfer.files[0],'ep')"
-        style="margin-top:6px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s;background:#fafafa">
-        <img id="ep-img-preview" src="" alt="" style="width:80px;height:80px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;display:none;background:#fff">
-        <div id="ep-img-placeholder" style="flex:1;text-align:center;color:#9ca3af;font-size:13px">
-          <div style="font-size:28px;margin-bottom:4px">📷</div>
-          <div>Drop image here or click to browse</div>
-          <div style="font-size:11px;margin-top:2px">JPG, PNG, WebP — will be resized automatically</div>
-        </div>
-        <button id="ep-img-remove" onclick="event.stopPropagation();removePartImage('ep')" style="display:none;font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5;flex-shrink:0">Remove</button>
+        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImages(event.dataTransfer.files,'ep')"
+        style="margin-top:8px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:border-color .2s;background:#fafafa;color:#9ca3af;font-size:13px">
+        <span style="font-size:22px">📷</span>
+        <span>Drop image(s) here or click to browse — JPG, PNG, WebP, resized automatically</span>
       </div>
-      <input type="file" id="ep-img-file" accept="image/*" style="display:none" onchange="handlePartImage(this.files[0],'ep')">
+      <input type="file" id="ep-img-file" accept="image/*" multiple style="display:none" onchange="handlePartImages(this.files,'ep')">
     </div>
 
     <div style="display:flex;gap:8px">
@@ -788,21 +784,17 @@ tr:hover td{background:#f9fafb}
     </datalist>
     <div style="margin-bottom:10px"><label>🔗 Datasheet / tech sheet link (URL, optional)</label><input id="ap-datasheet" placeholder="https://…"></div>
     <div style="margin-bottom:14px">
-      <label>Part image — optional (drag &amp; drop or click)</label>
+      <label>Part images — optional (drag &amp; drop or click, multiple allowed — first one becomes the main thumbnail used everywhere)</label>
+      <div id="ap-img-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       <div id="ap-img-zone" onclick="document.getElementById('ap-img-file').click()"
         ondragover="event.preventDefault();this.style.borderColor='#1e3a5f'"
         ondragleave="this.style.borderColor='#d1d5db'"
-        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImage(event.dataTransfer.files[0],'ap')"
-        style="margin-top:6px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;gap:14px;transition:border-color .2s;background:#fafafa">
-        <img id="ap-img-preview" src="" alt="" style="width:80px;height:80px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;display:none;background:#fff">
-        <div id="ap-img-placeholder" style="flex:1;text-align:center;color:#9ca3af;font-size:13px">
-          <div style="font-size:28px;margin-bottom:4px">📷</div>
-          <div>Drop image here or click to browse</div>
-          <div style="font-size:11px;margin-top:2px">JPG, PNG, WebP — resized automatically to thumbnail</div>
-        </div>
-        <button id="ap-img-remove" onclick="event.stopPropagation();removePartImage('ap')" style="display:none;font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5;flex-shrink:0">Remove</button>
+        ondrop="event.preventDefault();this.style.borderColor='#d1d5db';handlePartImages(event.dataTransfer.files,'ap')"
+        style="margin-top:8px;border:2px dashed #d1d5db;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:border-color .2s;background:#fafafa;color:#9ca3af;font-size:13px">
+        <span style="font-size:22px">📷</span>
+        <span>Drop image(s) here or click to browse — JPG, PNG, WebP, resized automatically</span>
       </div>
-      <input type="file" id="ap-img-file" accept="image/*" style="display:none" onchange="handlePartImage(this.files[0],'ap')">
+      <input type="file" id="ap-img-file" accept="image/*" multiple style="display:none" onchange="handlePartImages(this.files,'ap')">
     </div>
     <button class="btn-green" onclick="addPart()">Save part to catalogue</button>
   </div>
@@ -3408,6 +3400,12 @@ function showPartHistory(code){
       <strong style="color:#166534">🏷️ Also called:</strong> ${p.tags.map(t=>`<span style="background:#fff;padding:1px 8px;border-radius:8px;margin-left:4px">${t}</span>`).join('')}
       <span style="color:#9ca3af"> — manage via Edit part</span>
     </div>`:''}
+    ${(p.images||[]).length>1?`<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📷 Photos (${p.images.length})</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${p.images.map(src=>`<img src="${src}" onclick="window.open(this.src,'_blank')" style="width:64px;height:64px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;cursor:pointer" title="Click to view full size">`).join('')}
+      </div>
+    </div>`:''}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
       <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center">
         <div style="font-size:20px;font-weight:700;color:#166534">${p.qty}</div>
@@ -3520,7 +3518,8 @@ async function addPart(){
     tags: document.getElementById('ap-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
     tracked: document.getElementById('ap-tracked').checked,
     needsReorder: false,
-    img: _pendingImg||''
+    images: [..._pendingImages.ap],
+    img: _pendingImages.ap[0]||''
   };
   await saveDB();
   toast(`Part "${name}" added to catalogue`);
@@ -3532,7 +3531,7 @@ async function addPart(){
   document.getElementById('ap-cost').value='';
   document.getElementById('ap-cat').value='';
   ['ap-loc','ap-loc2','ap-loc3'].forEach(id=>document.getElementById(id).value='');
-  _pendingImg='';removePartImage('ap');
+  _pendingImages.ap=[];renderImageGallery('ap');
   renderDash();doSearch();
 }
 
@@ -7363,7 +7362,8 @@ function epTrackedChanged(){
 }
 function openEditPart(code){
   editingCode=code;const p=db.parts[code];if(!p)return;
-  _pendingImg=p.img||'';
+  _pendingImages.ep=(p.images&&p.images.length)?[...p.images]:(p.img?[p.img]:[]);
+  renderImageGallery('ep');
   document.getElementById('ep-loc').innerHTML=`<option value="">Area / unit…</option>`+areaOpts(p.loc).replace('<option value="">Area / unit…</option>','');
   document.getElementById('ep-loc2').innerHTML=`<option value="">Section / shelf…</option>`+sectionOpts(p.loc2).replace('<option value="">Section / shelf…</option>','');
   document.getElementById('ep-loc3').innerHTML=`<option value="">Bin / box…</option>`+containerOpts(p.loc3).replace('<option value="">Bin / box…</option>','');
@@ -7393,8 +7393,6 @@ function openEditPart(code){
   document.getElementById('ep-loc').value=p.loc||'';
   document.getElementById('ep-loc2').value=p.loc2||'';
   document.getElementById('ep-loc3').value=p.loc3||'';
-  if(p.img){showImagePreview('ep',p.img);}
-  else{removePartImage('ep');}
   document.getElementById('edit-part-modal').classList.add('open');
 }
 async function saveEditPart(){
@@ -7423,7 +7421,8 @@ async function saveEditPart(){
   p.loc=document.getElementById('ep-loc').value;
   p.loc2=document.getElementById('ep-loc2').value;
   p.loc3=document.getElementById('ep-loc3').value;
-  if(_pendingImg!==undefined)p.img=_pendingImg;
+  p.images=[..._pendingImages.ep];
+  p.img=_pendingImages.ep[0]||'';
   if(p.qty!==oldQty)addHist('ADJ',p.name,editingCode,p.qty-oldQty,'Manual edit');
   await saveDB();
   document.getElementById('edit-part-modal').classList.remove('open');
@@ -7438,53 +7437,64 @@ async function deletePartConfirm(){
   toast(`Part deleted — click Undo on dashboard to reverse`);renderDash();doSearch();renderSL();
 }
 
-// ─── PART IMAGE HANDLING ──────────────────────────────────────────────────────
-let _pendingImg = '';
+// ─── PART IMAGE HANDLING (multi-image gallery) ────────────────────────────────
+// Working image arrays for the two forms while the user is uploading/removing —
+// saved into p.images (full set) and p.img (images[0], kept for backward-compatibility
+// with every existing partImgHtml() call across the app, which only reads p.img).
+let _pendingImages={ap:[],ep:[]};
 
-function handlePartImage(file, prefix){
-  if(!file||!file.type.startsWith('image/'))return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      const MAX=300;
-      let w=img.width, h=img.height;
-      if(w>MAX||h>MAX){
-        if(w>h){h=Math.round(h*(MAX/w));w=MAX;}
-        else{w=Math.round(w*(MAX/h));h=MAX;}
-      }
-      const canvas=document.createElement('canvas');
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      const b64=canvas.toDataURL('image/jpeg',0.82);
-      _pendingImg=b64;
-      showImagePreview(prefix,b64);
+function handlePartImages(fileList, prefix){
+  const files=Array.from(fileList||[]).filter(f=>f&&f.type&&f.type.startsWith('image/'));
+  if(!files.length)return;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=400;
+        let w=img.width, h=img.height;
+        if(w>MAX||h>MAX){
+          if(w>h){h=Math.round(h*(MAX/w));w=MAX;}
+          else{w=Math.round(w*(MAX/h));h=MAX;}
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        const b64=canvas.toDataURL('image/jpeg',0.82);
+        _pendingImages[prefix].push(b64);
+        renderImageGallery(prefix);
+      };
+      img.src=e.target.result;
     };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
+  });
 }
 
-function showImagePreview(prefix, src){
-  const preview=document.getElementById(prefix+'-img-preview');
-  const placeholder=document.getElementById(prefix+'-img-placeholder');
-  const removeBtn=document.getElementById(prefix+'-img-remove');
-  if(preview){preview.src=src;preview.style.display='block';}
-  if(placeholder)placeholder.style.display='none';
-  if(removeBtn)removeBtn.style.display='inline-block';
+function renderImageGallery(prefix){
+  const el=document.getElementById(prefix+'-img-gallery');
+  if(!el)return;
+  const imgs=_pendingImages[prefix]||[];
+  if(!imgs.length){el.innerHTML='';return;}
+  el.innerHTML=imgs.map((src,i)=>`
+    <div style="position:relative;width:76px;height:88px">
+      <img src="${src}" style="width:76px;height:76px;object-fit:contain;border-radius:6px;border:2px solid ${i===0?'#1e3a5f':'#e5e7eb'};background:#fff">
+      ${i===0?`<div style="text-align:center;font-size:9px;font-weight:700;background:#1e3a5f;color:#fff;padding:1px 0;border-radius:6px;margin-top:2px">MAIN</div>`:`<button type="button" onclick="makePrimaryImage('${prefix}',${i})" title="Make this the main image" style="width:100%;font-size:9px;padding:1px 0;margin-top:2px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;cursor:pointer">★ Make main</button>`}
+      <button type="button" onclick="removePendingImage('${prefix}',${i})" title="Remove image" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#991b1b;color:#fff;border:2px solid #fff;cursor:pointer;font-size:11px;line-height:1;padding:0">✕</button>
+    </div>`).join('');
 }
 
-function removePartImage(prefix){
-  _pendingImg='';
-  const preview=document.getElementById(prefix+'-img-preview');
-  const placeholder=document.getElementById(prefix+'-img-placeholder');
-  const removeBtn=document.getElementById(prefix+'-img-remove');
-  if(preview){preview.src='';preview.style.display='none';}
-  if(placeholder)placeholder.style.display='flex';
-  if(removeBtn)removeBtn.style.display='none';
-  if(prefix==='ep'&&editingCode&&db.parts[editingCode]){
-    db.parts[editingCode].img='';
+function removePendingImage(prefix,i){
+  _pendingImages[prefix].splice(i,1);
+  renderImageGallery(prefix);
+  if(prefix==='ep'&&editingCode&&db.parts[editingCode]&&!_pendingImages.ep.length){
+    // Nothing left — will clear on save; no live mutation needed here.
   }
+}
+function makePrimaryImage(prefix,i){
+  const arr=_pendingImages[prefix];
+  const[chosen]=arr.splice(i,1);
+  arr.unshift(chosen);
+  renderImageGallery(prefix);
 }
 
 function partImgHtml(p, size=48){
