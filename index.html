@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev112</title>
+<title>Workshop Stock Control v2.1 Rev113</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 112 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 113 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1034,6 +1034,7 @@ tr:hover td{background:#f9fafb}
         <button onclick="openOrderAddModal()" style="background:#6d28d9;color:#fff;border-color:#6d28d9">+ Search &amp; add part</button>
         <button onclick="addLowStock()">+ Add low-stock</button>
         <button onclick="addBlankOrderLine()" class="btn-blue">+ Add line</button>
+        <button onclick="openCreatePOModal(null,'',db.order.map((o,i)=>i))" style="background:#166534;color:#fff;border-color:#166534;font-weight:600">📄 Create PO from whole list</button>
         <button class="btn-blue" onclick="exportOrder()">Export CSV</button>
         <button class="btn-red" onclick="clearOrder()">Clear</button>
       </div>
@@ -1060,6 +1061,44 @@ tr:hover td{background:#f9fafb}
     <div id="oa-results" style="max-height:440px;overflow-y:auto"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="closeOrderAddModal()" style="flex:1">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE PO MODAL — builds a delivery-tracking record directly from the Order List, no BOM needed -->
+<div class="imp-overlay" id="create-po-modal">
+  <div class="imp-box" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2>📄 Create purchase order</h2>
+      <button onclick="closeCreatePOModal()" style="font-size:18px;border:none;background:none;cursor:pointer;color:#6b7280;padding:0 4px">&times;</button>
+    </div>
+    <p style="margin-bottom:12px">Turns the selected order lines into a trackable PO — you'll be able to check items in against it later, exactly like a BOM delivery, without needing an actual BOM behind it.</p>
+    <div id="cpo-item-summary" style="margin-bottom:12px;padding:8px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:7px;font-size:12px;color:#166534;font-weight:600"></div>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label>PO / order reference *</label><input id="cpo-name" placeholder="e.g. PO — Bolts restock, ad-hoc order…"></div>
+      <div><label>PO number</label><input id="cpo-po" placeholder="e.g. PO-2024-0142"></div>
+    </div>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label>Supplier</label><input id="cpo-sup" placeholder="e.g. RS Components"></div>
+      <div><label>Assign to build / job (optional)</label><input id="cpo-assign" placeholder="e.g. General stock, Panel Build — Line 3…"></div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div><label>Expected delivery date</label><input type="date" id="cpo-due"></div>
+      <div><label>Status</label>
+        <select id="cpo-status">
+          <option value="pending">Awaiting order</option>
+          <option value="ordered" selected>Ordered</option>
+          <option value="in-transit">In transit</option>
+        </select>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px">
+      <input type="checkbox" id="cpo-remove-from-list" checked style="width:16px;height:16px">
+      Remove these items from the Order List once the PO is created
+    </label>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmCreatePO()" class="btn-green" style="flex:1;font-weight:700">Create PO</button>
+      <button onclick="closeCreatePOModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -1180,6 +1219,7 @@ tr:hover td{background:#f9fafb}
           <option value="JOB_CLOSE">Jobs closed</option>
           <option value="LOGIN">Logins</option>
           <option value="LOGOUT">Logouts</option>
+          <option value="PO_CREATE">POs created</option>
         </select>
       </div>
       <div style="flex:0 0 auto"><label>Brand</label>
@@ -6004,6 +6044,7 @@ function renderOrder(){
           ${supTotal>0?`<span style="font-size:13px;font-weight:700;color:${isReal?'#86efac':'#166534'}">£${supTotal.toFixed(2)}</span>`:''}
           <button onclick="addTickedToOrder('${groupId}')" style="font-size:11px;padding:3px 10px;background:${isReal?'rgba(255,255,255,.15)':'#e5e7eb'};border-color:${isReal?'rgba(255,255,255,.3)':'#d1d5db'};color:${isReal?'#fff':'#374151'}">✓ Add ticked to list</button>
           ${isReal?`<button onclick="sendSupplierEmail('${sup.replace(/'/g,"\\'")}',${JSON.stringify(items.map(x=>x.i))})" style="font-size:11px;padding:3px 10px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">✉ Email</button>`:''}
+          <button onclick="openCreatePOModal('${groupId}','${sup.replace(/'/g,"\\'")}',${JSON.stringify(items.map(x=>x.i))})" style="font-size:11px;padding:3px 10px;background:#166534;border-color:#166534;color:#fff;font-weight:600">📄 Create PO</button>
         </div>
       </div>
       ${tableHead}<tbody>${items.map(({o,i})=>rowHtml(o,i)).join('')}</tbody></table>
@@ -6108,6 +6149,67 @@ function addBlankOrderLine(){
 
 // ─── SEARCH & ADD PART TO ORDER ────────────────────────────────────────────────
 let oaFilter='all';
+// ─── CREATE PO — turns order-list lines into a trackable PO, no BOM required ──
+let _cpoOrderIndices=[];
+function openCreatePOModal(groupId,sup,indices){
+  _cpoOrderIndices=(indices||[]).filter(i=>db.order[i]);
+  if(!_cpoOrderIndices.length){toast('No items to include — add something to the order list first','err');return;}
+  const items=_cpoOrderIndices.map(i=>db.order[i]);
+  const totalUnits=items.reduce((s,o)=>s+(o.qty||1),0);
+  document.getElementById('cpo-item-summary').textContent=`${items.length} line${items.length!==1?'s':''} · ${totalUnits} unit${totalUnits!==1?'s':''} total${sup?' · '+sup:''}`;
+  document.getElementById('cpo-name').value=sup?`PO — ${sup}`:'Purchase order';
+  document.getElementById('cpo-po').value='';
+  document.getElementById('cpo-sup').value=sup||items.find(o=>o.sup)?.sup||'';
+  document.getElementById('cpo-assign').value='';
+  document.getElementById('cpo-due').value='';
+  document.getElementById('cpo-status').value='ordered';
+  document.getElementById('cpo-remove-from-list').checked=true;
+  document.getElementById('create-po-modal').classList.add('open');
+}
+function closeCreatePOModal(){
+  document.getElementById('create-po-modal').classList.remove('open');
+}
+async function confirmCreatePO(){
+  const name=(document.getElementById('cpo-name').value||'').trim();
+  if(!name){toast('Enter a PO / order reference','err');return;}
+  const po=(document.getElementById('cpo-po').value||'').trim();
+  const sup=(document.getElementById('cpo-sup').value||'').trim();
+  const assign=(document.getElementById('cpo-assign').value||'').trim();
+  const due=document.getElementById('cpo-due').value;
+  const status=document.getElementById('cpo-status').value;
+  const removeAfter=document.getElementById('cpo-remove-from-list').checked;
+
+  const items=_cpoOrderIndices.map(i=>db.order[i]).filter(Boolean);
+  if(!items.length){toast('No items to include','err');return;}
+
+  const del={
+    id:'del_'+Date.now(),
+    bomId:'',bomName:name,ref:'',
+    status,created:nowD(),
+    dueDate:due,assignTo:assign,po,supplier:sup,
+    items:items.map(o=>({
+      code:o.code,name:o.name,
+      expected:o.qty||1,
+      alreadyReceived:0,
+      receiving:o.qty||1,
+      loc:'',checked:false,done:false
+    }))
+  };
+  pushUndo();
+  db.deliveries.push(del);
+  if(removeAfter){
+    [..._cpoOrderIndices].sort((a,b)=>b-a).forEach(i=>db.order.splice(i,1));
+  }
+  addEventHist('PO_CREATE',`PO created: ${name}`,`PO: ${po||'none'} · Supplier: ${sup||'none'} · ${items.length} lines`);
+  await saveDB();
+  closeCreatePOModal();
+  renderOrder();
+  go('delivery');
+  showDelivery(del);
+  renderDelHist();
+  toast(`✓ PO "${name}" created — ${items.length} line${items.length!==1?'s':''}`);
+}
+
 function openOrderAddModal(){
   document.getElementById('oa-search').value='';
   oaFilter='all';
@@ -6228,7 +6330,7 @@ function renderHist(){
 
   function partMeta(code){return db.parts[code]||{};}
 
-  const EVENT_TYPES=['BOM_LOAD','QUOTE_ACCEPT','EMAIL','JOB_CLOSE','LOGIN','LOGOUT'];
+  const EVENT_TYPES=['BOM_LOAD','QUOTE_ACCEPT','EMAIL','JOB_CLOSE','LOGIN','LOGOUT','PO_CREATE'];
   const isEventType=type&&EVENT_TYPES.includes(type);
   const isStockType=type&&!EVENT_TYPES.includes(type);
 
@@ -6284,7 +6386,8 @@ function renderHist(){
     EMAIL:{cls:'',style:'background:#f5f0ff;color:#6d28d9',label:'Email'},
     JOB_CLOSE:{cls:'b-gray',label:'Job Closed'},
     LOGIN:{cls:'b-gray',label:'Login'},
-    LOGOUT:{cls:'b-gray',label:'Logout'}
+    LOGOUT:{cls:'b-gray',label:'Logout'},
+    PO_CREATE:{cls:'b-ok',label:'PO Created'}
   };
 
   _lastHistRows=allRows;
