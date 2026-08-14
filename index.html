@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev113</title>
+<title>Workshop Stock Control v2.1 Rev114</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 113 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 114 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1865,6 +1865,16 @@ function populateBrandDropdowns(){
   buildDatalist('dl-cats', cats);
   buildDatalist('dl-suppliers', suppliers.length?suppliers:dedupeCaseInsensitive((db.suppliers||[]).map(s=>s.name)));
   buildDatalist('dl-suppliers-order', dedupeCaseInsensitive((db.suppliers||[]).map(s=>s.name)));
+  buildPartCodeDatalist();
+}
+
+// Datalist showing every stock part's internal code, with its name as the visible hint —
+// selecting it fills the input with the CODE (standard datalist behaviour), which
+// orderCodeChanged() then uses to auto-fill name/supplier/cost.
+function buildPartCodeDatalist(){
+  let dl=document.getElementById('dl-all-parts');
+  if(!dl){dl=document.createElement('datalist');dl.id='dl-all-parts';document.body.appendChild(dl);}
+  dl.innerHTML=Object.values(db.parts).map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
 }
 
 function buildDatalist(id, items){
@@ -5861,6 +5871,24 @@ async function addAllFlaggedToOrder(){
   toast(`${flagged.length} flagged part${flagged.length!==1?'s':''} added to order list`);
 }
 
+// When a Part No. is typed/picked on an Order List row, auto-fill name/supplier/cost
+// if it matches a real stock part (exact code, mfrno, or alias) — otherwise leaves it
+// as free text, since not every order line is for something already in the catalogue.
+async function orderCodeChanged(i,val){
+  if(!db.order[i])return;
+  db.order[i].code=val;
+  const p=db.parts[val]||findPart(val);
+  if(p){
+    db.order[i].name=p.name;
+    db.order[i].matchedCode=p.code;
+    if(!db.order[i].sup)db.order[i].sup=p.sup||'';
+    if(!db.order[i].cost)db.order[i].cost=p.cost||0;
+    toast(`Linked to ${p.name}`);
+  }
+  await saveDB();
+  renderOrder();
+}
+
 function renderOrder(){
   renderOrderFlaggedPanel();
   const el=document.getElementById('order-content');
@@ -5973,7 +6001,7 @@ function renderOrder(){
       <td style="padding:4px 6px;width:28px"><input type="checkbox" class="order-row-chk" data-idx="${i}" style="width:15px;height:15px;cursor:pointer"></td>
       <td style="padding:4px 6px;width:50px">${p?partImgHtml(p,40):'<div style="width:40px;height:40px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>'}</td>
       <td style="padding:6px 6px">
-        <input value="${o.code||''}" style="font-size:11px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 3px" onchange="db.order[${i}].code=this.value;saveDB()" title="Edit part number">
+        <input value="${o.code||''}" list="dl-all-parts" style="font-size:11px;font-family:monospace;width:100%;border:none;background:transparent;padding:2px 3px" onchange="orderCodeChanged(${i},this.value)" title="Type a part number — auto-fills from stock if it matches, or type anything new">
       </td>
       <td style="padding:6px 6px">
         <input value="${o.name||''}" style="font-weight:500;width:100%;border:none;background:transparent;padding:2px 3px;font-size:13px" onchange="db.order[${i}].name=this.value;saveDB()" title="Edit part name">
