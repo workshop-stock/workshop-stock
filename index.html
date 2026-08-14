@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev116</title>
+<title>Workshop Stock Control v2.1 Rev117</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 116 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 117 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -939,6 +939,8 @@ tr:hover td{background:#f9fafb}
             <option value="pending">Awaiting</option>
             <option value="ordered">Ordered</option>
             <option value="in-transit">In Transit</option>
+            <option value="partial">Partial delivery</option>
+            <option value="complete">✓ Delivered / Complete</option>
           </select>
           <button class="btn-green" onclick="confirmDelivery()">&#10003; Check in ticked items</button>
           <button onclick="document.getElementById('del-active').style.display='none'" style="font-size:12px">Close</button>
@@ -4847,11 +4849,53 @@ function showDelivery(del){
   ].join('');
   renderDelRows(del);
 }
+// Used when a delivery is manually marked "Delivered / Complete" from a status dropdown —
+// actually receives whatever's still outstanding into stock (same smart part-matching as
+// confirmDelivery), rather than just relabelling it complete while stock stays untouched.
+async function markDeliveryFullyReceived(del){
+  const outstanding=del.items.filter(i=>!i.done);
+  if(!outstanding.length){del.status='complete';return true;}
+  let allOk=true;
+  for(const item of outstanding){
+    const remaining=item.expected-(item.alreadyReceived||0);
+    if(remaining<=0){item.done=true;continue;}
+    const catPart=db.parts[item.code]||Object.values(db.parts).find(p=>
+      normalise(p.code)===normalise(item.code)||
+      normalise(p.mfrno||'')===normalise(item.code)||
+      normalise(stripVendorPrefix(p.code))===normalise(item.code)||
+      (p.aliases||[]).some(a=>normalise(a)===normalise(item.code))
+    );
+    if(!catPart){
+      toast(`⚠ "${item.name}" has no matching stock part — link it first (🔗 on that line), then mark complete`,'err');
+      allOk=false;
+      continue;
+    }
+    catPart.qty+=remaining;
+    const note=`Delivery: ${del.bomName}${del.po?' PO:'+del.po:''}${del.assignTo?' → '+del.assignTo:''}`;
+    addHist('IN',item.name,catPart.code,remaining,note+' (to stock — marked complete)');
+    item.stockQty=(item.stockQty||0)+remaining;
+    item.alreadyReceived=(item.alreadyReceived||0)+remaining;
+    item.receiving=0;
+    item.checked=false;
+    item.done=true;
+  }
+  del.status=del.items.every(i=>i.done)?'complete':'partial';
+  return allOk;
+}
+
 async function updateActiveDelStatus(val){
   const activeTitle=document.getElementById('del-title').textContent;
   const del=db.deliveries.find(d=>(d.bomName+(d.ref?' — '+d.ref:''))===activeTitle&&d.status!=='complete');
   if(!del)return;
-  del.status=val;
+  if(val==='complete'){
+    const outstanding=del.items.filter(i=>!i.done).length;
+    if(outstanding>0&&!confirm(`Mark "${del.bomName}" as fully delivered? This will receive the remaining ${outstanding} outstanding item(s) into stock right now.`))return;
+    pushUndo();
+    await markDeliveryFullyReceived(del);
+    document.getElementById('del-active').style.display='none';
+  }else{
+    del.status=val;
+  }
   await saveDB();renderDash();renderDelHist();
   toast('Status updated to: '+val);
 }
@@ -5467,6 +5511,7 @@ function renderDelHist(){
               <option${d.status==='ordered'?' selected':''} value="ordered">Ordered</option>
               <option${d.status==='in-transit'?' selected':''} value="in-transit">In Transit</option>
               <option${d.status==='partial'?' selected':''} value="partial">Partial delivery</option>
+              <option${d.status==='complete'?' selected':''} value="complete">✓ Delivered / Complete</option>
             </select>
           </div>
           <div>
@@ -5543,7 +5588,14 @@ function toggleDelDetail(delId){
 async function updateDelField(delId,field,value){
   const del=db.deliveries.find(d=>d.id===delId);
   if(!del)return;
-  del[field]=value.trim();
+  if(field==='status'&&value.trim()==='complete'&&del.status!=='complete'){
+    const outstanding=del.items.filter(i=>!i.done).length;
+    if(outstanding>0&&!confirm(`Mark "${del.bomName}" as fully delivered? This will receive the remaining ${outstanding} outstanding item(s) into stock right now.`))return;
+    pushUndo();
+    await markDeliveryFullyReceived(del);
+  }else{
+    del[field]=value.trim();
+  }
   await saveDB();
   renderDelHist();
   renderDash();
