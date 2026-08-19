@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev119</title>
+<title>Workshop Stock Control v2.1 Rev121</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 119 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 121 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -651,6 +651,9 @@ tr:hover td{background:#f9fafb}
     <div class="g2" style="margin-bottom:10px">
       <div><label>Part name</label><input id="ep-name"></div>
       <div><label>Manufacturer</label><input id="ep-mfr"></div>
+    </div>
+    <div style="margin-bottom:10px"><label>Category</label>
+      <select id="ep-cat"><option value="">Select…</option></select>
     </div>
     <div style="margin-bottom:10px"><label>🏷️ Tags / also called (comma-separated — helps search find it regardless of who's looking)</label><input id="ep-tags" placeholder="e.g. monkey wrench, pipe grips, stillsons"></div>
     <div class="g3" style="margin-bottom:10px" id="ep-qty-block">
@@ -1205,7 +1208,7 @@ tr:hover td{background:#f9fafb}
     </div>
     <p style="margin-bottom:12px">Load a saved BOM, search stock directly, or both — then assign lines to one or more suppliers. You can create as many splits as you need — e.g. PLCs to one supplier, sensors to another. Each split is tracked separately.</p>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <div>
         <label>Load a saved BOM (optional)</label>
         <select id="qt-bom-sel" onchange="loadQtBOM()" style="font-size:13px;width:100%">
@@ -1216,10 +1219,14 @@ tr:hover td{background:#f9fafb}
         <label>Split reference *</label>
         <input id="qt-split-ref" placeholder="e.g. PLCs &amp; HMI, Sensors, Drives…" style="font-size:13px">
       </div>
+      <div>
+        <label>Our quote / split number</label>
+        <input id="qt-quote-no" placeholder="auto-generated" style="font-size:13px">
+      </div>
       <div style="display:flex;flex-direction:column;justify-content:flex-end">
         <label>Add supplier to this split</label>
         <div style="display:flex;gap:6px">
-          <input id="qt-new-co" placeholder="Company…" style="flex:1" onkeydown="if(event.key==='Enter')qtAddCompany()">
+          <input id="qt-new-co" list="dl-suppliers" placeholder="Company…" style="flex:1" oninput="qtAutoFillSupplierEmail()" onkeydown="if(event.key==='Enter')qtAddCompany()">
           <input id="qt-new-email" placeholder="Email…" style="flex:1" onkeydown="if(event.key==='Enter')qtAddCompany()">
           <button class="btn-blue" onclick="qtAddCompany()" style="flex-shrink:0">Add</button>
         </div>
@@ -1252,7 +1259,7 @@ tr:hover td{background:#f9fafb}
       <div id="qt-splits-list"></div>
     </div>
 
-    <div id="qt-companies-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div id="qt-companies-bar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;max-height:140px;overflow-y:auto"></div>
     <div id="qt-split-table"></div>
 
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
@@ -6855,6 +6862,7 @@ function openQuoteBuilder(preloadBomId){
   const sel=document.getElementById('qt-bom-sel');
   sel.innerHTML='<option value="">Choose saved BOM…</option>'+Object.entries(db.boms).map(([id,b])=>`<option value="${id}">${b.name}${b.ref?' ('+b.ref+')':''}</option>`).join('');
   document.getElementById('qt-split-ref').value='';
+  document.getElementById('qt-quote-no').value='QT-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
   document.getElementById('qtb-search').value='';
@@ -6954,11 +6962,26 @@ function loadQtBOM(){
   renderQtSplitTable();
 }
 
+// Looks up whether the typed company name matches an existing supplier (Settings → Suppliers)
+// and, if so, auto-fills their saved email — same convenience as picking from a dropdown.
+function qtAutoFillSupplierEmail(){
+  const name=(document.getElementById('qt-new-co').value||'').trim();
+  const emailInput=document.getElementById('qt-new-email');
+  if(!name||emailInput.value.trim())return;
+  const match=(db.suppliers||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
+  if(match&&match.email)emailInput.value=match.email;
+}
+
 function qtAddCompany(){
   const name=document.getElementById('qt-new-co').value.trim();
   if(!name)return;
   if(qtCompanies.find(c=>c.name.toLowerCase()===name.toLowerCase())){toast('Company already added','err');return;}
-  qtCompanies.push({id:'co_'+Date.now()+'_'+qtCompanies.length,name,email:document.getElementById('qt-new-email').value.trim(),color:QT_COLORS[qtCompanies.length%QT_COLORS.length]});
+  let email=document.getElementById('qt-new-email').value.trim();
+  if(!email){
+    const match=(db.suppliers||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
+    if(match&&match.email)email=match.email;
+  }
+  qtCompanies.push({id:'co_'+Date.now()+'_'+qtCompanies.length,name,email,color:QT_COLORS[qtCompanies.length%QT_COLORS.length]});
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
   renderQtCompaniesBar();
@@ -6984,8 +7007,16 @@ function renderQtCompaniesBar(){
 
 function renderQtSplitTable(){
   const el=document.getElementById('qt-split-table');
-  if(!qtBOMLines.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Select a BOM above to load its lines</div>';return;}
-  if(!qtCompanies.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Add at least one supplier above</div>';return;}
+  if(!qtBOMLines.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Search and add parts above, or load a BOM</div>';return;}
+  if(!qtCompanies.length){
+    el.innerHTML=`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px">
+      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:6px">✓ ${qtBOMLines.length} part${qtBOMLines.length!==1?'s':''} added — now add at least one supplier above to assign them</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        ${qtBOMLines.map(l=>`<div style="font-size:12px;color:#78350f;padding:3px 0;border-bottom:1px solid #fef3c7">${l.name} <span style="color:#9ca3af">${l.code} · ×${l.qty}</span></div>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
   const bomId=document.getElementById('qt-bom-sel').value;
   const alreadyQuoted={};
   Object.values(db.quotes||{}).filter(q=>q.bomId===bomId).forEach(q=>{
@@ -7027,25 +7058,26 @@ async function saveQuotation(){
   if(!qtBOMLines.length){toast('Add at least one part first — load a BOM or search stock above','err');return;}
   const splitRef=document.getElementById('qt-split-ref').value.trim();
   if(!splitRef){toast('Enter a split reference — e.g. "PLCs & HMI", "Sensors", "Drives"','err');return;}
+  const quoteNo=(document.getElementById('qt-quote-no').value||'').trim();
   const bomId=document.getElementById('qt-bom-sel').value;
   const bomName=bomId?(db.boms[bomId]?.name||'BOM'):splitRef;
   const qtId='qt_'+Date.now();
   if(!db.quotes)db.quotes={};
   db.quotes[qtId]={
-    bomId,bomName,splitRef,created:nowD(),
+    bomId,bomName,splitRef,quoteNo,created:nowD(),
     companies:qtCompanies.map(co=>{
       const lines=qtBOMLines.map((line,li)=>{
         const checked=document.getElementById(`qtck_${li}_${co.id}`)?.checked||false;
         if(!checked)return null;
         return{code:line.code,name:line.name,qty:line.qty,unitPrice:'',totalPrice:'',notes:'',status:'pending'};
       }).filter(Boolean);
-      return{id:co.id,name:co.name,email:co.email,color:co.color,lines,status:'draft',sentDate:'',responseDate:''};
+      return{id:co.id,name:co.name,email:co.email,color:co.color,lines,status:'draft',sentDate:'',responseDate:'',theirQuoteRef:''};
     }).filter(c=>c.lines.length>0)
   };
   if(!db.quotes[qtId].companies.length){toast('Tick at least one part for a supplier','err');return;}
   await saveDB();
   closeQtModal();
-  toast(`Split "${splitRef}" saved — ${db.quotes[qtId].companies.length} supplier${db.quotes[qtId].companies.length!==1?'s':''}`);
+  toast(`Split "${splitRef}"${quoteNo?' ('+quoteNo+')':''} saved — ${db.quotes[qtId].companies.length} supplier${db.quotes[qtId].companies.length!==1?'s':''}`);
   go('quotations');
 }
 
@@ -7094,6 +7126,7 @@ function renderQuotations(){
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
             <div>
               <span style="font-weight:600;background:#f5f0ff;color:#6d28d9;padding:2px 10px;border-radius:10px;font-size:13px">${qt.splitRef||'Unnamed split'}</span>
+              ${qt.quoteNo?`<span style="font-weight:600;background:#eff6ff;color:#1e40af;padding:2px 10px;border-radius:10px;font-size:12px;margin-left:4px">${qt.quoteNo}</span>`:''}
               <span style="font-size:12px;color:#6b7280;margin-left:8px">created ${qt.created} &middot; ${qt.companies.length} supplier${qt.companies.length!==1?'s':''} &middot; ${qt.companies.reduce((a,c)=>a+c.lines.length,0)} lines</span>
             </div>
             <button onclick="if(confirm('Delete this split?')){delete db.quotes['${qt.qtId}'];saveDB();renderQuotations()}" class="btn-red" style="font-size:11px;padding:3px 8px">Delete split</button>
@@ -7121,11 +7154,15 @@ function renderCoCard(qtId,co){
         ${total?`<span style="font-size:13px;font-weight:700;color:#166534">£${total.toFixed(2)}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="exportQuoteEmail('${qtId}','${co.id}')" style="font-size:12px;padding:4px 10px;background:#6d28d9;color:#fff;border-color:#6d28d9;font-weight:600">✉ Email this supplier</button>
         <button onclick="exportQuoteCSV('${qtId}','${co.id}')" class="btn-blue" style="font-size:12px;padding:4px 10px">Export CSV</button>
-        <button onclick="exportQuoteEmail('${qtId}','${co.id}')" style="font-size:12px;padding:4px 10px;background:#6d28d9;color:#fff;border-color:#6d28d9">Draft email</button>
         ${co.status==='draft'?`<button onclick="markSent('${qtId}','${coIdx}')" class="btn-amber" style="font-size:12px;padding:4px 10px">Mark sent</button>`:''}
         ${co.status==='sent'||co.status==='quoted'?`<button onclick="markAccepted('${qtId}','${coIdx}')" class="btn-green" style="font-size:12px;padding:4px 10px">Accept quote</button>`:''}
       </div>
+    </div>
+    <div style="padding:8px 16px 0;display:flex;align-items:center;gap:8px">
+      <label style="font-size:11px;color:#6b7280;white-space:nowrap">Their quote #:</label>
+      <input value="${co.theirQuoteRef||''}" placeholder="e.g. RS-Q-88213 (once they send it back)" style="font-size:12px;padding:4px 8px;max-width:240px" onchange="updateQuoteCoField('${qtId}',${coIdx},'theirQuoteRef',this.value)">
     </div>
     <div class="qt-company-body">
       <div class="qt-line-hdr"><span></span><span>Part</span><span>Qty</span><span>Unit price £</span><span>Total £</span><span>Lead time</span><span>Status</span></div>
@@ -7145,6 +7182,14 @@ function renderCoCard(qtId,co){
       </div>`).join('')}
     </div>
   </div>`;
+}
+
+async function updateQuoteCoField(qtId,coIdx,field,val){
+  const co=db.quotes[qtId].companies[coIdx];
+  if(!co)return;
+  co[field]=val.trim();
+  await saveDB();
+  toast(field==='theirQuoteRef'?"Supplier's quote number saved":'Updated','info');
 }
 
 async function updateQuoteLine(qtId,coIdx,li,field,val){
@@ -7226,8 +7271,9 @@ function exportQuoteEmail(qtId,coId){
   const co=qt.companies.find(c=>c.id===coId);
   if(!co)return;
   const linesList=co.lines.map(l=>`  • ${l.name} (${l.code}) — Qty: ${l.qty}`).join('\n');
-  const body=`Dear ${co.name},\n\nWe would like to request a quotation for the following items for our project: ${qt.bomName}\n\nPlease provide your best unit prices, availability, and lead times for the parts listed below.\n\n${linesList}\n\nPlease reply to this email with your quotation at your earliest convenience. If you require any further specifications or drawings, please let us know.\n\nKind regards,\n[Your name]\n[Your company]\n[Phone number]`;
-  const subject=`Quotation Request — ${qt.bomName} — ${nowD()}`;
+  const refLine=qt.quoteNo?`Our reference: ${qt.quoteNo}\n\n`:'';
+  const body=`Dear ${co.name},\n\nWe would like to request a quotation for the following items for our project: ${qt.bomName}\n\n${refLine}Please provide your best unit prices, availability, and lead times for the parts listed below.\n\n${linesList}\n\nPlease reply to this email with your quotation at your earliest convenience — including your own quote reference number if you have one. If you require any further specifications or drawings, please let us know.\n\nKind regards,\n[Your name]\n[Your company]\n[Phone number]`;
+  const subject=`Quotation Request${qt.quoteNo?' — '+qt.quoteNo:''} — ${qt.bomName} — ${nowD()}`;
   const mailto=`mailto:${co.email||''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   showEmailModal(co.name,co.email,subject,body,mailto);
 }
@@ -7938,6 +7984,7 @@ function openEditPart(code){
   document.getElementById('ep-barcode').value=p.barcode||'';
   document.getElementById('ep-name').value=p.name;
   document.getElementById('ep-mfr').value=p.mfr||'';
+  document.getElementById('ep-cat').innerHTML=catOpts(p.cat);
   document.getElementById('ep-tracked').checked=p.tracked!==false;
   document.getElementById('ep-needs-reorder').checked=p.needsReorder===true;
   epTrackedChanged();
@@ -7969,6 +8016,7 @@ async function saveEditPart(){
   p.barcode=document.getElementById('ep-barcode').value.trim();
   p.name=document.getElementById('ep-name').value.trim();
   p.mfr=document.getElementById('ep-mfr').value.trim();
+  p.cat=document.getElementById('ep-cat').value||p.cat;
   p.qty=parseInt(document.getElementById('ep-qty').value)||0;
   p.min=parseInt(document.getElementById('ep-min').value)||1;
   p.max=parseInt(document.getElementById('ep-max').value)||0;
