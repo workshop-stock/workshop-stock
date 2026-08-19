@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev124</title>
+<title>Workshop Stock Control v2.1 Rev125</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 124 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 125 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1389,6 +1389,18 @@ tr:hover td{background:#f9fafb}
             <option value="">Select supplier…</option>
           </select>
           <button class="btn-blue" onclick="addBrandSupplier()">Assign</button>
+        </div>
+      </div>
+      <div class="card" style="border:2px solid #f59e0b">
+        <div class="sec">🧹 Clean up duplicate supplier names</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">If typing suppliers on parts created slightly different spellings of the same company (e.g. "Adopt Automation" / "Adopt Automation Ltd" / "AdoptAuto"), tick the duplicates below and merge them into one correct name — every part using any of the ticked names gets updated, and the merged names are kept as linked aliases so nothing that already relies on them breaks.</div>
+        <div id="sup-cleanup-list" style="max-height:260px;overflow-y:auto;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <label style="font-size:11px;color:#6b7280">Merge ticked names into…</label>
+            <input id="sup-cleanup-target" list="dl-suppliers" placeholder="Type or pick the correct name…">
+          </div>
+          <button onclick="mergeSupplierNames()" class="btn-red" style="font-weight:700">Merge selected</button>
         </div>
       </div>
       <div class="card">
@@ -7816,6 +7828,7 @@ function renderSettings(){
   if(brandSupSelect){
     brandSupSelect.innerHTML='<option value="">Select supplier…</option>'+(db.suppliers||[]).map(s=>`<option>${s.name}</option>`).join('');
   }
+  renderSupplierCleanup();
 }
 
 async function addSupplier(){
@@ -7880,6 +7893,78 @@ function findSupplierByName(name){
   const n=name.trim().toLowerCase();
   if(!n)return null;
   return(db.suppliers||[]).find(s=>s.name.toLowerCase()===n||(s.aliases||[]).some(a=>a.toLowerCase()===n));
+}
+
+// ─── SUPPLIER NAME CLEANUP — merges near-duplicate names that were typed inconsistently
+// across parts (e.g. "Adopt Automation" vs "Adopt Automation Ltd") into one correct name.
+function getAllSupplierNamesWithCounts(){
+  const counts={};
+  Object.values(db.parts).forEach(p=>{
+    if(p.sup){
+      const key=p.sup.trim();
+      if(key)counts[key]=(counts[key]||0)+1;
+    }
+  });
+  (db.suppliers||[]).forEach(s=>{
+    if(!(s.name in counts))counts[s.name]=0;
+  });
+  return Object.entries(counts).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
+}
+function renderSupplierCleanup(){
+  const el=document.getElementById('sup-cleanup-list');
+  if(!el)return;
+  const list=getAllSupplierNamesWithCounts();
+  if(!list.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:6px">No supplier names in use on parts yet</div>';return;}
+  el.innerHTML=list.map(({name,count})=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:13px">
+      <input type="checkbox" class="sup-cleanup-chk" value="${name.replace(/"/g,'&quot;')}" style="width:15px;height:15px">
+      <span style="flex:1">${name}</span>
+      <span style="font-size:11px;color:#9ca3af">${count} part${count!==1?'s':''}</span>
+    </label>`).join('');
+}
+async function mergeSupplierNames(){
+  const checked=[...document.querySelectorAll('.sup-cleanup-chk:checked')].map(cb=>cb.value);
+  const target=(document.getElementById('sup-cleanup-target').value||'').trim();
+  if(checked.length<2){toast('Tick at least 2 names to merge together','err');return;}
+  if(!target){toast('Enter the correct name to merge into','err');return;}
+  if(!confirm(`Merge these ${checked.length} names into "${target}"?\n\n${checked.join('\n')}\n\nEvery part currently using any of these will be updated to "${target}". Reversible with the main Undo button.`))return;
+
+  pushUndo();
+  const checkedLower=checked.map(c=>c.toLowerCase());
+  let partsUpdated=0;
+  Object.values(db.parts).forEach(p=>{
+    if(p.sup&&checkedLower.includes(p.sup.trim().toLowerCase())&&p.sup.trim().toLowerCase()!==target.toLowerCase()){
+      p.sup=target;
+      partsUpdated++;
+    }
+  });
+
+  if(!db.suppliers)db.suppliers=[];
+  let targetEntry=findSupplierByName(target);
+  if(!targetEntry){
+    targetEntry={name:target,email:'',phone:'',aliases:[]};
+    db.suppliers.push(targetEntry);
+  }
+  if(!targetEntry.aliases)targetEntry.aliases=[];
+  checked.forEach(name=>{
+    if(name.toLowerCase()!==target.toLowerCase()&&!targetEntry.aliases.some(a=>a.toLowerCase()===name.toLowerCase())){
+      targetEntry.aliases.push(name);
+    }
+  });
+  // Fold in contact details from any separate supplier entries being merged away, then remove them
+  db.suppliers=db.suppliers.filter(s=>{
+    if(s===targetEntry)return true;
+    if(!checkedLower.includes(s.name.toLowerCase()))return true;
+    if(!targetEntry.email&&s.email)targetEntry.email=s.email;
+    if(!targetEntry.phone&&s.phone)targetEntry.phone=s.phone;
+    return false;
+  });
+
+  await saveDB();
+  document.getElementById('sup-cleanup-target').value='';
+  renderSettings();
+  populateBrandDropdowns();
+  toast(`✓ Merged into "${target}" — ${partsUpdated} part${partsUpdated!==1?'s':''} updated`);
 }
 
 async function addBrandSupplier(){
