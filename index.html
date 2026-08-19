@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev125</title>
+<title>Workshop Stock Control v2.1 Rev126</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 125 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 126 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -7802,13 +7802,17 @@ function renderSettings(){
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <div style="flex:1;min-width:120px">
               <div style="font-weight:600;font-size:13px">${s.name}</div>
-              <div style="font-size:11px;color:#9ca3af">${[s.email,s.phone].filter(Boolean).join(' · ')||'No contact info'}</div>
+              <div style="font-size:11px;color:#9ca3af">${[s.email,s.phone].filter(Boolean).join(' · ')||'No contact info'}${(s.contacts||[]).length?` · +${s.contacts.length} more contact${s.contacts.length!==1?'s':''}`:''}</div>
             </div>
+            <button onclick="editSupplierModal(${i})" class="btn-blue" style="font-size:11px;padding:3px 8px">✏️ Edit</button>
             <button onclick="addSupplierAlias(${i})" style="font-size:11px;padding:3px 8px;color:#6d28d9;border-color:#c4b5fd">🔗 Link a name</button>
             <button onclick="removeSupplier(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
           </div>
           ${(s.aliases||[]).length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
             ${s.aliases.map((a,ai)=>`<span style="font-size:10px;background:#f5f0ff;color:#6d28d9;padding:2px 4px 2px 8px;border-radius:8px;display:inline-flex;align-items:center;gap:5px">${a}<span onclick="removeSupplierAlias(${i},${ai})" title="Unlink" style="cursor:pointer;font-weight:700;color:#991b1b;padding:0 3px">✕</span></span>`).join('')}
+          </div>`:''}
+          ${(s.contacts||[]).length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
+            ${s.contacts.map(c=>`<span onclick="navigator.clipboard&&navigator.clipboard.writeText('${(c.email||'').replace(/'/g,"\\'")}').then(()=>toast('Email copied'))" title="Click to copy" style="cursor:pointer;font-size:10px;background:#eff6ff;color:#1e40af;padding:2px 8px;border-radius:8px">${c.label?c.label+': ':''}${c.email||''}</span>`).join('')}
           </div>`:''}
         </div>`).join('')
       :'<div style="color:#9ca3af;font-size:13px">No suppliers yet — add your main suppliers below</div>';
@@ -7860,6 +7864,86 @@ async function removeSupplier(i){
 // ─── LINKED SUPPLIER NAMES — merge duplicates like "Adopt Automation" written 3 different
 // ways, or "MBS" / "Machine Building Service Ltd" — into one entry so the email always
 // resolves correctly, without deleting or renaming any of the names you already use on parts.
+// ─── EDIT SUPPLIER — name/primary contact/phone, plus any number of extra contact emails ──
+let _editSupIdx=null;
+let _editSupContacts=[];
+function editSupplierModal(i){
+  const s=db.suppliers[i];if(!s)return;
+  _editSupIdx=i;
+  _editSupContacts=(s.contacts||[]).map(c=>({...c}));
+  const existing=document.getElementById('edit-sup-modal');
+  if(existing)existing.remove();
+  const div=document.createElement('div');
+  div.id='edit-sup-modal';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-size:16px;font-weight:700;margin:0">✏️ Edit supplier</h2>
+      <button onclick="document.getElementById('edit-sup-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
+    </div>
+    <div style="margin-bottom:10px"><label>Supplier name</label><input id="es-name" value="${s.name}"></div>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label>Primary email</label><input id="es-email" value="${s.email||''}"></div>
+      <div><label>Phone</label><input id="es-phone" value="${s.phone||''}"></div>
+    </div>
+    <div style="margin-bottom:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px">
+      <label style="font-weight:700;color:#374151">Additional contacts (optional)</label>
+      <div style="font-size:11px;color:#6b7280;margin:3px 0 8px">e.g. a specific sales rep, an orders inbox, accounts — the primary email above is still what's used for auto-fill on quotes.</div>
+      <div id="es-contacts-list"></div>
+      <button type="button" onclick="esAddContactRow()" style="font-size:12px;margin-top:4px">+ Add contact</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="saveSupplierEdit()" class="btn-green" style="flex:1;font-weight:700">Save changes</button>
+      <button onclick="document.getElementById('edit-sup-modal').remove()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  renderEsContactsList();
+}
+function esAddContactRow(){
+  _editSupContacts.push({label:'',email:''});
+  renderEsContactsList();
+}
+function esRemoveContactRow(i){
+  _editSupContacts.splice(i,1);
+  renderEsContactsList();
+}
+function esUpdateContactRow(i,field,val){
+  if(!_editSupContacts[i])return;
+  _editSupContacts[i][field]=val;
+}
+function renderEsContactsList(){
+  const el=document.getElementById('es-contacts-list');
+  if(!el)return;
+  if(!_editSupContacts.length){
+    el.innerHTML='<div style="font-size:12px;color:#9ca3af;padding:4px 0">No additional contacts yet.</div>';
+    return;
+  }
+  el.innerHTML=_editSupContacts.map((c,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 1.4fr 32px;gap:6px;margin-bottom:6px;align-items:center">
+      <input value="${c.label||''}" placeholder="Label (e.g. Sales, Orders, John)" style="font-size:12px;padding:6px 8px" oninput="esUpdateContactRow(${i},'label',this.value)">
+      <input value="${c.email||''}" placeholder="Email address" style="font-size:12px;padding:6px 8px" oninput="esUpdateContactRow(${i},'email',this.value)">
+      <button type="button" onclick="esRemoveContactRow(${i})" style="font-size:12px;padding:4px 6px;color:#991b1b;border-color:#fca5a5">✕</button>
+    </div>`).join('');
+}
+async function saveSupplierEdit(){
+  const s=db.suppliers[_editSupIdx];if(!s)return;
+  const name=(document.getElementById('es-name').value||'').trim();
+  if(!name){toast('Supplier name is required','err');return;}
+  const clash=db.suppliers.find((o,oi)=>oi!==_editSupIdx&&o.name.toLowerCase()===name.toLowerCase());
+  if(clash){toast(`"${name}" is already used by another supplier`,'err');return;}
+  s.name=name;
+  s.email=(document.getElementById('es-email').value||'').trim();
+  s.phone=(document.getElementById('es-phone').value||'').trim();
+  s.contacts=_editSupContacts.filter(c=>(c.label||'').trim()||(c.email||'').trim());
+  await saveDB();
+  document.getElementById('edit-sup-modal').remove();
+  renderSettings();
+  buildDatalist('dl-suppliers',db.suppliers.map(x=>x.name));
+  buildDatalist('dl-suppliers-order',db.suppliers.map(x=>x.name));
+  toast(`"${name}" updated`);
+}
+
 async function addSupplierAlias(i){
   const s=db.suppliers[i];if(!s)return;
   const input=prompt(`Link another name to "${s.name}" (e.g. "MBS" for "Machine Building Service Ltd"):`);
