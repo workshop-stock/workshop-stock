@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev123</title>
+<title>Workshop Stock Control v2.1 Rev124</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 123 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 124 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1209,7 +1209,7 @@ tr:hover td{background:#f9fafb}
     </div>
     <p style="margin-bottom:12px">Load a saved BOM, search stock directly, or both — then assign lines to one or more suppliers. You can create as many splits as you need — e.g. PLCs to one supplier, sensors to another. Each split is tracked separately.</p>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
         <label>Load a saved BOM (optional)</label>
         <select id="qt-bom-sel" onchange="loadQtBOM()" style="font-size:13px;width:100%">
@@ -1224,13 +1224,14 @@ tr:hover td{background:#f9fafb}
         <label>Our quote / split number</label>
         <input id="qt-quote-no" placeholder="auto-generated" style="font-size:13px">
       </div>
-      <div style="display:flex;flex-direction:column;justify-content:flex-end">
-        <label>Add supplier to this split</label>
-        <div style="display:flex;gap:6px">
-          <input id="qt-new-co" list="dl-suppliers" placeholder="Company…" style="flex:1" oninput="qtAutoFillSupplierEmail()" onchange="qtAutoFillSupplierEmail()" onkeydown="if(event.key==='Enter')qtAddCompany()">
-          <input id="qt-new-email" placeholder="Email…" style="flex:1" onkeydown="if(event.key==='Enter')qtAddCompany()">
-          <button class="btn-blue" onclick="qtAddCompany()" style="flex-shrink:0">Add</button>
-        </div>
+    </div>
+
+    <div style="margin-bottom:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px">
+      <label>Add supplier to this split</label>
+      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+        <input id="qt-new-co" list="dl-suppliers" placeholder="Company name…" style="flex:2;min-width:180px" oninput="qtAutoFillSupplierEmail()" onchange="qtAutoFillSupplierEmail()" onkeydown="if(event.key==='Enter')qtAddCompany()">
+        <input id="qt-new-email" placeholder="Email address…" style="flex:2;min-width:200px" onkeydown="if(event.key==='Enter')qtAddCompany()">
+        <button class="btn-blue" onclick="qtAddCompany()" style="flex-shrink:0">+ Add supplier</button>
       </div>
     </div>
 
@@ -7085,9 +7086,9 @@ function qtAutoFillSupplierEmail(){
   // user actually typed themselves is never overwritten.
   if(current&&current!==_qtLastAutoFilledEmail)return;
   if(!name){emailInput.value='';_qtLastAutoFilledEmail='';return;}
-  let match=(db.suppliers||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
+  let match=findSupplierByName(name);
   if(!match){
-    const prefixMatches=(db.suppliers||[]).filter(s=>s.name.toLowerCase().startsWith(name.toLowerCase()));
+    const prefixMatches=(db.suppliers||[]).filter(s=>s.name.toLowerCase().startsWith(name.toLowerCase())||(s.aliases||[]).some(a=>a.toLowerCase().startsWith(name.toLowerCase())));
     if(prefixMatches.length===1)match=prefixMatches[0];
   }
   if(match&&match.email){
@@ -7105,7 +7106,7 @@ function qtAddCompany(){
   if(qtCompanies.find(c=>c.name.toLowerCase()===name.toLowerCase())){toast('Company already added','err');return;}
   let email=document.getElementById('qt-new-email').value.trim();
   if(!email){
-    const match=(db.suppliers||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
+    const match=findSupplierByName(name);
     if(match&&match.email)email=match.email;
   }
   qtCompanies.push({id:'co_'+Date.now()+'_'+qtCompanies.length,name,email,color:QT_COLORS[qtCompanies.length%QT_COLORS.length]});
@@ -7785,12 +7786,18 @@ function renderSettings(){
   if(supListEl){
     supListEl.innerHTML=db.suppliers.length
       ?db.suppliers.map((s,i)=>`
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;flex-wrap:wrap">
-          <div style="flex:1;min-width:120px">
-            <div style="font-weight:600;font-size:13px">${s.name}</div>
-            <div style="font-size:11px;color:#9ca3af">${[s.email,s.phone].filter(Boolean).join(' · ')||'No contact info'}</div>
+        <div style="padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px">
+              <div style="font-weight:600;font-size:13px">${s.name}</div>
+              <div style="font-size:11px;color:#9ca3af">${[s.email,s.phone].filter(Boolean).join(' · ')||'No contact info'}</div>
+            </div>
+            <button onclick="addSupplierAlias(${i})" style="font-size:11px;padding:3px 8px;color:#6d28d9;border-color:#c4b5fd">🔗 Link a name</button>
+            <button onclick="removeSupplier(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
           </div>
-          <button onclick="removeSupplier(${i})" style="font-size:11px;padding:3px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
+          ${(s.aliases||[]).length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
+            ${s.aliases.map((a,ai)=>`<span style="font-size:10px;background:#f5f0ff;color:#6d28d9;padding:2px 4px 2px 8px;border-radius:8px;display:inline-flex;align-items:center;gap:5px">${a}<span onclick="removeSupplierAlias(${i},${ai})" title="Unlink" style="cursor:pointer;font-weight:700;color:#991b1b;padding:0 3px">✕</span></span>`).join('')}
+          </div>`:''}
         </div>`).join('')
       :'<div style="color:#9ca3af;font-size:13px">No suppliers yet — add your main suppliers below</div>';
   }
@@ -7835,6 +7842,44 @@ async function removeSupplier(i){
   await saveDB();
   renderSettings();
   toast('Supplier removed');
+}
+
+// ─── LINKED SUPPLIER NAMES — merge duplicates like "Adopt Automation" written 3 different
+// ways, or "MBS" / "Machine Building Service Ltd" — into one entry so the email always
+// resolves correctly, without deleting or renaming any of the names you already use on parts.
+async function addSupplierAlias(i){
+  const s=db.suppliers[i];if(!s)return;
+  const input=prompt(`Link another name to "${s.name}" (e.g. "MBS" for "Machine Building Service Ltd"):`);
+  if(!input)return;
+  const name=input.trim();
+  if(!name)return;
+  if(name.toLowerCase()===s.name.toLowerCase()){toast('That\'s already the main name','err');return;}
+  if(!s.aliases)s.aliases=[];
+  if(s.aliases.some(a=>a.toLowerCase()===name.toLowerCase())){toast('Already linked','err');return;}
+  const clash=db.suppliers.find((o,oi)=>oi!==i&&(o.name.toLowerCase()===name.toLowerCase()||(o.aliases||[]).some(a=>a.toLowerCase()===name.toLowerCase())));
+  if(clash){
+    if(!confirm(`"${name}" is already set up as a separate supplier entry ("${clash.name}"${clash.email?', '+clash.email:''}). Link it to "${s.name}" as well anyway?\n\nYou may want to delete the separate "${clash.name}" entry afterward to avoid confusion — this won't do that automatically.`))return;
+  }
+  s.aliases.push(name);
+  await saveDB();
+  renderSettings();
+  toast(`"${name}" linked to "${s.name}" — its email will now be used for both`);
+}
+async function removeSupplierAlias(i,ai){
+  const s=db.suppliers[i];if(!s||!s.aliases)return;
+  const name=s.aliases[ai];
+  if(!confirm(`Unlink "${name}" from "${s.name}"?`))return;
+  s.aliases.splice(ai,1);
+  await saveDB();
+  renderSettings();
+  toast('Unlinked');
+}
+// Looks up a supplier by exact name OR any linked alias name — case-insensitive.
+function findSupplierByName(name){
+  if(!name)return null;
+  const n=name.trim().toLowerCase();
+  if(!n)return null;
+  return(db.suppliers||[]).find(s=>s.name.toLowerCase()===n||(s.aliases||[]).some(a=>a.toLowerCase()===n));
 }
 
 async function addBrandSupplier(){
