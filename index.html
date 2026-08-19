@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev118</title>
+<title>Workshop Stock Control v2.1 Rev119</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 118 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 119 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -639,7 +639,12 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
     <div class="g3" style="margin-bottom:10px">
-      <div><label>Internal part no.</label><input id="ep-code" readonly style="background:#f9fafb"></div>
+      <div><label>Internal part no.</label>
+        <div style="display:flex;gap:6px">
+          <input id="ep-code" readonly style="background:#f9fafb;flex:1">
+          <button type="button" onclick="renamePartCode()" title="Fix a typo or change the internal code" style="font-size:11px;padding:0 10px;flex-shrink:0">✏️ Rename</button>
+        </div>
+      </div>
       <div><label>Mfr part number</label><input id="ep-mfrno" placeholder="Manufacturer ref"></div>
       <div><label>Barcode</label><input id="ep-barcode" placeholder="Scan or type"></div>
     </div>
@@ -1221,10 +1226,25 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
 
-    <div style="margin-bottom:12px">
-      <label>Or search stock to add parts directly (no BOM needed)</label>
-      <input id="qt-search" placeholder="Search by name, part number, tag…" style="margin-top:4px" oninput="renderQtSearchResults()">
-      <div id="qt-search-results" style="max-height:220px;overflow-y:auto;margin-top:6px;border:1px solid #e5e7eb;border-radius:6px;display:none"></div>
+    <div style="margin-bottom:16px">
+      <div class="sec" style="margin-bottom:8px">Add items — search stock (no BOM needed)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <input id="qtb-search" placeholder="Search by name, part number, tag…" style="flex:2;min-width:180px" oninput="renderQtSearchResults()">
+        <select id="qtb-filter-cat" onchange="renderQtSearchResults()" style="flex:1;min-width:130px"><option value="">All categories</option></select>
+        <select id="qtb-filter-brand" onchange="renderQtSearchResults()" style="flex:1;min-width:130px"><option value="">All brands</option></select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button id="qtb-filter-all" onclick="setQtSearchFilter('all')" class="btn-blue" style="font-size:12px">All parts</button>
+        <button id="qtb-filter-low" onclick="setQtSearchFilter('low')" style="font-size:12px">⚠ Low / out of stock</button>
+        <button id="qtb-filter-most" onclick="setQtSearchFilter('most')" style="font-size:12px">🔥 Most used</button>
+      </div>
+      <div id="qt-search-results" style="max-height:260px;overflow-y:auto;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:#6b7280">Or add something not yet in stock</label><input id="qtb-new-code" placeholder="Part number…" style="margin-top:2px"></div>
+        <div style="flex:2;min-width:160px"><input id="qtb-new-name" placeholder="Description…"></div>
+        <div style="width:70px"><input type="number" id="qtb-new-qty" value="1" min="1"></div>
+        <button onclick="qtAddNewItem()" class="btn-blue">+ Add</button>
+      </div>
     </div>
 
     <div id="qt-existing-splits" style="display:none;margin-bottom:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px">
@@ -6837,8 +6857,11 @@ function openQuoteBuilder(preloadBomId){
   document.getElementById('qt-split-ref').value='';
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
-  document.getElementById('qt-search').value='';
-  document.getElementById('qt-search-results').style.display='none';
+  document.getElementById('qtb-search').value='';
+  document.getElementById('qtb-filter-cat').innerHTML=catFilterOpts();
+  const qtbBrands=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
+  document.getElementById('qtb-filter-brand').innerHTML='<option value="">All brands</option>'+qtbBrands.map(b=>`<option>${b}</option>`).join('');
+  setQtSearchFilter('all');
   document.getElementById('qt-existing-splits').style.display='none';
   const savedId=preloadBomId||Object.keys(db.boms).find(id=>db.boms[id].name===document.getElementById('bom-name').value)||'';
   if(savedId){sel.value=savedId;loadQtBOM();}
@@ -6849,20 +6872,44 @@ function openQuoteBuilder(preloadBomId){
 function closeQtModal(){document.getElementById('qt-overlay').classList.remove('open');}
 
 // Lets a quotation split be built by searching stock directly, without ever loading a BOM
+let qtSearchFilter='all';
+function setQtSearchFilter(f){
+  qtSearchFilter=f;
+  ['all','low','most'].forEach(k=>{
+    const btn=document.getElementById('qtb-filter-'+k);
+    if(btn){btn.className=k===f?'btn-blue':'';btn.style.fontSize='12px';}
+  });
+  renderQtSearchResults();
+}
 function renderQtSearchResults(){
-  const q=(document.getElementById('qt-search').value||'').trim();
+  const q=(document.getElementById('qtb-search').value||'').trim();
+  const cat=document.getElementById('qtb-filter-cat').value;
+  const brand=document.getElementById('qtb-filter-brand').value;
   const el=document.getElementById('qt-search-results');
-  if(!q){el.style.display='none';el.innerHTML='';return;}
-  const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,15);
-  el.style.display='block';
-  if(!res.length){el.innerHTML='<div style="padding:8px;color:#9ca3af;font-size:12px">No matches</div>';return;}
-  el.innerHTML=res.map(p=>{
+  let list=Object.values(db.parts);
+
+  if(qtSearchFilter==='low')list=list.filter(p=>isFlagged(p)||(isTracked(p)&&p.qty<=p.min));
+  else if(qtSearchFilter==='most')list=list.filter(p=>getPartUsage(p.code).useCount>0).sort((a,b)=>getPartUsage(b.code).useCount-getPartUsage(a.code).useCount);
+
+  list=list.filter(p=>partFilter(p,q,cat,brand,''));
+  if(qtSearchFilter!=='most')list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  list=list.slice(0,30);
+
+  if(!q&&!cat&&!brand&&qtSearchFilter==='all'){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:14px;text-align:center">Type to search, or use a quick filter above</div>';
+    return;
+  }
+  if(!list.length){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:14px;text-align:center">No parts match</div>';
+    return;
+  }
+  el.innerHTML=list.map(p=>{
     const already=qtBOMLines.find(l=>l.code===p.code);
     return`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #f3f4f6">
-      ${partImgHtml(p,28)}
-      <div style="flex:1"><div style="font-weight:600;font-size:12px">${p.name}${already?` <span style="font-size:10px;color:#1e40af">(added ×${already.qty})</span>`:''}</div><div style="font-size:11px;color:#9ca3af">${p.code}</div></div>
-      <input type="number" id="qt-add-qty-${p.code}" value="1" min="1" style="width:50px;font-size:12px">
-      <button onclick="qtAddSearchedPart('${p.code}')" class="btn-green" style="font-size:11px;padding:3px 8px">+ Add</button>
+      ${partImgHtml(p,32)}
+      <div style="flex:1;min-width:100px"><div style="font-weight:600;font-size:12px">${p.name}${already?` <span style="font-size:10px;color:#1e40af">(added ×${already.qty})</span>`:''}</div><div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' · '+p.mfrno:''} · ${isTracked(p)?p.qty+' in stock':'not tracked'}</div></div>
+      <input type="number" id="qt-add-qty-${p.code}" value="1" min="1" style="width:56px;font-size:12px">
+      <button onclick="qtAddSearchedPart('${p.code}')" class="btn-green" style="font-size:11px;padding:4px 10px">+ Add</button>
     </div>`;
   }).join('');
 }
@@ -6876,6 +6923,18 @@ function qtAddSearchedPart(code){
   renderQtSplitTable();
   renderQtSearchResults();
   toast(`${qty}× ${p.name} added to this split`);
+}
+function qtAddNewItem(){
+  const code=(document.getElementById('qtb-new-code').value||'').trim();
+  const name=(document.getElementById('qtb-new-name').value||'').trim();
+  const qty=Math.max(1,parseInt(document.getElementById('qtb-new-qty').value)||1);
+  if(!code&&!name){toast('Enter a part number or description','err');return;}
+  qtBOMLines.push({code:code||'(new)',name:name||code,qty,cat:'',inStock:0});
+  document.getElementById('qtb-new-code').value='';
+  document.getElementById('qtb-new-name').value='';
+  document.getElementById('qtb-new-qty').value=1;
+  renderQtSplitTable();
+  toast(`${qty}× ${name||code} added to this split`);
 }
 
 function loadQtBOM(){
@@ -7837,6 +7896,36 @@ function epTrackedChanged(){
   document.getElementById('ep-qty-block').style.display=tracked?'grid':'none';
   document.getElementById('ep-reorder-flag-wrap').style.display='flex';
 }
+// Renames a part's internal code. Rather than rewriting every historical BOM/order/delivery/
+// allocation/history record that references the old code (risky and easy to miss one), the old
+// code is kept as a linked alias on the part — everything that already used it keeps resolving
+// correctly via the alias-matching already built into search, scanning, BOM and delivery matching.
+async function renamePartCode(){
+  const oldCode=editingCode;
+  const p=db.parts[oldCode];
+  if(!p)return;
+  const input=prompt(`Enter the new internal part number (currently "${oldCode}"):`,oldCode);
+  if(input===null)return;
+  const newCode=input.trim();
+  if(!newCode||newCode===oldCode)return;
+  if(db.parts[newCode]){toast(`"${newCode}" is already used by another part`,'err');return;}
+  if(!confirm(`Rename this part's internal code from "${oldCode}" to "${newCode}"?\n\nThe old code will be kept as a linked alias, so existing BOMs, orders, deliveries and history that reference "${oldCode}" will keep working correctly and still find this part.`))return;
+
+  pushUndo();
+  delete db.parts[oldCode];
+  p.code=newCode;
+  if(!p.aliases)p.aliases=[];
+  if(!p.aliases.some(a=>normalise(a)===normalise(oldCode)))p.aliases.push(oldCode);
+  db.parts[newCode]=p;
+  editingCode=newCode;
+  if(!epAliasRows.some(a=>normalise(a)===normalise(oldCode)))epAliasRows.push(oldCode);
+  await saveDB();
+  document.getElementById('ep-code').value=newCode;
+  renderEpAliases();
+  renderDash();doSearch();renderSL();
+  toast(`✓ Renamed to "${newCode}" — "${oldCode}" kept as a linked alias so nothing else breaks`);
+}
+
 function openEditPart(code){
   editingCode=code;const p=db.parts[code];if(!p)return;
   _pendingImages.ep=(p.images&&p.images.length)?[...p.images]:(p.img?[p.img]:[]);
