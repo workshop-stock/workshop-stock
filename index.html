@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev122</title>
+<title>Workshop Stock Control v2.1 Rev123</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -22,6 +22,7 @@ header h1{font-size:16px;font-weight:600;letter-spacing:.02em}
 .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:12px}
 label{font-size:12px;color:#6b7280;display:block;margin-bottom:3px}
 input,select,textarea{width:100%;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;font-size:13px;background:#fff;color:#1a1a1a;outline:none;font-family:inherit}
+select{min-width:140px}
 input:focus,select:focus,textarea:focus{border-color:#1e3a5f;box-shadow:0 0 0 2px rgba(30,58,95,.1)}
 button{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit}
 button:hover{background:#f3f4f6}
@@ -319,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 122 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 123 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1263,7 +1264,8 @@ tr:hover td{background:#f9fafb}
     <div id="qt-split-table"></div>
 
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button onclick="saveQuotation()" style="background:#6d28d9;color:#fff;border-color:#6d28d9;flex:1">Save this split</button>
+      <button onclick="saveQuotation(false)" style="background:#6d28d9;color:#fff;border-color:#6d28d9;flex:1">Save this split</button>
+      <button onclick="saveQuotation(true)" class="btn-green" style="flex:1;font-weight:700">✓ Save &amp; email supplier(s)</button>
       <button onclick="closeQtModal()">Cancel</button>
     </div>
   </div>
@@ -6919,6 +6921,7 @@ function openQuoteBuilder(preloadBomId){
   document.getElementById('qt-quote-no').value='QT-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
+  _qtLastAutoFilledEmail='';
   document.getElementById('qtb-search').value='';
   document.getElementById('qtb-filter-cat').innerHTML=catFilterOpts();
   const qtbBrands=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
@@ -6959,6 +6962,7 @@ function editQuoteSplit(qtId){
   document.getElementById('qt-quote-no').value=qt.quoteNo||'';
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
+  _qtLastAutoFilledEmail='';
   document.getElementById('qtb-search').value='';
   document.getElementById('qtb-filter-cat').innerHTML=catFilterOpts();
   const qtbBrands=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
@@ -7071,16 +7075,28 @@ function loadQtBOM(){
 
 // Looks up whether the typed company name matches an existing supplier (Settings → Suppliers)
 // and, if so, auto-fills their saved email — same convenience as picking from a dropdown.
+let _qtLastAutoFilledEmail='';
 function qtAutoFillSupplierEmail(){
   const name=(document.getElementById('qt-new-co').value||'').trim();
   const emailInput=document.getElementById('qt-new-email');
-  if(!name||emailInput.value.trim())return;
+  const current=emailInput.value.trim();
+  // Only touch the email if it's empty, or it still matches what we auto-filled last time —
+  // that way changing the supplier name updates the email automatically, but anything the
+  // user actually typed themselves is never overwritten.
+  if(current&&current!==_qtLastAutoFilledEmail)return;
+  if(!name){emailInput.value='';_qtLastAutoFilledEmail='';return;}
   let match=(db.suppliers||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
   if(!match){
     const prefixMatches=(db.suppliers||[]).filter(s=>s.name.toLowerCase().startsWith(name.toLowerCase()));
     if(prefixMatches.length===1)match=prefixMatches[0];
   }
-  if(match&&match.email)emailInput.value=match.email;
+  if(match&&match.email){
+    emailInput.value=match.email;
+    _qtLastAutoFilledEmail=match.email;
+  }else{
+    emailInput.value='';
+    _qtLastAutoFilledEmail='';
+  }
 }
 
 function qtAddCompany(){
@@ -7095,6 +7111,7 @@ function qtAddCompany(){
   qtCompanies.push({id:'co_'+Date.now()+'_'+qtCompanies.length,name,email,color:QT_COLORS[qtCompanies.length%QT_COLORS.length]});
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
+  _qtLastAutoFilledEmail='';
   renderQtCompaniesBar();
   renderQtSplitTable();
 }
@@ -7164,7 +7181,7 @@ function renderQtSplitTable(){
 function qtSelectAll(coId){qtBOMLines.forEach((_,li)=>{const el=document.getElementById(`qtck_${li}_${coId}`);if(el)el.checked=true;});}
 function qtClearAll(coId){qtBOMLines.forEach((_,li)=>{const el=document.getElementById(`qtck_${li}_${coId}`);if(el)el.checked=false;});}
 
-async function saveQuotation(){
+async function saveQuotation(sendEmail){
   if(!qtCompanies.length){toast('Add at least one supplier','err');return;}
   if(!qtBOMLines.length){toast('Add at least one part first — load a BOM or search stock above','err');return;}
   const splitRef=document.getElementById('qt-split-ref').value.trim();
@@ -7200,8 +7217,16 @@ async function saveQuotation(){
   closeQtModal();
   const wasEditing=!!_editingQtId;
   _editingQtId=null;
-  toast(`Split "${splitRef}"${quoteNo?' ('+quoteNo+')':''} ${wasEditing?'updated':'saved'} — ${db.quotes[qtId].companies.length} supplier${db.quotes[qtId].companies.length!==1?'s':''}`);
+  const savedQt=db.quotes[qtId];
+  toast(`Split "${splitRef}"${quoteNo?' ('+quoteNo+')':''} ${wasEditing?'updated':'saved'} — ${savedQt.companies.length} supplier${savedQt.companies.length!==1?'s':''}`);
   go('quotations');
+  if(sendEmail&&savedQt.companies.length){
+    const target=savedQt.companies.find(c=>c.status==='draft')||savedQt.companies[0];
+    exportQuoteEmail(qtId,target.id);
+    if(savedQt.companies.length>1){
+      setTimeout(()=>toast(`Opened email for ${target.name} — use "✉ Email this supplier" on the others below too`,'info'),400);
+    }
+  }
 }
 
 function renderQuotations(){
