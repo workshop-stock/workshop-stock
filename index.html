@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev117</title>
+<title>Workshop Stock Control v2.1 Rev118</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -319,7 +319,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 117 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 118 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1064,18 +1064,20 @@ tr:hover td{background:#f9fafb}
       <div class="g3" style="margin-bottom:10px">
         <div><label>PO / order reference *</label><input id="npo-name" placeholder="e.g. PO — Bolts restock"></div>
         <div><label>PO number</label><input id="npo-po" placeholder="e.g. PO-2024-0142"></div>
-        <div><label>Supplier</label><input id="npo-sup" list="dl-suppliers" placeholder="e.g. RS Components"></div>
+        <div><label>Quotation number (optional)</label><input id="npo-quote" placeholder="e.g. Q-12345"></div>
       </div>
       <div class="g3" style="margin-bottom:16px">
+        <div><label>Supplier</label><input id="npo-sup" list="dl-suppliers" placeholder="e.g. RS Components"></div>
         <div><label>Assign to build / job (optional)</label><input id="npo-assign" placeholder="e.g. General stock"></div>
         <div><label>Expected delivery date</label><input type="date" id="npo-due"></div>
-        <div><label>Status</label>
-          <select id="npo-status">
-            <option value="pending">Awaiting order</option>
-            <option value="ordered" selected>Ordered</option>
-            <option value="in-transit">In transit</option>
-          </select>
-        </div>
+      </div>
+      <div style="margin-bottom:16px;max-width:260px">
+        <label>Status</label>
+        <select id="npo-status">
+          <option value="pending">Awaiting order</option>
+          <option value="ordered" selected>Ordered</option>
+          <option value="in-transit">In transit</option>
+        </select>
       </div>
 
       <div class="sec" style="margin-bottom:8px">Add items — search stock</div>
@@ -1142,18 +1144,20 @@ tr:hover td{background:#f9fafb}
       <div><label>PO number</label><input id="cpo-po" placeholder="e.g. PO-2024-0142"></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
+      <div><label>Quotation number (optional)</label><input id="cpo-quote" placeholder="e.g. Q-12345"></div>
       <div><label>Supplier</label><input id="cpo-sup" placeholder="e.g. RS Components"></div>
-      <div><label>Assign to build / job (optional)</label><input id="cpo-assign" placeholder="e.g. General stock, Panel Build — Line 3…"></div>
     </div>
-    <div class="g2" style="margin-bottom:14px">
+    <div class="g2" style="margin-bottom:10px">
+      <div><label>Assign to build / job (optional)</label><input id="cpo-assign" placeholder="e.g. General stock, Panel Build — Line 3…"></div>
       <div><label>Expected delivery date</label><input type="date" id="cpo-due"></div>
-      <div><label>Status</label>
+    </div>
+    <div style="margin-bottom:14px;max-width:260px">
+      <label>Status</label>
         <select id="cpo-status">
           <option value="pending">Awaiting order</option>
           <option value="ordered" selected>Ordered</option>
           <option value="in-transit">In transit</option>
         </select>
-      </div>
     </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px">
       <input type="checkbox" id="cpo-remove-from-list" checked style="width:16px;height:16px">
@@ -1176,7 +1180,7 @@ tr:hover td{background:#f9fafb}
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="qt-search" placeholder="Search by BOM name, split ref, supplier…" oninput="renderQuotations()" style="width:260px;font-size:13px">
-        <button onclick="openQuoteBuilder()" style="background:#6d28d9;color:#fff;border-color:#6d28d9">+ New split from BOM</button>
+        <button onclick="openQuoteBuilder()" style="background:#6d28d9;color:#fff;border-color:#6d28d9">+ New quotation request</button>
       </div>
     </div>
   </div>
@@ -1194,11 +1198,11 @@ tr:hover td{background:#f9fafb}
       <h2>Create quotation split</h2>
       <button onclick="closeQtModal()" style="font-size:18px;border:none;background:none;cursor:pointer;color:#6b7280;padding:0 4px">&times;</button>
     </div>
-    <p style="margin-bottom:12px">Assign BOM lines to one or more suppliers. You can create as many splits as you need — e.g. PLCs to one supplier, sensors to another. Each split is tracked separately.</p>
+    <p style="margin-bottom:12px">Load a saved BOM, search stock directly, or both — then assign lines to one or more suppliers. You can create as many splits as you need — e.g. PLCs to one supplier, sensors to another. Each split is tracked separately.</p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <div>
-        <label>BOM to split</label>
+        <label>Load a saved BOM (optional)</label>
         <select id="qt-bom-sel" onchange="loadQtBOM()" style="font-size:13px;width:100%">
           <option value="">Choose saved BOM…</option>
         </select>
@@ -1215,6 +1219,12 @@ tr:hover td{background:#f9fafb}
           <button class="btn-blue" onclick="qtAddCompany()" style="flex-shrink:0">Add</button>
         </div>
       </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label>Or search stock to add parts directly (no BOM needed)</label>
+      <input id="qt-search" placeholder="Search by name, part number, tag…" style="margin-top:4px" oninput="renderQtSearchResults()">
+      <div id="qt-search-results" style="max-height:220px;overflow-y:auto;margin-top:6px;border:1px solid #e5e7eb;border-radius:6px;display:none"></div>
     </div>
 
     <div id="qt-existing-splits" style="display:none;margin-bottom:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px">
@@ -4841,6 +4851,7 @@ function showDelivery(del){
   tags.innerHTML=[
     del.assignTo?`<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">&#128196; ${del.assignTo}</span>`:'',
     del.po?`<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">PO: ${del.po}</span>`:'',
+    del.quoteRef?`<span style="background:#f5f0ff;color:#6d28d9;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">Quote: ${del.quoteRef}</span>`:'',
     del.supplier?`<span style="background:#f0fdf4;color:#166534;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">${del.supplier}</span>`:'',
     !del.po?`<div style="display:flex;gap:6px;align-items:center">
       <input id="del-po-add" placeholder="Add PO number…" style="width:160px;font-size:12px;padding:4px 8px">
@@ -5473,6 +5484,7 @@ function renderDelHist(){
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
             ${d.po?`<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">PO: ${d.po}</span>`:'<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:8px;font-size:11px">No PO</span>'}
+            ${d.quoteRef?`<span style="background:#f5f0ff;color:#6d28d9;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">Quote: ${d.quoteRef}</span>`:''}
             ${d.supplier?`<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600">📦 ${d.supplier}</span>`:''}
             ${d.assignTo?`<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:8px;font-size:11px">For: ${d.assignTo}</span>`:''}
           </div>
@@ -5523,6 +5535,11 @@ function renderDelHist(){
             <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">PO number</label>
             <input value="${d.po||''}" placeholder="e.g. PO-2024-0142" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;width:100%"
               onchange="updateDelField('${d.id}','po',this.value)">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Quotation number</label>
+            <input value="${d.quoteRef||''}" placeholder="e.g. Q-12345" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;width:100%"
+              onchange="updateDelField('${d.id}','quoteRef',this.value)">
           </div>
           <div>
             <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Notes / update</label>
@@ -5599,7 +5616,7 @@ async function updateDelField(delId,field,value){
   await saveDB();
   renderDelHist();
   renderDash();
-  toast(`${field==='dueDate'?'Due date':field==='status'?'Status':field==='supplier'?'Supplier':field==='po'?'PO':field} updated`,'info');
+  toast(`${field==='dueDate'?'Due date':field==='status'?'Status':field==='supplier'?'Supplier':field==='po'?'PO':field==='quoteRef'?'Quotation number':field} updated`,'info');
 }
 
 function promptAddPO(delId){
@@ -6441,6 +6458,7 @@ async function createNewPO(){
   if(!name){toast('Enter a PO / order reference','err');return;}
   if(!npoItems.length){toast('Add at least one item first','err');return;}
   const po=(document.getElementById('npo-po').value||'').trim();
+  const quoteRef=(document.getElementById('npo-quote').value||'').trim();
   const sup=(document.getElementById('npo-sup').value||'').trim();
   const assign=(document.getElementById('npo-assign').value||'').trim();
   const due=document.getElementById('npo-due').value;
@@ -6450,7 +6468,7 @@ async function createNewPO(){
     id:'del_'+Date.now(),
     bomId:'',bomName:name,ref:'',
     status,created:nowD(),
-    dueDate:due,assignTo:assign,po,supplier:sup,
+    dueDate:due,assignTo:assign,po,quoteRef,supplier:sup,
     items:npoItems.map(it=>({
       code:it.code,name:it.name,
       expected:it.qty,alreadyReceived:0,receiving:it.qty,
@@ -6459,11 +6477,11 @@ async function createNewPO(){
   };
   pushUndo();
   db.deliveries.push(del);
-  addEventHist('PO_CREATE',`PO created: ${name}`,`PO: ${po||'none'} · Supplier: ${sup||'none'} · ${npoItems.length} lines`);
+  addEventHist('PO_CREATE',`PO created: ${name}`,`PO: ${po||'none'}${quoteRef?' · Quote: '+quoteRef:''} · Supplier: ${sup||'none'} · ${npoItems.length} lines`);
   await saveDB();
 
   npoItems=[];
-  ['npo-name','npo-po','npo-sup','npo-assign','npo-due'].forEach(id=>document.getElementById(id).value='');
+  ['npo-name','npo-po','npo-quote','npo-sup','npo-assign','npo-due'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('npo-status').value='ordered';
   document.getElementById('npo-search').value='';
   renderNpoItemsList();
@@ -6482,6 +6500,7 @@ function openCreatePOModal(groupId,sup,indices){
   document.getElementById('cpo-item-summary').textContent=`${items.length} line${items.length!==1?'s':''} · ${totalUnits} unit${totalUnits!==1?'s':''} total${sup?' · '+sup:''}`;
   document.getElementById('cpo-name').value=sup?`PO — ${sup}`:'Purchase order';
   document.getElementById('cpo-po').value='';
+  document.getElementById('cpo-quote').value='';
   document.getElementById('cpo-sup').value=sup||items.find(o=>o.sup)?.sup||'';
   document.getElementById('cpo-assign').value='';
   document.getElementById('cpo-due').value='';
@@ -6496,6 +6515,7 @@ async function confirmCreatePO(){
   const name=(document.getElementById('cpo-name').value||'').trim();
   if(!name){toast('Enter a PO / order reference','err');return;}
   const po=(document.getElementById('cpo-po').value||'').trim();
+  const quoteRef=(document.getElementById('cpo-quote').value||'').trim();
   const sup=(document.getElementById('cpo-sup').value||'').trim();
   const assign=(document.getElementById('cpo-assign').value||'').trim();
   const due=document.getElementById('cpo-due').value;
@@ -6509,7 +6529,7 @@ async function confirmCreatePO(){
     id:'del_'+Date.now(),
     bomId:'',bomName:name,ref:'',
     status,created:nowD(),
-    dueDate:due,assignTo:assign,po,supplier:sup,
+    dueDate:due,assignTo:assign,po,quoteRef,supplier:sup,
     items:items.map(o=>({
       code:o.code,name:o.name,
       expected:o.qty||1,
@@ -6523,7 +6543,7 @@ async function confirmCreatePO(){
   if(removeAfter){
     [..._cpoOrderIndices].sort((a,b)=>b-a).forEach(i=>db.order.splice(i,1));
   }
-  addEventHist('PO_CREATE',`PO created: ${name}`,`PO: ${po||'none'} · Supplier: ${sup||'none'} · ${items.length} lines`);
+  addEventHist('PO_CREATE',`PO created: ${name}`,`PO: ${po||'none'}${quoteRef?' · Quote: '+quoteRef:''} · Supplier: ${sup||'none'} · ${items.length} lines`);
   await saveDB();
   closeCreatePOModal();
   renderOrder();
@@ -6811,13 +6831,14 @@ let qtBOMLines=[];
 let qtCompanies=[];
 
 function openQuoteBuilder(preloadBomId){
-  if(!Object.keys(db.boms).length&&!curBOM.length){toast('Save a BOM first','err');return;}
   qtBOMLines=[];qtCompanies=[];
   const sel=document.getElementById('qt-bom-sel');
   sel.innerHTML='<option value="">Choose saved BOM…</option>'+Object.entries(db.boms).map(([id,b])=>`<option value="${id}">${b.name}${b.ref?' ('+b.ref+')':''}</option>`).join('');
   document.getElementById('qt-split-ref').value='';
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
+  document.getElementById('qt-search').value='';
+  document.getElementById('qt-search-results').style.display='none';
   document.getElementById('qt-existing-splits').style.display='none';
   const savedId=preloadBomId||Object.keys(db.boms).find(id=>db.boms[id].name===document.getElementById('bom-name').value)||'';
   if(savedId){sel.value=savedId;loadQtBOM();}
@@ -6826,6 +6847,36 @@ function openQuoteBuilder(preloadBomId){
   document.getElementById('qt-overlay').classList.add('open');
 }
 function closeQtModal(){document.getElementById('qt-overlay').classList.remove('open');}
+
+// Lets a quotation split be built by searching stock directly, without ever loading a BOM
+function renderQtSearchResults(){
+  const q=(document.getElementById('qt-search').value||'').trim();
+  const el=document.getElementById('qt-search-results');
+  if(!q){el.style.display='none';el.innerHTML='';return;}
+  const res=Object.values(db.parts).filter(p=>partFilter(p,q,'','','')).slice(0,15);
+  el.style.display='block';
+  if(!res.length){el.innerHTML='<div style="padding:8px;color:#9ca3af;font-size:12px">No matches</div>';return;}
+  el.innerHTML=res.map(p=>{
+    const already=qtBOMLines.find(l=>l.code===p.code);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #f3f4f6">
+      ${partImgHtml(p,28)}
+      <div style="flex:1"><div style="font-weight:600;font-size:12px">${p.name}${already?` <span style="font-size:10px;color:#1e40af">(added ×${already.qty})</span>`:''}</div><div style="font-size:11px;color:#9ca3af">${p.code}</div></div>
+      <input type="number" id="qt-add-qty-${p.code}" value="1" min="1" style="width:50px;font-size:12px">
+      <button onclick="qtAddSearchedPart('${p.code}')" class="btn-green" style="font-size:11px;padding:3px 8px">+ Add</button>
+    </div>`;
+  }).join('');
+}
+function qtAddSearchedPart(code){
+  const p=db.parts[code];if(!p)return;
+  const qtyInput=document.getElementById('qt-add-qty-'+code);
+  const qty=Math.max(1,parseInt(qtyInput?qtyInput.value:1)||1);
+  const existing=qtBOMLines.find(l=>l.code===code);
+  if(existing){existing.qty+=qty;}
+  else{qtBOMLines.push({code:p.code,name:p.name,qty,cat:p.cat,inStock:p.qty});}
+  renderQtSplitTable();
+  renderQtSearchResults();
+  toast(`${qty}× ${p.name} added to this split`);
+}
 
 function loadQtBOM(){
   const id=document.getElementById('qt-bom-sel').value;
@@ -6914,11 +6965,11 @@ function qtClearAll(coId){qtBOMLines.forEach((_,li)=>{const el=document.getEleme
 
 async function saveQuotation(){
   if(!qtCompanies.length){toast('Add at least one supplier','err');return;}
-  if(!qtBOMLines.length){toast('Select a BOM first','err');return;}
+  if(!qtBOMLines.length){toast('Add at least one part first — load a BOM or search stock above','err');return;}
   const splitRef=document.getElementById('qt-split-ref').value.trim();
   if(!splitRef){toast('Enter a split reference — e.g. "PLCs & HMI", "Sensors", "Drives"','err');return;}
   const bomId=document.getElementById('qt-bom-sel').value;
-  const bomName=bomId?(db.boms[bomId]?.name||'BOM'):(document.getElementById('bom-name').value||'Current BOM');
+  const bomName=bomId?(db.boms[bomId]?.name||'BOM'):splitRef;
   const qtId='qt_'+Date.now();
   if(!db.quotes)db.quotes={};
   db.quotes[qtId]={
@@ -6943,7 +6994,7 @@ function renderQuotations(){
   const el=document.getElementById('qt-companies');
   const q=((document.getElementById('qt-search')||{value:''}).value||'').toLowerCase().trim();
   if(!db.quotes||!Object.keys(db.quotes).length){
-    el.innerHTML='<div class="card" style="color:#9ca3af;font-size:13px">No quotation splits yet. Go to BOM Builder → Order full BOM → Split to suppliers, or click "+ New split from BOM" above.</div>';
+    el.innerHTML='<div class="card" style="color:#9ca3af;font-size:13px">No quotation requests yet. Click "+ New quotation request" above — search stock directly or load a saved BOM.</div>';
     document.getElementById('qt-comparison').innerHTML='<div style="color:#9ca3af;font-size:13px">No accepted prices yet.</div>';
     return;
   }
