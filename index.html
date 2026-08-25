@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev126</title>
+<title>Workshop Stock Control v2.1 Rev127</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 126 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 127 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1393,7 +1393,7 @@ tr:hover td{background:#f9fafb}
       </div>
       <div class="card" style="border:2px solid #f59e0b">
         <div class="sec">🧹 Clean up duplicate supplier names</div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">If typing suppliers on parts created slightly different spellings of the same company (e.g. "Adopt Automation" / "Adopt Automation Ltd" / "AdoptAuto"), tick the duplicates below and merge them into one correct name — every part using any of the ticked names gets updated, and the merged names are kept as linked aliases so nothing that already relies on them breaks.</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">If typing suppliers on parts created slightly different spellings of the same company (e.g. "Adopt Automation" / "Adopt Automation Ltd" / "AdoptAuto"), tick the duplicates below and merge them into one correct name — every part using any of the ticked names gets updated. Already-merged names stay in the list below, greyed out with a strikethrough, so you can see what's already been cleaned up.</div>
         <div id="sup-cleanup-list" style="max-height:260px;overflow-y:auto;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
           <div style="flex:1;min-width:200px">
@@ -7997,14 +7997,32 @@ function getAllSupplierNamesWithCounts(){
 function renderSupplierCleanup(){
   const el=document.getElementById('sup-cleanup-list');
   if(!el)return;
-  const list=getAllSupplierNamesWithCounts();
-  if(!list.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:6px">No supplier names in use on parts yet</div>';return;}
-  el.innerHTML=list.map(({name,count})=>`
-    <label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:13px">
-      <input type="checkbox" class="sup-cleanup-chk" value="${name.replace(/"/g,'&quot;')}" style="width:15px;height:15px">
-      <span style="flex:1">${name}</span>
-      <span style="font-size:11px;color:#9ca3af">${count} part${count!==1?'s':''}</span>
-    </label>`).join('');
+  const activeList=getAllSupplierNamesWithCounts();
+  const mergedList=[];
+  (db.suppliers||[]).forEach(s=>{
+    (s.aliases||[]).forEach(a=>mergedList.push({name:a,target:s.name}));
+  });
+  if(!activeList.length&&!mergedList.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:6px">No supplier names in use on parts yet</div>';return;}
+
+  const combined=[
+    ...activeList.map(x=>({...x,merged:false})),
+    ...mergedList.map(x=>({...x,merged:true}))
+  ].sort((a,b)=>a.name.localeCompare(b.name));
+
+  el.innerHTML=combined.map(row=>{
+    if(row.merged){
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid #f3f4f6;font-size:13px;opacity:.5;background:#f9fafb">
+        <span style="width:15px;text-align:center;flex-shrink:0">✓</span>
+        <span style="flex:1;text-decoration:line-through;color:#6b7280">${row.name}</span>
+        <span style="font-size:11px;color:#166534;font-weight:600;white-space:nowrap">merged → ${row.target}</span>
+      </div>`;
+    }
+    return`<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:13px">
+      <input type="checkbox" class="sup-cleanup-chk" value="${row.name.replace(/"/g,'&quot;')}" style="width:15px;height:15px">
+      <span style="flex:1">${row.name}</span>
+      <span style="font-size:11px;color:#9ca3af">${row.count} part${row.count!==1?'s':''}</span>
+    </label>`;
+  }).join('');
 }
 async function mergeSupplierNames(){
   const checked=[...document.querySelectorAll('.sup-cleanup-chk:checked')].map(cb=>cb.value);
