@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev127</title>
+<title>Workshop Stock Control v2.1 Rev128</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 127 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 128 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1394,6 +1394,10 @@ tr:hover td{background:#f9fafb}
       <div class="card" style="border:2px solid #f59e0b">
         <div class="sec">🧹 Clean up duplicate supplier names</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">If typing suppliers on parts created slightly different spellings of the same company (e.g. "Adopt Automation" / "Adopt Automation Ltd" / "AdoptAuto"), tick the duplicates below and merge them into one correct name — every part using any of the ticked names gets updated. Already-merged names stay in the list below, greyed out with a strikethrough, so you can see what's already been cleaned up.</div>
+        <div id="sup-case-dupe-banner" style="display:none;margin-bottom:10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="font-size:12px;color:#92400e"><strong id="sup-case-dupe-count"></strong> — same name, just different capitalisation. Safe to merge automatically.</div>
+          <button onclick="autoMergeCaseOnlyDuplicates()" style="font-size:12px;background:#92400e;color:#fff;border-color:#92400e;font-weight:700">🪄 Auto-fix these now</button>
+        </div>
         <div id="sup-cleanup-list" style="max-height:260px;overflow-y:auto;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
           <div style="flex:1;min-width:200px">
@@ -7994,6 +7998,69 @@ function getAllSupplierNamesWithCounts(){
   });
   return Object.entries(counts).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
 }
+
+// Groups active supplier names that differ ONLY by capitalisation (e.g. "festo"/"Festo"/"FESTO")
+// — unambiguous, so these can be merged automatically without a manual tick-and-confirm.
+function findCaseOnlyDuplicateGroups(){
+  const list=getAllSupplierNamesWithCounts();
+  const byLower={};
+  list.forEach(({name,count})=>{
+    const key=name.toLowerCase();
+    if(!byLower[key])byLower[key]=[];
+    byLower[key].push({name,count});
+  });
+  return Object.values(byLower).filter(group=>group.length>1);
+}
+
+async function autoMergeCaseOnlyDuplicates(){
+  const groups=findCaseOnlyDuplicateGroups();
+  if(!groups.length){toast('No case-only duplicates found','info');return;}
+  const summary=groups.map(g=>{
+    const target=[...g].sort((a,b)=>b.count-a.count)[0];
+    return `${g.map(x=>x.name).join(' / ')} → "${target.name}"`;
+  }).join('\n');
+  if(!confirm(`Auto-merge ${groups.length} case-only duplicate group${groups.length!==1?'s':''}?\n\n${summary}\n\nEach group merges into whichever capitalisation is used on the most parts. Reversible with the main Undo button.`))return;
+
+  pushUndo();
+  let partsUpdated=0;
+  if(!db.suppliers)db.suppliers=[];
+  groups.forEach(g=>{
+    const sorted=[...g].sort((a,b)=>b.count-a.count);
+    const target=sorted[0].name;
+    const namesToMergeLower=sorted.map(x=>x.name.toLowerCase());
+
+    Object.values(db.parts).forEach(p=>{
+      if(p.sup&&namesToMergeLower.includes(p.sup.trim().toLowerCase())&&p.sup.trim()!==target){
+        p.sup=target;
+        partsUpdated++;
+      }
+    });
+
+    let targetEntry=findSupplierByName(target);
+    if(!targetEntry){
+      targetEntry={name:target,email:'',phone:'',aliases:[]};
+      db.suppliers.push(targetEntry);
+    }
+    if(!targetEntry.aliases)targetEntry.aliases=[];
+    sorted.forEach(({name})=>{
+      if(name.toLowerCase()!==target.toLowerCase()&&!targetEntry.aliases.some(a=>a.toLowerCase()===name.toLowerCase())){
+        targetEntry.aliases.push(name);
+      }
+    });
+    db.suppliers=db.suppliers.filter(s=>{
+      if(s===targetEntry)return true;
+      if(!namesToMergeLower.includes(s.name.toLowerCase()))return true;
+      if(!targetEntry.email&&s.email)targetEntry.email=s.email;
+      if(!targetEntry.phone&&s.phone)targetEntry.phone=s.phone;
+      return false;
+    });
+  });
+
+  await saveDB();
+  renderSettings();
+  populateBrandDropdowns();
+  toast(`✓ Auto-merged ${groups.length} case-duplicate group${groups.length!==1?'s':''} — ${partsUpdated} part${partsUpdated!==1?'s':''} updated`);
+}
 function renderSupplierCleanup(){
   const el=document.getElementById('sup-cleanup-list');
   if(!el)return;
@@ -8002,6 +8069,19 @@ function renderSupplierCleanup(){
   (db.suppliers||[]).forEach(s=>{
     (s.aliases||[]).forEach(a=>mergedList.push({name:a,target:s.name}));
   });
+
+  const caseGroups=findCaseOnlyDuplicateGroups();
+  const banner=document.getElementById('sup-case-dupe-banner');
+  if(banner){
+    if(caseGroups.length){
+      banner.style.display='flex';
+      const dupeCount=caseGroups.reduce((s,g)=>s+g.length,0);
+      document.getElementById('sup-case-dupe-count').textContent=`${dupeCount} names across ${caseGroups.length} group${caseGroups.length!==1?'s':''} look like case-only duplicates`;
+    }else{
+      banner.style.display='none';
+    }
+  }
+
   if(!activeList.length&&!mergedList.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:6px">No supplier names in use on parts yet</div>';return;}
 
   const combined=[
