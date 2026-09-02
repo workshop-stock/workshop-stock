@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev129</title>
+<title>Workshop Stock Control v2.1 Rev130</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -291,7 +291,7 @@ tr:hover td{background:#f9fafb}
   <div class="tab" onclick="go('addpart')">Add Part</div>
   <div class="tab" onclick="go('bom')">BOM Builder</div>
   <div class="tab" onclick="go('delivery')">BOM Delivery</div>
-  <div class="tab" onclick="go('quotations')">Quotations</div>
+  <div class="tab" onclick="go('quotations')">Quotation Requests</div>
   <div class="tab" onclick="go('orders')">Order List</div>
   <div class="tab" onclick="go('allocations')">▣ Allocations</div>
   <div class="tab" onclick="go('history')">History</div>
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 129 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 130 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1073,7 +1073,7 @@ tr:hover td{background:#f9fafb}
       <div class="g3" style="margin-bottom:10px">
         <div><label>PO / order reference *</label><input id="npo-name" placeholder="e.g. PO — Bolts restock"></div>
         <div><label>PO number</label><input id="npo-po" placeholder="e.g. PO-2024-0142"></div>
-        <div><label>Quotation number (optional)</label><input id="npo-quote" placeholder="e.g. Q-12345"></div>
+        <div><label>Quotation number (optional)</label><input id="npo-quote" placeholder="e.g. TE-12345"></div>
       </div>
       <div class="g3" style="margin-bottom:16px">
         <div><label>Supplier</label><input id="npo-sup" list="dl-suppliers" placeholder="e.g. RS Components"></div>
@@ -1153,7 +1153,7 @@ tr:hover td{background:#f9fafb}
       <div><label>PO number</label><input id="cpo-po" placeholder="e.g. PO-2024-0142"></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
-      <div><label>Quotation number (optional)</label><input id="cpo-quote" placeholder="e.g. Q-12345"></div>
+      <div><label>Quotation number (optional)</label><input id="cpo-quote" placeholder="e.g. TE-12345"></div>
       <div><label>Supplier</label><input id="cpo-sup" placeholder="e.g. RS Components"></div>
     </div>
     <div class="g2" style="margin-bottom:10px">
@@ -1184,7 +1184,7 @@ tr:hover td{background:#f9fafb}
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
-        <div class="sec" style="margin:0">Quotation splits</div>
+        <div class="sec" style="margin:0">Quotation Requests</div>
         <div style="font-size:12px;color:#6b7280;margin-top:2px">Each BOM can have multiple splits — one per supplier group. Track responses and compare prices.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1204,7 +1204,7 @@ tr:hover td{background:#f9fafb}
 <div class="imp-overlay" id="qt-overlay">
   <div class="imp-box" style="max-width:860px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h2>Create quotation split</h2>
+      <h2>Create quotation request</h2>
       <button onclick="closeQtModal()" style="font-size:18px;border:none;background:none;cursor:pointer;color:#6b7280;padding:0 4px">&times;</button>
     </div>
     <p style="margin-bottom:12px">Load a saved BOM, search stock directly, or both — then assign lines to one or more suppliers. You can create as many splits as you need — e.g. PLCs to one supplier, sensors to another. Each split is tracked separately.</p>
@@ -1221,7 +1221,7 @@ tr:hover td{background:#f9fafb}
         <input id="qt-split-ref" placeholder="e.g. PLCs &amp; HMI, Sensors, Drives…" style="font-size:13px">
       </div>
       <div>
-        <label>Our quote / split number</label>
+        <label>TE Ref / Request Number</label>
         <input id="qt-quote-no" placeholder="auto-generated" style="font-size:13px">
       </div>
     </div>
@@ -4820,7 +4820,7 @@ function renderDelQuickSearch(){
           <div style="font-weight:600;font-size:13px">📋 ${qt.splitRef||'Unnamed split'}${qt.quoteNo?' — '+qt.quoteNo:''} <span style="font-size:10px;color:#9ca3af;font-weight:400">— quotation</span></div>
           <div style="font-size:11px;color:#6b7280">${qt.bomName} · ${qt.companies.length} supplier${qt.companies.length!==1?'s':''}${acceptedCount?' · '+acceptedCount+' accepted':''}</div>
         </div>
-        <button onclick="delQuickOpenQuote()" class="btn-blue" style="font-size:12px">View in Quotations</button>
+        <button onclick="delQuickOpenQuote()" class="btn-blue" style="font-size:12px">View in Quotation Requests</button>
       </div>`;
     }).join('');
   }
@@ -5604,7 +5604,7 @@ function renderDelHist(){
           </div>
           <div>
             <label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Quotation number</label>
-            <input value="${d.quoteRef||''}" placeholder="e.g. Q-12345" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;width:100%"
+            <input value="${d.quoteRef||''}" placeholder="e.g. TE-12345" style="font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;width:100%"
               onchange="updateDelField('${d.id}','quoteRef',this.value)">
           </div>
           <div>
@@ -6935,7 +6935,7 @@ function openQuoteBuilder(preloadBomId){
   const sel=document.getElementById('qt-bom-sel');
   sel.innerHTML='<option value="">Choose saved BOM…</option>'+Object.entries(db.boms).map(([id,b])=>`<option value="${id}">${b.name}${b.ref?' ('+b.ref+')':''}</option>`).join('');
   document.getElementById('qt-split-ref').value='';
-  document.getElementById('qt-quote-no').value='QT-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
+  document.getElementById('qt-quote-no').value='TE-'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
   document.getElementById('qt-new-co').value='';
   document.getElementById('qt-new-email').value='';
   _qtLastAutoFilledEmail='';
