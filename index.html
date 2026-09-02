@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev130</title>
+<title>Workshop Stock Control v2.1 Rev131</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 130 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 131 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -5776,7 +5776,12 @@ function renderAllocations(){
             <th style="padding:7px 10px;text-align:right;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Action</th>
           </tr></thead>
           <tbody>${items.map((a,ai)=>{
-            const p=db.parts[a.code];
+            const p=db.parts[a.code]||Object.values(db.parts).find(pt=>
+              normalise(pt.code)===normalise(a.code)||
+              normalise(pt.mfrno||'')===normalise(a.code)||
+              normalise(stripVendorPrefix(pt.code))===normalise(a.code)||
+              (pt.aliases||[]).some(al=>normalise(al)===normalise(a.code))
+            );
             const globalIdx=db.allocations.indexOf(a);
             const isReleased=a.status==='released';
             const stockLoc=p?formatLoc(p)||p.loc||'':'';
@@ -5887,14 +5892,23 @@ async function clearReleasedAllocs(){
 async function releaseSingleAlloc(idx){
   const a=db.allocations[idx];
   if(!a)return;
-  const p=db.parts[a.code];
-  const stockLoc=p?formatLoc(p)||p.loc||'':'';
+  const catPart=db.parts[a.code]||Object.values(db.parts).find(p=>
+    normalise(p.code)===normalise(a.code)||
+    normalise(p.mfrno||'')===normalise(a.code)||
+    normalise(stripVendorPrefix(p.code))===normalise(a.code)||
+    (p.aliases||[]).some(al=>normalise(al)===normalise(a.code))
+  );
+  const stockLoc=catPart?formatLoc(catPart)||catPart.loc||'':'';
   const locMsg=stockLoc?`\n\n📦 PUT BACK AT: ${stockLoc}`:'';
   if(!confirm(`Release ${a.qty}× ${a.name} from project "${a.build}" to general stock?${locMsg}`))return;
-  if(p)p.qty+=a.qty;
+  if(!catPart){
+    toast(`⚠ "${a.name}" has no matching stock part — link it first (Edit Part → 🔗 Also known as), then release it`,'err');
+    return;
+  }
+  catPart.qty+=a.qty;
   a.status='released';
   a.releaseDate=nowD();
-  addHist('IN',a.name,a.code,a.qty,`Released from project: ${a.build}${stockLoc?' → back to '+stockLoc:''}`);
+  addHist('IN',a.name,catPart.code,a.qty,`Released from project: ${a.build}${stockLoc?' → back to '+stockLoc:''}`);
   await saveDB();
   renderAllocations();
   renderDash();
@@ -5904,16 +5918,24 @@ async function releaseSingleAlloc(idx){
 async function releaseAllProject(project,keepInStock){
   if(!confirm(`Release ALL parts for "${project}" back to general stock?`))return;
   const toRelease=(db.allocations||[]).filter(a=>a.build===project&&a.status!=='released');
+  let skipped=0;
   for(const a of toRelease){
-    if(db.parts[a.code])db.parts[a.code].qty+=a.qty;
+    const catPart=db.parts[a.code]||Object.values(db.parts).find(p=>
+      normalise(p.code)===normalise(a.code)||
+      normalise(p.mfrno||'')===normalise(a.code)||
+      normalise(stripVendorPrefix(p.code))===normalise(a.code)||
+      (p.aliases||[]).some(al=>normalise(al)===normalise(a.code))
+    );
+    if(!catPart){skipped++;continue;}
+    catPart.qty+=a.qty;
     a.status='released';
     a.releaseDate=nowD();
-    addHist('IN',a.name,a.code,a.qty,`Released from project: ${project}`);
+    addHist('IN',a.name,catPart.code,a.qty,`Released from project: ${project}`);
   }
   await saveDB();
   renderAllocations();
   renderDash();
-  toast(`All parts from "${project}" released to stock`);
+  toast(skipped?`Released — but ${skipped} item(s) had no matching stock part and were skipped, link them first`:`All parts from "${project}" released to stock`,skipped?'err':'ok');
 }
 
 function showManualAllocModal(){
