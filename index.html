@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev131</title>
+<title>Workshop Stock Control v2.1 Rev132</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 131 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 132 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -5938,100 +5938,154 @@ async function releaseAllProject(project,keepInStock){
   toast(skipped?`Released — but ${skipped} item(s) had no matching stock part and were skipped, link them first`:`All parts from "${project}" released to stock`,skipped?'err':'ok');
 }
 
+let amBatchItems=[]; // {code,name,qty,avail}
+
 function showManualAllocModal(){
   const existing=document.getElementById('alloc-modal');
   if(existing)existing.remove();
+  amBatchItems=[];
   const div=document.createElement('div');
   div.id='alloc-modal';
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:24px;max-width:680px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <h2 style="font-size:16px;font-weight:700;margin:0">▣ Allocate parts to project</h2>
       <button onclick="document.getElementById('alloc-modal').remove()" style="font-size:20px;border:none;background:none;cursor:pointer;color:#6b7280">×</button>
     </div>
-    <div style="margin-bottom:10px">
-      <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Part (search by name or code)</label>
-      <input id="am-part" placeholder="Type part name or code…" list="dl-parts-alloc" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px" oninput="amPartSearch(this.value)">
-      <datalist id="dl-parts-alloc">${Object.values(db.parts).map(p=>`<option value="${p.code}">${p.name}</option>`).join('')}</datalist>
-      <div id="am-part-info" style="font-size:12px;color:#6b7280;margin-top:4px;padding:6px 10px;background:#f9fafb;border-radius:6px;display:none"></div>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">Search and add as many parts as you need, then allocate them all to the same project in one go.</p>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Project / build name *</label><input id="am-project" placeholder="e.g. Splines Machine 4"></div>
+      <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">PO number (optional)</label><input id="am-po" placeholder="e.g. PO-2024-001"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Qty to allocate</label>
-        <input type="number" id="am-qty" value="1" min="1" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
-      </div>
-      <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Project / build name *</label>
-        <input id="am-project" placeholder="e.g. Splines Machine 4" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
-      </div>
+    <div style="margin-bottom:16px"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Notes (optional)</label><input id="am-notes" placeholder="Any notes…"></div>
+
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Add items — search stock</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="am-search" placeholder="Search by name, part number, tag…" style="flex:2;min-width:180px" oninput="renderAmSearchResults()">
+      <select id="am-filter-cat" onchange="renderAmSearchResults()" style="flex:1;min-width:130px"><option value="">All categories</option></select>
+      <select id="am-filter-brand" onchange="renderAmSearchResults()" style="flex:1;min-width:130px"><option value="">All brands</option></select>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">PO number (optional)</label>
-        <input id="am-po" placeholder="e.g. PO-2024-001" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
-      </div>
-      <div>
-        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Notes (optional)</label>
-        <input id="am-notes" placeholder="Any notes…" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px">
-      </div>
-    </div>
+    <div id="am-search-results" style="max-height:260px;overflow-y:auto;margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
+
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Items to allocate (<span id="am-batch-count">0</span>)</div>
+    <div id="am-batch-list" style="margin-bottom:14px"></div>
+
     <div id="am-err" style="display:none;margin-bottom:10px;padding:8px 12px;background:#fee2e2;border-radius:6px;font-size:12px;color:#991b1b"></div>
     <div style="display:flex;gap:8px">
-      <button onclick="doManualAlloc()" class="btn-blue" style="flex:1">Allocate to project</button>
+      <button onclick="doManualAllocBatch()" class="btn-green" style="flex:1;font-weight:700">Allocate all to project</button>
       <button onclick="document.getElementById('alloc-modal').remove()">Cancel</button>
     </div>
   </div>`;
   document.body.appendChild(div);
+  document.getElementById('am-filter-cat').innerHTML=catFilterOpts();
+  const amBrands=dedupeCaseInsensitive(Object.values(db.parts).map(p=>p.mfr||'').filter(Boolean)).sort((a,b)=>a.localeCompare(b));
+  document.getElementById('am-filter-brand').innerHTML='<option value="">All brands</option>'+amBrands.map(b=>`<option>${b}</option>`).join('');
+  renderAmSearchResults();
+  renderAmBatchList();
 }
 
-function amPartSearch(val){
-  const infoEl=document.getElementById('am-part-info');
-  if(!infoEl)return;
-  const p=db.parts[val]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(val)||normalise(pt.name)===normalise(val));
-  if(p){
+function renderAmSearchResults(){
+  const q=(document.getElementById('am-search').value||'').trim();
+  const cat=document.getElementById('am-filter-cat').value;
+  const brand=document.getElementById('am-filter-brand').value;
+  const el=document.getElementById('am-search-results');
+  if(!q&&!cat&&!brand){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:14px;text-align:center">Type to search, or use the category/brand filters</div>';
+    return;
+  }
+  const list=Object.values(db.parts).filter(p=>partFilter(p,q,cat,brand,'')).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,30);
+  if(!list.length){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:14px;text-align:center">No parts match</div>';return;}
+  el.innerHTML=list.map(p=>{
     const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
     const avail=Math.max(0,p.qty-allocQty);
-    infoEl.style.display='block';
-    infoEl.innerHTML=`<strong>${p.name}</strong> · In stock: <strong style="color:#166534">${p.qty}</strong> · Allocated: <strong style="color:#6d28d9">${allocQty}</strong> · Available: <strong style="color:${avail>0?'#166534':'#991b1b'}">${avail}</strong>`;
-    document.getElementById('am-qty').max=avail;
-  }else{
-    infoEl.style.display='none';
-  }
+    const already=amBatchItems.find(i=>i.code===p.code);
+    return`<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid #f3f4f6">
+      ${partImgHtml(p,32)}
+      <div style="flex:1;min-width:120px">
+        <div style="font-weight:600;font-size:13px">${p.name}${already?` <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px;font-weight:700">added ×${already.qty}</span>`:''}</div>
+        <div style="font-size:11px;color:#9ca3af">${p.code} · Available: <strong style="color:${avail>0?'#166534':'#991b1b'}">${avail}</strong></div>
+      </div>
+      <input type="number" id="am-add-qty-${p.code}" value="1" min="1" max="${avail}" style="width:60px;font-size:13px">
+      <button onclick="amAddBatchItem('${p.code}')" class="btn-green" style="font-size:12px;padding:5px 12px" ${avail<=0?'disabled title="None available"':''}>+ Add</button>
+    </div>`;
+  }).join('');
 }
 
-async function doManualAlloc(){
-  const partVal=(document.getElementById('am-part').value||'').trim();
-  const qty=parseInt(document.getElementById('am-qty').value)||0;
+function amAddBatchItem(code){
+  const p=db.parts[code];if(!p)return;
+  const qtyInput=document.getElementById('am-add-qty-'+code);
+  const qty=Math.max(1,parseInt(qtyInput?qtyInput.value:1)||1);
+  const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
+  const avail=Math.max(0,p.qty-allocQty);
+  const existing=amBatchItems.find(i=>i.code===code);
+  const currentBatchQty=existing?existing.qty:0;
+  if(currentBatchQty+qty>avail){toast(`Only ${avail} available for ${p.name}`,'err');return;}
+  if(existing){existing.qty+=qty;}
+  else{amBatchItems.push({code:p.code,name:p.name,qty,avail});}
+  renderAmBatchList();
+  renderAmSearchResults();
+  toast(`${qty}× ${p.name} added`);
+}
+function amUpdateBatchQty(i,val){
+  if(!amBatchItems[i])return;
+  const qty=Math.max(1,parseInt(val)||1);
+  amBatchItems[i].qty=Math.min(qty,amBatchItems[i].avail);
+  renderAmBatchList();
+}
+function amRemoveBatchItem(i){
+  amBatchItems.splice(i,1);
+  renderAmBatchList();
+  renderAmSearchResults();
+}
+function renderAmBatchList(){
+  const el=document.getElementById('am-batch-list');
+  const countEl=document.getElementById('am-batch-count');
+  if(countEl)countEl.textContent=amBatchItems.length;
+  if(!el)return;
+  if(!amBatchItems.length){
+    el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:10px 0">Nothing added yet — search above.</div>';
+    return;
+  }
+  el.innerHTML=amBatchItems.map((it,i)=>{
+    const p=db.parts[it.code];
+    return`<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border:1px solid #e5e7eb;border-radius:7px;margin-bottom:5px">
+      ${p?partImgHtml(p,32):''}
+      <div style="flex:1;min-width:100px"><div style="font-weight:600;font-size:13px">${it.name}</div><div style="font-size:11px;color:#9ca3af">${it.code} · max ${it.avail}</div></div>
+      <input type="number" value="${it.qty}" min="1" max="${it.avail}" style="width:60px;font-size:13px" onchange="amUpdateBatchQty(${i},this.value)">
+      <button onclick="amRemoveBatchItem(${i})" style="font-size:12px;padding:4px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function doManualAllocBatch(){
   const project=(document.getElementById('am-project').value||'').trim();
   const po=(document.getElementById('am-po').value||'').trim();
   const notes=(document.getElementById('am-notes').value||'').trim();
   const errEl=document.getElementById('am-err');
   errEl.style.display='none';
 
-  const p=db.parts[partVal]||Object.values(db.parts).find(pt=>normalise(pt.code)===normalise(partVal)||normalise(pt.name)===normalise(partVal));
-  if(!p){errEl.style.display='block';errEl.textContent='Part not found — type the exact code or name';return;}
   if(!project){errEl.style.display='block';errEl.textContent='Enter a project name';return;}
-  if(qty<1){errEl.style.display='block';errEl.textContent='Quantity must be at least 1';return;}
-
-  const allocQty=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released').reduce((s,a)=>s+a.qty,0);
-  const avail=Math.max(0,p.qty-allocQty);
-  if(qty>avail){errEl.style.display='block';errEl.textContent=`Only ${avail} available (${p.qty} in stock, ${allocQty} already allocated)`;return;}
+  if(!amBatchItems.length){errEl.style.display='block';errEl.textContent='Add at least one part first';return;}
 
   if(!db.allocations)db.allocations=[];
-  db.allocations.push({
-    code:p.code,name:p.name,qty,
-    build:project,po,notes,
-    date:nowD(),
-    deliveryId:'manual',
-    allocatedBy:currentUser?currentUser.name:'Unknown',
-    status:'allocated'
-  });
-  addEventHist('ALLOC',`${qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
+  pushUndo();
+  for(const it of amBatchItems){
+    const p=db.parts[it.code];if(!p)continue;
+    db.allocations.push({
+      code:p.code,name:p.name,qty:it.qty,
+      build:project,po,notes,
+      date:nowD(),
+      deliveryId:'manual',
+      allocatedBy:currentUser?currentUser.name:'Unknown',
+      status:'allocated'
+    });
+    addEventHist('ALLOC',`${it.qty}× ${p.name} allocated to ${project}`,`By: ${currentUser?currentUser.name:'?'}${po?' · PO: '+po:''}`);
+  }
   await saveDB();
   document.getElementById('alloc-modal').remove();
   renderAllocations();
   renderDash();
-  toast(`${qty}× ${p.name} allocated to "${project}"`);
+  toast(`${amBatchItems.length} part${amBatchItems.length!==1?'s':''} allocated to "${project}"`);
 }
 function getPartUsage(code){
   const hist=[...(db.hist||[])].filter(h=>h.code===code);
