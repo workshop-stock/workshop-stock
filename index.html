@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev132</title>
+<title>Workshop Stock Control v2.1 Rev133</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 132 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 133 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1281,13 +1281,14 @@ tr:hover td{background:#f9fafb}
         <div style="font-size:12px;color:#6b7280;margin-top:2px">Parts held for specific projects — these are reserved and not counted as general stock.</div>
       </div>
       <button onclick="showManualAllocModal()" class="btn-blue">+ Allocate parts to project</button>
-      <button onclick="clearReleasedAllocs()" class="admin-only" style="display:none;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px">🗑 Clear released history</button>
+      <button onclick="clearReleasedAllocs()" class="admin-only" style="display:none;background:#f3f4f6;color:#6b7280;border-color:#d1d5db;font-size:12px">🗑 Clear released/used history</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <input id="alloc-search" placeholder="Search by part, project, PO…" oninput="renderAllocations()" style="flex:1;min-width:160px">
       <select id="alloc-filter" onchange="renderAllocations()" style="width:160px">
         <option value="">All statuses</option>
         <option value="allocated">Held for project</option>
+        <option value="used">Used on job</option>
         <option value="released">Released to stock</option>
       </select>
     </div>
@@ -5726,7 +5727,7 @@ function renderAllocations(){
   if(q)allocs=allocs.filter(a=>(a.build+a.code+a.name+(a.po||'')).toLowerCase().includes(q));
   if(filterStatus)allocs=allocs.filter(a=>(a.status||'allocated')===filterStatus);
 
-  const active=db.allocations.filter(a=>a.status!=='released');
+  const active=db.allocations.filter(a=>a.status!=='released'&&a.status!=='used');
   const projects=[...new Set(active.map(a=>a.build))];
   const totalParts=active.reduce((s,a)=>s+a.qty,0);
   if(sumEl){
@@ -5749,8 +5750,8 @@ function renderAllocations(){
   });
 
   el.innerHTML=Object.entries(byProject).map(([project,items])=>{
-    const active=items.filter(i=>i.status!=='released');
-    const released=items.filter(i=>i.status==='released');
+    const active=items.filter(i=>i.status!=='released'&&i.status!=='used');
+    const finished=items.filter(i=>i.status==='released'||i.status==='used');
     return`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
       <div style="padding:12px 14px;background:#f5f0ff;border-bottom:1px solid #e9d5ff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
@@ -5784,10 +5785,12 @@ function renderAllocations(){
             );
             const globalIdx=db.allocations.indexOf(a);
             const isReleased=a.status==='released';
+            const isUsed=a.status==='used';
+            const isFinished=isReleased||isUsed;
             const stockLoc=p?formatLoc(p)||p.loc||'':'';
 
             const projLoc=a.projectLoc||'';
-            const projLocCell=isReleased
+            const projLocCell=isFinished
               ?`<span style="font-size:12px;color:#9ca3af">${projLoc||'—'}</span>`
               :`<div>
                   ${projLoc
@@ -5802,7 +5805,7 @@ function renderAllocations(){
                     onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#c4b5fd'">
                 </div>`;
 
-            return`<tr style="border-bottom:1px solid #f3f4f6;${isReleased?'opacity:.6':''}">
+            return`<tr style="border-bottom:1px solid #f3f4f6;${isFinished?'opacity:.6':''}">
               <td style="padding:8px 10px">
                 <div style="display:flex;align-items:center;gap:8px">
                   ${p?partImgHtml(p,40):'<div style="width:40px;height:40px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px">📦</div>'}
@@ -5814,7 +5817,7 @@ function renderAllocations(){
                 </div>
               </td>
               <td style="padding:8px 10px;text-align:center">
-                ${isReleased
+                ${isFinished
                   ?`<span style="font-weight:700;color:#9ca3af">${a.qty}</span>`
                   :`<input type="number" value="${a.qty}" min="1" style="width:60px;text-align:center;font-weight:700;color:#6d28d9;border-color:#c4b5fd"
                     onchange="updateAllocQty(${globalIdx},parseInt(this.value)||1)">`}
@@ -5831,14 +5834,17 @@ function renderAllocations(){
               <td style="padding:8px 10px;font-size:12px">${a.po||'—'}</td>
               <td style="padding:8px 10px;font-size:12px;color:#6b7280;white-space:nowrap">${a.date||'—'}</td>
               <td style="padding:8px 10px">
-                <span class="badge" style="background:${isReleased?'#f3f4f6':'#f5f0ff'};color:${isReleased?'#6b7280':'#6d28d9'}">
-                  ${isReleased?'Released':'Held for project'}
+                <span class="badge" style="background:${isUsed?'#dbeafe':isReleased?'#f3f4f6':'#f5f0ff'};color:${isUsed?'#1e40af':isReleased?'#6b7280':'#6d28d9'}">
+                  ${isUsed?'✓ Used on job':isReleased?'Released':'Held for project'}
                 </span>
               </td>
               <td style="padding:8px 10px;text-align:right;white-space:nowrap">
-                ${!isReleased
-                  ?`<button onclick="releaseSingleAlloc(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#f0fdf4;color:#166534;border-color:#86efac;font-weight:600">Release to stock</button>`
-                  :`<span style="font-size:11px;color:#9ca3af">Released ${a.releaseDate||''}</span>
+                ${!isFinished
+                  ?`<div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
+                      <button onclick="useAllocForProject(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#eff6ff;color:#1e40af;border-color:#93c5fd;font-weight:600">✓ Use for job</button>
+                      <button onclick="releaseSingleAlloc(${globalIdx})" style="font-size:11px;padding:3px 10px;background:#f0fdf4;color:#166534;border-color:#86efac;font-weight:600">Release to stock</button>
+                    </div>`
+                  :`<span style="font-size:11px;color:#9ca3af">${isUsed?'Used':'Released'} ${a.releaseDate||a.usedDate||''}</span>
                     ${currentUser&&currentUser.isAdmin?`<button onclick="deleteAlloc(${globalIdx})" style="font-size:11px;padding:2px 7px;color:#991b1b;border-color:#fca5a5;background:#fff;margin-left:6px" title="Delete this allocation record">✕</button>`:''}`}
               </td>
             </tr>`;
@@ -5867,11 +5873,12 @@ async function updateAllocQty(idx,qty){
 async function deleteAlloc(idx){
   const a=db.allocations[idx];
   if(!a)return;
-  if(a.status!=='released'){
-    toast('Must be released to stock before it can be deleted — click "Release to stock" first','err');
+  if(a.status!=='released'&&a.status!=='used'){
+    toast('Must be released or used before it can be deleted — use "Use for job" or "Release to stock" first','err');
     return;
   }
-  if(!confirm(`Delete this allocation record?\n\n${a.name} · ${a.build} · ${a.qty} units · Released ${a.releaseDate||''}\n\nThis only removes the record — stock has already been returned.`))return;
+  const isUsed=a.status==='used';
+  if(!confirm(`Delete this allocation record?\n\n${a.name} · ${a.build} · ${a.qty} units · ${isUsed?'Used '+(a.usedDate||''):'Released '+(a.releaseDate||'')}\n\nThis only removes the record — ${isUsed?'the part was already consumed on the job':'stock has already been returned'}.`))return;
   db.allocations.splice(idx,1);
   await saveDB();
   renderAllocations();
@@ -5879,14 +5886,55 @@ async function deleteAlloc(idx){
 }
 
 async function clearReleasedAllocs(){
-  const released=db.allocations.filter(a=>a.status==='released');
-  const active=db.allocations.filter(a=>a.status!=='released');
-  if(!released.length){toast('No released allocations to clear','info');return;}
-  if(!confirm(`Clear ${released.length} released allocation record${released.length!==1?'s':''}?\n\nOnly released records will be removed. The ${active.length} active allocation${active.length!==1?'s':''} still holding stock will NOT be affected.\n\nStock has already been returned for all released items — this just cleans up the history.`))return;
+  const finished=db.allocations.filter(a=>a.status==='released'||a.status==='used');
+  const active=db.allocations.filter(a=>a.status!=='released'&&a.status!=='used');
+  if(!finished.length){toast('No released or used allocations to clear','info');return;}
+  if(!confirm(`Clear ${finished.length} released/used allocation record${finished.length!==1?'s':''}?\n\nOnly finished records will be removed. The ${active.length} active allocation${active.length!==1?'s':''} still holding stock will NOT be affected.\n\nStock has already been settled for all of these — this just cleans up the history.`))return;
   db.allocations=active;
   await saveDB();
   renderAllocations();
-  toast(`${released.length} released record${released.length!==1?'s':''} cleared`);
+  toast(`${finished.length} record${finished.length!==1?'s':''} cleared`);
+}
+
+// Marks an allocated part as actually used/installed on the job it's held for. Different from
+// "Release to stock" — this is consumption, not un-reserving. Whether it touches the part's
+// general stock count depends on how it got allocated in the first place: a manual allocation
+// pulls from stock that's still counted in general qty (so using it now needs to deduct that),
+// while a BOM-delivery "for project" allocation was never added to general stock to begin with
+// (so using it just closes out the allocation — nothing further to subtract).
+async function useAllocForProject(idx){
+  const a=db.allocations[idx];
+  if(!a)return;
+  const input=prompt(`How many of the ${a.qty} allocated ${a.name} are you taking/using now for "${a.build}"?`,a.qty);
+  if(input===null)return;
+  const takeQty=Math.min(a.qty,Math.max(0,parseInt(input)||0));
+  if(takeQty<=0){toast('Enter a quantity of at least 1','err');return;}
+
+  const catPart=db.parts[a.code]||Object.values(db.parts).find(p=>
+    normalise(p.code)===normalise(a.code)||
+    normalise(p.mfrno||'')===normalise(a.code)||
+    normalise(stripVendorPrefix(p.code))===normalise(a.code)||
+    (p.aliases||[]).some(al=>normalise(al)===normalise(a.code))
+  );
+  const fromGeneralStock=a.deliveryId==='manual';
+  if(!confirm(`Take ${takeQty}× ${a.name} for "${a.build}"?\n\nThis marks it as used/installed on the job — it does NOT go back to general stock, it's simply consumed.`))return;
+
+  pushUndo();
+  if(catPart&&fromGeneralStock){
+    catPart.qty=Math.max(0,catPart.qty-takeQty);
+  }
+  addHist('OUT',a.name,catPart?catPart.code:a.code,-takeQty,`Used for project: ${a.build}${a.po?' · PO: '+a.po:''} (installed/consumed)`);
+
+  if(takeQty>=a.qty){
+    a.status='used';
+    a.usedDate=nowD();
+  }else{
+    a.qty-=takeQty;
+  }
+  await saveDB();
+  renderAllocations();
+  renderDash();
+  toast(`${takeQty}× ${a.name} marked as used for "${a.build}"`);
 }
 
 async function releaseSingleAlloc(idx){
