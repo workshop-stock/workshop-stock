@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev134</title>
+<title>Workshop Stock Control v2.1 Rev137</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 134 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 137 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -598,6 +598,7 @@ tr:hover td{background:#f9fafb}
         <input type="checkbox" id="sstandard" onchange="doSearch()" style="width:15px;height:15px">
         ⭐ Standardised parts only
       </label>
+      <button id="s-bulk-toggle" onclick="toggleSBulkMode()" style="font-size:13px">☑ Select multiple</button>
     </div>
     <div id="s-bulk-tag-bar" style="display:none;margin-bottom:10px;background:#f5f0ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;align-items:center;gap:10px;flex-wrap:wrap">
       <span id="s-bulk-count" style="font-size:12px;color:#6d28d9;font-weight:600"></span>
@@ -3514,6 +3515,13 @@ function clearSearch(){
   document.getElementById('sstandard').checked=false;
   doSearch();
 }
+let sBulkMode=false;
+function toggleSBulkMode(){
+  sBulkMode=!sBulkMode;
+  const btn=document.getElementById('s-bulk-toggle');
+  if(btn){btn.textContent=sBulkMode?'✕ Cancel select':'☑ Select multiple';btn.className=sBulkMode?'btn-red':'';}
+  doSearch();
+}
 function doSearch(){
   const q=(document.getElementById('sq').value||'').trim();
   const cat=document.getElementById('scat').value;
@@ -3538,7 +3546,7 @@ function doSearch(){
   const closeRes=(q&&!standardOnly)?closeCodeMatches(q,res.map(p=>p.code),5):[];
   const hint=q?`${res.length} of ${total} parts match "<strong>${q}</strong>"${standardOnly?' · ⭐ standardised only':''}`:`Showing ${standardOnly?'standardised parts':'all '+total+' parts'}${standardOnly?'':' — type anything to filter'}`;
   const rowHtml=(p,isClose)=>`<tr style="${isClose?'background:#fffbeb':isFlagged(p)?'background:#fff5f5':''}">
-      <td style="padding:6px 0 6px 6px"><input type="checkbox" class="s-bulk-chk" value="${p.code}" onchange="updateSBulkBar()" style="width:15px;height:15px"></td>
+      ${sBulkMode?`<td style="padding:6px 0 6px 6px"><input type="checkbox" class="s-bulk-chk" value="${p.code}" onchange="updateSBulkBar()" style="width:15px;height:15px"></td>`:''}
       <td style="padding:6px">${partImgHtml(p,48)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}${p.supPartNo?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">Sup: ${p.supPartNo}</div>`:''}</td>
@@ -3559,12 +3567,12 @@ function doSearch(){
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
   <div class="s-results-scroll" style="overflow-x:auto;max-height:600px;overflow-y:auto">
   <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
-    <th style="width:28px"></th><th style="width:60px"></th>
+    ${sBulkMode?'<th style="width:28px"></th>':''}<th style="width:60px"></th>
     <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
   </tr></thead><tbody>${
     res.length||closeRes.length?
       res.map(p=>rowHtml(p,false)).join('')+closeRes.map(p=>rowHtml(p,true)).join('')
-    :`<tr><td colspan="11" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
+    :`<tr><td colspan="${sBulkMode?11:10}" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
   }</tbody></table></div>`;
   const newScrollBox=el.querySelector('.s-results-scroll');
   if(newScrollBox)newScrollBox.scrollTop=prevScroll;
@@ -8975,3 +8983,4 @@ loadFirebaseConfig().then(ok=>{
 </script>
 </body>
 </html>
+
