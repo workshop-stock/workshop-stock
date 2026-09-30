@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev138</title>
+<title>Workshop Stock Control v2.1 Rev139</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 138 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 139 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -8441,23 +8441,27 @@ function renderSL(){
   el.innerHTML=`<div style="overflow-x:auto"><table>
     <thead><tr>
       <th style="width:56px"></th>
-      <th style="min-width:110px">Internal no.</th>
-      <th style="min-width:140px">Mfr part no.</th>
+      <th style="min-width:110px">Part no.</th>
       <th>Part name</th><th>Location</th>
-      <th title="Edit directly">Current qty</th>
+      <th title="Edit directly">Current qty / status</th>
       <th title="Held for projects — click to see details" style="color:#6d28d9">Allocated ▣</th>
-      <th title="Edit directly">Min stock</th><th title="Edit directly">Max stock</th>
-      <th>Status</th><th>Quick adj.</th>
+      <th title="Edit directly">Min / max stock</th>
+      <th>Quick adj.</th>
     </tr></thead><tbody>${res.map(p=>{
       const allocs=(db.allocations||[]).filter(a=>a.code===p.code&&a.status!=='released');
       const allocQty=allocs.reduce((s,a)=>s+a.qty,0);
       return`<tr style="${isFlagged(p)?'background:#fff5f5':''}">
         <td style="padding:5px 6px">${partImgHtml(p,44)}</td>
-        <td style="font-size:12px;font-family:monospace;font-weight:600">${p.code}</td>
-        <td style="font-size:12px;color:#374151">${p.mfrno||'—'}</td>
-        <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td>
-        <td style="font-size:12px">${formatLoc(p)||'—'}</td>
-        <td>${isTracked(p)?`<div style="display:flex;align-items:center;gap:6px"><input type="number" value="${p.qty}" min="0" style="width:64px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)">${reorderToggleHtml(p)}</div>`:reorderToggleHtml(p)}</td>
+        <td style="font-size:12px">
+          <div style="font-family:monospace;font-weight:600">${p.code}</div>
+          ${p.mfrno?`<div style="font-size:10px;color:#6b7280;margin-top:1px">Mfr: ${p.mfrno}</div>`:''}
+        </td>
+        <td style="font-weight:500;max-width:280px">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}</td>
+        <td style="font-size:12px;max-width:140px">${formatLoc(p)||'—'}</td>
+        <td>
+          ${isTracked(p)?`<div style="display:flex;align-items:center;gap:6px"><input type="number" value="${p.qty}" min="0" style="width:64px;font-weight:700" onchange="updateSLField('${p.code}','qty',parseInt(this.value)||0)">${reorderToggleHtml(p)}</div>`:reorderToggleHtml(p)}
+          <div style="margin-top:4px">${stockStatusBadge(p)}</div>
+        </td>
         <td style="text-align:center">
           ${allocQty>0
             ?`<div style="text-align:center">
@@ -8470,9 +8474,13 @@ function renderSL(){
               </div>`
             :`<span style="color:#d1d5db;font-size:12px;text-align:center;display:block">—</span>`}
         </td>
-        <td>${isTracked(p)?`<input type="number" value="${p.min}" min="0" style="width:60px;border-color:#fcd34d" onchange="updateSLField('${p.code}','min',parseInt(this.value)||0)">`:'<span style="color:#d1d5db">—</span>'}</td>
-        <td>${isTracked(p)?`<input type="number" value="${p.max||''}" min="0" placeholder="—" style="width:60px;border-color:#86efac" onchange="updateSLField('${p.code}','max',parseInt(this.value)||0)">`:'<span style="color:#d1d5db">—</span>'}</td>
-        <td>${stockStatusBadge(p)}</td>
+        <td>
+          ${isTracked(p)?`<div style="display:flex;align-items:center;gap:4px">
+            <input type="number" value="${p.min}" min="0" style="width:52px;border-color:#fcd34d" onchange="updateSLField('${p.code}','min',parseInt(this.value)||0)" title="Min stock">
+            <span style="color:#9ca3af;font-size:11px">/</span>
+            <input type="number" value="${p.max||''}" min="0" placeholder="—" style="width:52px;border-color:#86efac" onchange="updateSLField('${p.code}','max',parseInt(this.value)||0)" title="Max stock">
+          </div>`:'<span style="color:#d1d5db">—</span>'}
+        </td>
         <td style="display:flex;gap:4px;flex-wrap:wrap">
           ${isTracked(p)?`<button onclick="slAdj('${p.code}',1)" style="font-size:14px;padding:2px 9px;color:#166534;border-color:#86efac;font-weight:700">+</button>
           <button onclick="slAdj('${p.code}',-1)" style="font-size:14px;padding:2px 9px;color:#991b1b;border-color:#fca5a5;font-weight:700">−</button>`:''}
