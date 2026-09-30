@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev133</title>
+<title>Workshop Stock Control v2.1 Rev134</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 133 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 134 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -589,11 +589,20 @@ tr:hover td{background:#f9fafb}
         <button onclick="clearSearch()" style="color:#991b1b;border-color:#fca5a5" title="Clear search and filters">✕ Clear</button>
       </div>
     </div>
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       <label>Search by location</label>
       <select id="sloc" onchange="doSearch()" style="max-width:260px">
         <option value="">All locations</option>
       </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;background:#fffbeb;border:1px solid #fcd34d;border-radius:7px;padding:6px 12px;margin-bottom:0">
+        <input type="checkbox" id="sstandard" onchange="doSearch()" style="width:15px;height:15px">
+        ⭐ Standardised parts only
+      </label>
+    </div>
+    <div id="s-bulk-tag-bar" style="display:none;margin-bottom:10px;background:#f5f0ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="s-bulk-count" style="font-size:12px;color:#6d28d9;font-weight:600"></span>
+      <button onclick="bulkSetStandardised(true)" style="font-size:12px;background:#fffbeb;color:#92400e;border-color:#fcd34d;font-weight:600">⭐ Mark selected as standardised</button>
+      <button onclick="bulkSetStandardised(false)" style="font-size:12px">Unmark selected</button>
     </div>
     <div id="s-results"></div>
   </div>
@@ -637,6 +646,13 @@ tr:hover td{background:#f9fafb}
       <div id="ep-reorder-flag-wrap" style="display:none;align-items:center;gap:10px;border-left:1px solid #d1d5db;padding-left:12px">
         <label class="toggle-sw"><input type="checkbox" id="ep-needs-reorder"><span class="toggle-sw-slider"></span></label>
         <div style="font-size:12px;font-weight:600;color:#991b1b">🔴 Flag for reorder</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px">
+      <label class="toggle-sw"><input type="checkbox" id="ep-standard"><span class="toggle-sw-slider"></span></label>
+      <div>
+        <div style="font-weight:600;font-size:13px">⭐ Standardised part</div>
+        <div style="font-size:11px;color:#92400e">Mark this as an approved/preferred part — lets you filter down to just your standard catalogue when reordering.</div>
       </div>
     </div>
     <div class="g3" style="margin-bottom:10px">
@@ -726,6 +742,13 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="font-weight:600;font-size:13px">Track exact stock quantity</div>
         <div style="font-size:11px;color:#6b7280">On by default. Switch off for hardware/consumables that can't be counted exactly (bolts, nuts, washers, Loctite, WD40…) — you'll get a simple reorder flag instead of a stock count.</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px">
+      <label class="toggle-sw"><input type="checkbox" id="ap-standard"><span class="toggle-sw-slider"></span></label>
+      <div>
+        <div style="font-weight:600;font-size:13px">⭐ Standardised part</div>
+        <div style="font-size:11px;color:#92400e">Mark this as an approved/preferred part — lets you filter down to just your standard catalogue when reordering.</div>
       </div>
     </div>
     <div class="g3" style="margin-bottom:10px">
@@ -1099,6 +1122,7 @@ tr:hover td{background:#f9fafb}
         <button id="npo-filter-all" onclick="setNewPOFilter('all')" class="btn-blue" style="font-size:12px">All parts</button>
         <button id="npo-filter-low" onclick="setNewPOFilter('low')" style="font-size:12px">⚠ Low / out of stock</button>
         <button id="npo-filter-most" onclick="setNewPOFilter('most')" style="font-size:12px">🔥 Most used</button>
+        <button id="npo-filter-standard" onclick="setNewPOFilter('standard')" style="font-size:12px">⭐ Standardised</button>
       </div>
       <div id="npo-search-results" style="max-height:320px;overflow-y:auto;margin-bottom:14px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
 
@@ -3487,6 +3511,7 @@ function clearSearch(){
   document.getElementById('sbrand').value='';
   document.getElementById('svolt').value='';
   document.getElementById('sloc').value='';
+  document.getElementById('sstandard').checked=false;
   doSearch();
 }
 function doSearch(){
@@ -3495,6 +3520,7 @@ function doSearch(){
   const brand=(document.getElementById('sbrand')||{value:''}).value;
   const volt=(document.getElementById('svolt')||{value:''}).value;
   const loc=(document.getElementById('sloc')||{value:''}).value;
+  const standardOnly=(document.getElementById('sstandard')||{checked:false}).checked;
   const total=Object.keys(db.parts).length;
   const el=document.getElementById('s-results');
   if(!total){el.innerHTML='<div style="color:#9ca3af;font-size:13px;padding:8px 0">No parts in catalogue yet — use Add Part to get started.</div>';return;}
@@ -3502,19 +3528,21 @@ function doSearch(){
   const prevScroll=prevScrollBox?prevScrollBox.scrollTop:0;
   const res=Object.values(db.parts).filter(p=>{
     if(!partFilter(p,q,cat,brand,volt))return false;
+    if(standardOnly&&!p.standardised)return false;
     if(loc){
       const allLocs=[p.loc,p.loc2,p.loc3].filter(Boolean).join(' ');
       if(!allLocs.includes(loc))return false;
     }
     return true;
   }).sort((a,b)=>a.name.localeCompare(b.name));
-  const closeRes=q?closeCodeMatches(q,res.map(p=>p.code),5):[];
-  const hint=q?`${res.length} of ${total} parts match "<strong>${q}</strong>"`:`Showing all ${total} parts — type anything to filter`;
+  const closeRes=(q&&!standardOnly)?closeCodeMatches(q,res.map(p=>p.code),5):[];
+  const hint=q?`${res.length} of ${total} parts match "<strong>${q}</strong>"${standardOnly?' · ⭐ standardised only':''}`:`Showing ${standardOnly?'standardised parts':'all '+total+' parts'}${standardOnly?'':' — type anything to filter'}`;
   const rowHtml=(p,isClose)=>`<tr style="${isClose?'background:#fffbeb':isFlagged(p)?'background:#fff5f5':''}">
+      <td style="padding:6px 0 6px 6px"><input type="checkbox" class="s-bulk-chk" value="${p.code}" onchange="updateSBulkBar()" style="width:15px;height:15px"></td>
       <td style="padding:6px">${partImgHtml(p,48)}</td>
       <td style="font-size:12px;font-family:monospace">${p.code}</td>
       <td style="font-size:12px;color:#6b7280">${p.mfrno||'—'}${p.supPartNo?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">Sup: ${p.supPartNo}</div>`:''}</td>
-      <td style="font-weight:500">${p.name}${datasheetLink(p)}${supplierRefBadge(p)}${getAllocTag(p.code)}
+      <td style="font-weight:500">${p.standardised?'<span title="Standardised part" style="margin-right:3px">⭐</span>':''}${p.name}${datasheetLink(p)}${supplierRefBadge(p)}${getAllocTag(p.code)}
         ${isClose?`<div style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:6px;margin-top:3px;display:inline-block;font-weight:600" title="Your search had extra text (e.g. a cable length) beyond this part's code — check it's the right variant">≈ Close match — verify variant</div>`:''}
       </td>
       <td style="font-size:12px">${p.mfr||'—'}</td>
@@ -3531,15 +3559,34 @@ function doSearch(){
   el.innerHTML=`<div style="font-size:12px;color:#6b7280;margin-bottom:8px">${hint}</div>
   <div class="s-results-scroll" style="overflow-x:auto;max-height:600px;overflow-y:auto">
   <table><thead style="position:sticky;top:0;background:#f9fafb;z-index:1"><tr>
-    <th style="width:60px"></th>
+    <th style="width:28px"></th><th style="width:60px"></th>
     <th>Internal no.</th><th>Mfr part no.</th><th>Part name</th><th>Brand</th><th>Category</th><th>Location</th><th style="text-align:center">Qty</th><th>Status</th><th></th>
   </tr></thead><tbody>${
     res.length||closeRes.length?
       res.map(p=>rowHtml(p,false)).join('')+closeRes.map(p=>rowHtml(p,true)).join('')
-    :`<tr><td colspan="10" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
+    :`<tr><td colspan="11" style="color:#9ca3af;padding:16px;text-align:center">No parts match — try fewer words or check spelling</td></tr>`
   }</tbody></table></div>`;
   const newScrollBox=el.querySelector('.s-results-scroll');
   if(newScrollBox)newScrollBox.scrollTop=prevScroll;
+  updateSBulkBar();
+}
+function updateSBulkBar(){
+  const checked=document.querySelectorAll('.s-bulk-chk:checked');
+  const bar=document.getElementById('s-bulk-tag-bar');
+  if(!bar)return;
+  bar.style.display=checked.length?'flex':'none';
+  const countEl=document.getElementById('s-bulk-count');
+  if(countEl)countEl.textContent=`${checked.length} part${checked.length!==1?'s':''} selected`;
+}
+async function bulkSetStandardised(val){
+  const codes=[...document.querySelectorAll('.s-bulk-chk:checked')].map(cb=>cb.value);
+  if(!codes.length)return;
+  if(!confirm(`${val?'Mark':'Unmark'} ${codes.length} part${codes.length!==1?'s':''} as standardised?`))return;
+  pushUndo();
+  codes.forEach(code=>{if(db.parts[code])db.parts[code].standardised=val;});
+  await saveDB();
+  doSearch();
+  toast(`${codes.length} part${codes.length!==1?'s':''} ${val?'marked':'unmarked'} as standardised`);
 }
 function prefillCI(code){go('checkin');document.getElementById('ci-scan').value=code;ciLook();}
 function showPartHistory(code){
@@ -3687,6 +3734,7 @@ async function addPart(){
     grade: document.getElementById('ap-grade').value.trim(),
     tags: document.getElementById('ap-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
     tracked: document.getElementById('ap-tracked').checked,
+    standardised: document.getElementById('ap-standard').checked,
     needsReorder: false,
     images: [..._pendingImages.ap],
     img: _pendingImages.ap[0]||''
@@ -3695,6 +3743,7 @@ async function addPart(){
   toast(`Part "${name}" added to catalogue`);
   ['ap-code','ap-name','ap-mfrno','ap-barcode','ap-mfr','ap-sup','ap-suppartno','ap-notes','ap-datasheet','ap-headtype','ap-grade','ap-tags'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ap-tracked').checked=true;
+  document.getElementById('ap-standard').checked=false;
   document.getElementById('ap-qty').value=0;
   document.getElementById('ap-min').value=1;
   document.getElementById('ap-max').value=10;
@@ -6541,7 +6590,7 @@ function setOrderSubTab(tab){
 
 function setNewPOFilter(f){
   npoFilter=f;
-  ['all','low','most'].forEach(k=>{
+  ['all','low','most','standard'].forEach(k=>{
     const btn=document.getElementById('npo-filter-'+k);
     if(btn){btn.className=k===f?'btn-blue':'';btn.style.fontSize='12px';}
   });
@@ -6557,6 +6606,7 @@ function renderNewPOResults(){
 
   if(npoFilter==='low')list=list.filter(p=>isFlagged(p)||(isTracked(p)&&p.qty<=p.min));
   else if(npoFilter==='most')list=list.filter(p=>getPartUsage(p.code).useCount>0).sort((a,b)=>getPartUsage(b.code).useCount-getPartUsage(a.code).useCount);
+  else if(npoFilter==='standard')list=list.filter(p=>p.standardised);
 
   list=list.filter(p=>partFilter(p,q,cat,brand,''));
   if(npoFilter!=='most')list=list.sort((a,b)=>a.name.localeCompare(b.name));
@@ -6576,7 +6626,7 @@ function renderNewPOResults(){
     return`<div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid #f3f4f6">
       ${partImgHtml(p,36)}
       <div style="flex:1;min-width:120px">
-        <div style="font-weight:600;font-size:13px">${p.name}${already?` <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px;font-weight:700">on PO ×${already.qty}</span>`:''}</div>
+        <div style="font-weight:600;font-size:13px">${p.standardised?'⭐ ':''}${p.name}${already?` <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px;font-weight:700">on PO ×${already.qty}</span>`:''}</div>
         <div style="font-size:11px;color:#9ca3af">${p.code}${p.mfrno?' · '+p.mfrno:''} · ${isTracked(p)?p.qty+' in stock':'not tracked'}</div>
       </div>
       <input type="number" id="npo-qty-${p.code}" value="${Math.max(suggestQty,1)}" min="1" style="width:60px;font-size:13px">
@@ -8587,6 +8637,7 @@ function openEditPart(code){
   document.getElementById('ep-mfr').value=p.mfr||'';
   document.getElementById('ep-cat').innerHTML=catOpts(p.cat);
   document.getElementById('ep-tracked').checked=p.tracked!==false;
+  document.getElementById('ep-standard').checked=!!p.standardised;
   document.getElementById('ep-needs-reorder').checked=p.needsReorder===true;
   epTrackedChanged();
   document.getElementById('ep-qty').value=p.qty;
@@ -8632,6 +8683,7 @@ async function saveEditPart(){
   p.altSuppliers=epSupplierRows.filter(r=>(r.sup||'').trim()||(r.partNo||'').trim());
   p.aliases=epAliasRows.filter(a=>(a||'').trim());
   p.tracked=document.getElementById('ep-tracked').checked;
+  p.standardised=document.getElementById('ep-standard').checked;
   p.needsReorder=document.getElementById('ep-needs-reorder').checked;
   p.loc=document.getElementById('ep-loc').value;
   p.loc2=document.getElementById('ep-loc2').value;
