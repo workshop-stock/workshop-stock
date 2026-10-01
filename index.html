@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev140</title>
+<title>Workshop Stock Control v2.1 Rev141</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 140 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 141 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -3763,7 +3763,7 @@ async function addPart(){
     standardised: document.getElementById('ap-standard').checked,
     needsReorder: false,
     images: [..._pendingImages.ap],
-    img: _pendingImages.ap[0]||''
+    img: ''
   };
   await saveDB();
   toast(`Part "${name}" added to catalogue`);
@@ -5368,7 +5368,7 @@ async function delScanAdd(){
 
   await saveDB();
 
-  _delScanLog.unshift({name:p.name,code,qty,forProject,forStock,img:p.img||''});
+  _delScanLog.unshift({name:p.name,code,qty,forProject,forStock,img:partThumb(p)});
   renderDelScanLog();
 
   toast(`✓ ${qty}× ${p.name}${forProject>0?` — ${forProject} → ${del.assignTo}`:''} ${forStock>0?`— ${forStock} → stock`:''}`)
@@ -8003,7 +8003,26 @@ function renderDbSizeDiagnostic(){
     <div style="background:#f3f4f6;border-radius:6px;height:10px;overflow:hidden">
       <div style="background:${barColor};height:100%;width:${pct}%"></div>
     </div>
-    ${pct>80?`<div style="margin-top:8px;font-size:12px;color:#991b1b;font-weight:600">⚠ Getting close to the limit — saves may start failing soon. Use the compress button below.</div>`:''}`;
+    ${pct>80?`<div style="margin-top:8px;font-size:12px;color:#991b1b;font-weight:600">⚠ Getting close to the limit — saves may start failing soon.</div>`:''}`;
+
+  // Category breakdown — images are often the biggest, but not always; history/deliveries/
+  // quotes etc. can add up too on a long-used catalogue, so this shows where to actually look.
+  const categories=[
+    ['Part photos',Object.values(db.parts).map(p=>JSON.stringify([p.img||'',...(p.images||[])]))],
+    ['Part details (names, notes, tags, etc.)',[JSON.stringify(Object.values(db.parts).map(({img,images,...rest})=>rest))]],
+    ['Stock history',[JSON.stringify(db.hist||[])]],
+    ['Event history',[JSON.stringify(db.eventHist||[])]],
+    ['Deliveries / POs',[JSON.stringify(db.deliveries||[])]],
+    ['Quotation requests',[JSON.stringify(db.quotes||{})]],
+    ['Order list',[JSON.stringify(db.order||[])]],
+    ['Saved BOMs',[JSON.stringify(db.boms||{})]],
+    ['Allocations',[JSON.stringify(db.allocations||[])]],
+  ].map(([label,strs])=>({label,size:strs.reduce((s,x)=>s+byteSize(x),0)})).sort((a,b)=>b.size-a.size);
+
+  // Duplicate-image check — older saves stored the same photo twice (p.img AND images[0]);
+  // this has been fixed going forward, but existing parts may still be carrying the duplicate.
+  const dupeParts=Object.values(db.parts).filter(p=>p.img&&p.images&&p.images.length&&p.img===p.images[0]);
+  const dupeBytes=dupeParts.reduce((s,p)=>s+byteSize(p.img),0);
 
   const sizedParts=Object.values(db.parts).map(p=>{
     const imgs=(p.images&&p.images.length)?p.images:(p.img?[p.img]:[]);
@@ -8011,12 +8030,35 @@ function renderDbSizeDiagnostic(){
     return{name:p.name,code:p.code,size,imgCount:imgs.length};
   }).filter(x=>x.size>0).sort((a,b)=>b.size-a.size).slice(0,10);
 
-  if(!sizedParts.length){topEl.innerHTML='';return;}
-  topEl.innerHTML=`<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">Biggest parts by photo size:</div>
+  topEl.innerHTML=`
+    ${dupeParts.length?`<div style="margin-bottom:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px">
+      <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:4px">🧹 ${dupeParts.length} part(s) still storing their main photo twice</div>
+      <div style="font-size:12px;color:#78350f;margin-bottom:8px">Older saves duplicated the first photo — fixed for new saves, but these ${dupeParts.length} still carry the old duplicate (~${(dupeBytes/1024).toFixed(0)} KB wasted). Safe to clean up — nothing is removed, just the redundant copy.</div>
+      <button onclick="removeDuplicateImageData()" style="font-size:12px;background:#92400e;color:#fff;border-color:#92400e;font-weight:700">Remove duplicate copies now</button>
+    </div>`:''}
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">Where the space is going:</div>
+    ${categories.map(c=>{
+      const cpct=totalBytes?((c.size/totalBytes)*100):0;
+      return`<div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span>${c.label}</span><span style="font-weight:600">${(c.size/1024).toFixed(0)} KB (${cpct.toFixed(0)}%)</span></div>
+        <div style="background:#f3f4f6;border-radius:4px;height:5px;overflow:hidden;margin-top:2px"><div style="background:#6d28d9;height:100%;width:${Math.min(100,cpct)}%"></div></div>
+      </div>`;
+    }).join('')}
+    ${sizedParts.length?`<div style="font-size:12px;font-weight:700;color:#374151;margin:14px 0 6px">Biggest parts by photo size:</div>
     ${sizedParts.map(x=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #f3f4f6">
       <span>${x.name} <span style="color:#9ca3af">(${x.imgCount} photo${x.imgCount!==1?'s':''})</span></span>
       <span style="font-weight:600">${(x.size/1024).toFixed(0)} KB</span>
-    </div>`).join('')}`;
+    </div>`).join('')}`:''}`;
+}
+
+async function removeDuplicateImageData(){
+  const dupeParts=Object.values(db.parts).filter(p=>p.img&&p.images&&p.images.length&&p.img===p.images[0]);
+  if(!dupeParts.length){toast('No duplicates found','info');return;}
+  pushUndo();
+  dupeParts.forEach(p=>{p.img='';});
+  await saveDB();
+  renderDbSizeDiagnostic();
+  toast(`✓ Cleaned up ${dupeParts.length} part(s) — no photos were removed, just the redundant copies`);
 }
 
 // Re-resizes and re-compresses every stored image down to a smaller ceiling, reclaiming
@@ -8042,7 +8084,7 @@ async function compressAllImages(){
       }
     }
     p.images=newImgs;
-    p.img=newImgs[0]||'';
+    p.img='';
     done++;
   }
   await saveDB();
@@ -8810,7 +8852,7 @@ async function saveEditPart(){
   p.loc2=document.getElementById('ep-loc2').value;
   p.loc3=document.getElementById('ep-loc3').value;
   p.images=[..._pendingImages.ep];
-  p.img=_pendingImages.ep[0]||'';
+  p.img='';
   if(p.qty!==oldQty)addHist('ADJ',p.name,editingCode,p.qty-oldQty,'Manual edit');
   await saveDB();
   document.getElementById('edit-part-modal').classList.remove('open');
@@ -8885,9 +8927,14 @@ function makePrimaryImage(prefix,i){
   renderImageGallery(prefix);
 }
 
+// Single source of truth for a part's main photo — images[0] if the gallery has one,
+// falling back to the legacy p.img field only for parts never touched by the gallery system.
+// Nothing should read p.img directly except this helper, to avoid recreating duplicate storage.
+function partThumb(p){return(p&&p.images&&p.images[0])||(p&&p.img)||'';}
 function partImgHtml(p, size=48){
-  if(!p||!p.img)return`<div style="width:${size}px;height:${size}px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.45)}px;flex-shrink:0">📦</div>`;
-  return`<img src="${p.img}" alt="${p.name}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;flex-shrink:0">`;
+  const src=partThumb(p);
+  if(!p||!src)return`<div style="width:${size}px;height:${size}px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.45)}px;flex-shrink:0">📦</div>`;
+  return`<img src="${src}" alt="${p.name}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;border:1px solid #e5e7eb;background:#fff;flex-shrink:0">`;
 }
 function datasheetLink(p, size){
   if(!p||!p.datasheet)return'';
