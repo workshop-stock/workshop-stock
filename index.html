@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev139</title>
+<title>Workshop Stock Control v2.1 Rev140</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +320,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 139 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 140 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1433,6 +1433,13 @@ tr:hover td{background:#f9fafb}
           <button onclick="mergeSupplierNames()" class="btn-red" style="font-weight:700">Merge selected</button>
         </div>
       </div>
+      <div class="card" style="border:2px solid #f59e0b">
+        <div class="sec">📊 Database size</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Everything is stored as one block in Firebase, which has a hard 10MB limit — if you go over it, saves fail completely (nothing from that save gets written, even the parts of it that would've fit). The usual cause is accumulated part photos. Check here before it bites you.</div>
+        <div id="db-size-summary" style="margin-bottom:12px"></div>
+        <div id="db-size-top" style="margin-bottom:12px"></div>
+        <button onclick="compressAllImages()" class="btn-amber" style="font-weight:700">🗜 Re-compress all part images to reclaim space</button>
+      </div>
       <div class="card">
         <div class="sec">Categories</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Add or rename part categories.</div>
@@ -1562,7 +1569,11 @@ async function saveDB(){
     }catch(e){
       console.error('Firebase save error:',e);
       setStatus('⚠ Save failed — data safe locally','#f59e0b');
-      toast('Save error: '+e.message,'err');
+      if((e.message||'').includes('10485760')||(e.message||'').toLowerCase().includes('greater than')){
+        toast('⚠ Save failed — your data is too large (over Firebase\'s 10MB limit, usually from part photos). Nothing from this change was saved. Go to Settings → Database size to see what\'s using the space and compress it.','err');
+      }else{
+        toast('Save error: '+e.message,'err');
+      }
     }
   },1500);
 }
@@ -7971,6 +7982,92 @@ function browseAddToCheckout(code){
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
+// ─── DATABASE SIZE DIAGNOSTIC — Firebase hard-caps a single value at 10MB; everything here
+// is stored as one JSON blob, so this helps spot what's eating the space (almost always
+// part photos) before a save silently fails and loses whatever you were just adding.
+const FIREBASE_SIZE_LIMIT=10485760;
+function byteSize(str){return new TextEncoder().encode(str||'').length;}
+function renderDbSizeDiagnostic(){
+  const summaryEl=document.getElementById('db-size-summary');
+  const topEl=document.getElementById('db-size-top');
+  if(!summaryEl)return;
+  const totalBytes=byteSize(JSON.stringify(db));
+  const pct=Math.min(100,(totalBytes/FIREBASE_SIZE_LIMIT)*100);
+  const mb=(totalBytes/1048576).toFixed(2);
+  const barColor=pct>90?'#991b1b':pct>70?'#f59e0b':'#166534';
+  summaryEl.innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+      <span style="font-weight:700;color:${barColor}">${mb} MB used</span>
+      <span style="color:#6b7280">of 10 MB limit (${pct.toFixed(0)}%)</span>
+    </div>
+    <div style="background:#f3f4f6;border-radius:6px;height:10px;overflow:hidden">
+      <div style="background:${barColor};height:100%;width:${pct}%"></div>
+    </div>
+    ${pct>80?`<div style="margin-top:8px;font-size:12px;color:#991b1b;font-weight:600">⚠ Getting close to the limit — saves may start failing soon. Use the compress button below.</div>`:''}`;
+
+  const sizedParts=Object.values(db.parts).map(p=>{
+    const imgs=(p.images&&p.images.length)?p.images:(p.img?[p.img]:[]);
+    const size=imgs.reduce((s,i)=>s+byteSize(i),0);
+    return{name:p.name,code:p.code,size,imgCount:imgs.length};
+  }).filter(x=>x.size>0).sort((a,b)=>b.size-a.size).slice(0,10);
+
+  if(!sizedParts.length){topEl.innerHTML='';return;}
+  topEl.innerHTML=`<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">Biggest parts by photo size:</div>
+    ${sizedParts.map(x=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #f3f4f6">
+      <span>${x.name} <span style="color:#9ca3af">(${x.imgCount} photo${x.imgCount!==1?'s':''})</span></span>
+      <span style="font-weight:600">${(x.size/1024).toFixed(0)} KB</span>
+    </div>`).join('')}`;
+}
+
+// Re-resizes and re-compresses every stored image down to a smaller ceiling, reclaiming
+// space from old photos that were saved before tighter compression was in place.
+async function compressAllImages(){
+  const parts=Object.values(db.parts).filter(p=>(p.images&&p.images.length)||p.img);
+  if(!parts.length){toast('No part photos to compress','info');return;}
+  if(!confirm(`Re-compress photos on ${parts.length} part(s)? This shrinks existing images to save space — quality will look slightly softer but still clearly usable. This can take a minute for a large catalogue.`))return;
+
+  pushUndo();
+  let done=0,savedBytes=0;
+  for(const p of parts){
+    const imgs=(p.images&&p.images.length)?p.images:(p.img?[p.img]:[]);
+    const newImgs=[];
+    for(const src of imgs){
+      const before=byteSize(src);
+      try{
+        const compressed=await recompressImage(src,260,0.65);
+        newImgs.push(compressed);
+        savedBytes+=Math.max(0,before-byteSize(compressed));
+      }catch(e){
+        newImgs.push(src); // keep original if it fails to recompress
+      }
+    }
+    p.images=newImgs;
+    p.img=newImgs[0]||'';
+    done++;
+  }
+  await saveDB();
+  renderDbSizeDiagnostic();
+  toast(`✓ Compressed ${done} part(s) — reclaimed ~${(savedBytes/1048576).toFixed(2)} MB`);
+}
+function recompressImage(dataUrl,maxDim,quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){h=Math.round(h*(maxDim/w));w=maxDim;}
+        else{w=Math.round(w*(maxDim/h));h=maxDim;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=reject;
+    img.src=dataUrl;
+  });
+}
+
 function renderSettings(){
   document.getElementById('s-key').value=cfg.apiKey||'';
   document.getElementById('s-bin').value=cfg.binId||'';
@@ -8026,6 +8123,7 @@ function renderSettings(){
     brandSupSelect.innerHTML='<option value="">Select supplier…</option>'+(db.suppliers||[]).map(s=>`<option>${s.name}</option>`).join('');
   }
   renderSupplierCleanup();
+  renderDbSizeDiagnostic();
 }
 
 async function addSupplier(){
@@ -8741,7 +8839,7 @@ function handlePartImages(fileList, prefix){
     reader.onload=e=>{
       const img=new Image();
       img.onload=()=>{
-        const MAX=400;
+        const MAX=260;
         let w=img.width, h=img.height;
         if(w>MAX||h>MAX){
           if(w>h){h=Math.round(h*(MAX/w));w=MAX;}
@@ -8750,7 +8848,7 @@ function handlePartImages(fileList, prefix){
         const canvas=document.createElement('canvas');
         canvas.width=w;canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        const b64=canvas.toDataURL('image/jpeg',0.82);
+        const b64=canvas.toDataURL('image/jpeg',0.68);
         _pendingImages[prefix].push(b64);
         renderImageGallery(prefix);
       };
