@@ -6,7 +6,15 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Workshop Stock Control v2.1 Rev141</title>
+<title>Automation Workshop</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icon-16.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#1e3a5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Workshop">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f4}
@@ -320,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 141 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 142 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1434,8 +1442,9 @@ tr:hover td{background:#f9fafb}
         </div>
       </div>
       <div class="card" style="border:2px solid #f59e0b">
-        <div class="sec">📊 Database size</div>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Everything is stored as one block in Firebase, which has a hard 10MB limit — if you go over it, saves fail completely (nothing from that save gets written, even the parts of it that would've fit). The usual cause is accumulated part photos. Check here before it bites you.</div>
+        <div class="sec">📊 Database size &amp; backup</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Your data is split across several pieces in Firebase (parts spread over multiple buckets, everything else in its own piece) — each piece has a 10MB hard limit, so splitting it up buys a lot of headroom over one giant block. The usual cause of size growth is accumulated part photos.</div>
+        <button onclick="downloadFullBackup()" style="font-size:12px;margin-bottom:12px">📥 Download full backup (.json)</button>
         <div id="db-size-summary" style="margin-bottom:12px"></div>
         <div id="db-size-top" style="margin-bottom:12px"></div>
         <button onclick="compressAllImages()" class="btn-amber" style="font-weight:700">🗜 Re-compress all part images to reclaim space</button>
@@ -1552,6 +1561,38 @@ function readLocal(){
   return null;
 }
 
+// ─── SHARDED STORAGE ────────────────────────────────────────────────────────
+// Instead of one giant JSON blob (which hits Firebase's 10MB-per-value hard limit as the
+// catalogue grows), parts are split across several buckets by a hash of their code, and
+// everything else (history, deliveries, quotes, BOMs, etc.) sits in its own separate piece.
+// Each piece independently has to stay under 10MB, so this buys a lot of headroom — and the
+// bucket count can simply be raised later (PARTS_SHARD_COUNT) if the catalogue keeps growing.
+const PARTS_SHARD_COUNT=12;
+function _shardHash(str){
+  let h=0;
+  for(let i=0;i<(str||'').length;i++){h=(h*31+str.charCodeAt(i))|0;}
+  return Math.abs(h)%PARTS_SHARD_COUNT;
+}
+function _buildShardWrites(){
+  const shards=Array.from({length:PARTS_SHARD_COUNT},()=>({}));
+  Object.entries(db.parts||{}).forEach(([code,p])=>{
+    shards[_shardHash(code)][code]=p;
+  });
+  const rest={...db};
+  delete rest.parts;
+  const writes={};
+  shards.forEach((shard,i)=>{writes['parts'+i]=JSON.stringify(shard);});
+  writes['rest']=JSON.stringify(rest);
+  return writes;
+}
+let _shardCache={};
+function _mergeShardsIntoDb(){
+  const mergedParts={};
+  for(let i=0;i<PARTS_SHARD_COUNT;i++)Object.assign(mergedParts,_shardCache['parts'+i]||{});
+  const rest=_shardCache.rest||{};
+  db={...rest,parts:mergedParts};
+}
+
 async function saveDB(){
   writeLocal();
   if(!_firebaseReady||!DATA_REF){return;}
@@ -1564,13 +1605,13 @@ async function saveDB(){
         const l=readLocal();
         if(l&&Object.keys(l.parts||{}).length>0){console.warn('saveDB blocked');return;}
       }
-      await DATA_REF.child('data').set(JSON.stringify(db));
+      await DATA_REF.update(_buildShardWrites());
       setStatus('Live ✓ — all data shared','#16a34a');
     }catch(e){
       console.error('Firebase save error:',e);
       setStatus('⚠ Save failed — data safe locally','#f59e0b');
       if((e.message||'').includes('10485760')||(e.message||'').toLowerCase().includes('greater than')){
-        toast('⚠ Save failed — your data is too large (over Firebase\'s 10MB limit, usually from part photos). Nothing from this change was saved. Go to Settings → Database size to see what\'s using the space and compress it.','err');
+        toast('⚠ Save failed — one piece of your data is still too large even after splitting it up. Go to Settings → Database size to see what\'s using the space.','err');
       }else{
         toast('Save error: '+e.message,'err');
       }
@@ -1583,41 +1624,32 @@ function startFirebaseListener(){
   _fbListenerActive=true;
   setStatus('Connecting…','#f59e0b');
 
-  DATA_REF.child('data').on('value', snapshot=>{
-    const raw=snapshot.val();
-    if(raw){
+  // One-time check: if the old single-blob format is still sitting there, migrate it into the
+  // new sharded format, then remove it. Only runs once per database — after migration, this
+  // node is empty and every subsequent load skips straight to the sharded listeners below.
+  DATA_REF.child('data').once('value').then(legacySnap=>{
+    const legacyRaw=legacySnap.val();
+    if(legacyRaw){
       try{
-        const cloud=typeof raw==='string'?JSON.parse(raw):raw;
-        if(cloud&&typeof cloud==='object'){
-          const cp=Object.keys(cloud.parts||{}).length;
-          const lp=Object.keys(db.parts||{}).length;
-          if(cp>0||lp===0){
-            if(_saveTimer)clearTimeout(_saveTimer);
-            db=cloud;
-            initDefaults();
-            writeLocal();
-            renderAll();
-            populateBrandDropdowns();
-          }
-          setStatus('Live ✓ — all data shared','#16a34a');
-          updateUserCount();
-          if(currentUser)revalidateAdmin();
+        const legacyDb=typeof legacyRaw==='string'?JSON.parse(legacyRaw):legacyRaw;
+        if(legacyDb&&typeof legacyDb==='object'){
+          db=legacyDb;
+          initDefaults();
+          DATA_REF.update(_buildShardWrites()).then(()=>{
+            DATA_REF.child('data').remove();
+            toast('Upgraded to the new storage format — no data was lost','info');
+            _attachShardListeners();
+          }).catch(e=>{
+            console.error('Migration write failed:',e);
+            toast('⚠ Could not migrate to new storage format yet — will retry next load','err');
+            _attachShardListeners();
+          });
+          return;
         }
-      }catch(e){console.warn('Firebase parse error:',e);}
-    }else{
-      const local=readLocal();
-      if(local&&Object.keys(local.parts||{}).length>0){
-        db=local;initDefaults();
-        DATA_REF.child('data').set(JSON.stringify(db));
-        toast('Uploading your data to Firebase…','info');
-        renderAll();populateBrandDropdowns();
-      }
-      setStatus('Live ✓ — ready','#16a34a');
+      }catch(e){console.warn('Legacy migration parse error:',e);}
     }
-  }, err=>{
-    console.warn('Firebase listener error:',err);
-    setStatus('⚠ Firebase offline — local data shown','#f59e0b');
-  });
+    _attachShardListeners();
+  }).catch(()=>{_attachShardListeners();});
 
   fbdb.ref('.info/connected').on('value', snap=>{
     if(snap.val()===true){setStatus('Live ✓ — all data shared','#16a34a');}
@@ -1625,11 +1657,75 @@ function startFirebaseListener(){
   });
 }
 
+let _liveShardUpdateTimer=null;
+function _attachShardListeners(){
+  const shardKeys=[...Array.from({length:PARTS_SHARD_COUNT},(_,i)=>'parts'+i),'rest'];
+  let loadedCount=0,initialLoadDone=false,anyDataFound=false;
+
+  shardKeys.forEach(key=>{
+    DATA_REF.child(key).on('value', snapshot=>{
+      const raw=snapshot.val();
+      try{
+        _shardCache[key]=raw?(typeof raw==='string'?JSON.parse(raw):raw):(key==='rest'?{}:{});
+        if(raw)anyDataFound=true;
+      }catch(e){
+        console.warn('Shard parse error for',key,e);
+        _shardCache[key]=key==='rest'?{}:{};
+      }
+
+      if(!initialLoadDone){
+        loadedCount++;
+        if(loadedCount>=shardKeys.length){initialLoadDone=true;_finishInitialLoad(anyDataFound);}
+      }else{
+        // A remote change arrived — cancel any pending local save (same priority rule as
+        // before: an incoming confirmed remote change wins over our own unsent edit) and
+        // debounce the merge, since one atomic multi-path update touches several shards
+        // at once and they can arrive as separate callbacks a few ms apart.
+        if(_saveTimer)clearTimeout(_saveTimer);
+        if(_liveShardUpdateTimer)clearTimeout(_liveShardUpdateTimer);
+        _liveShardUpdateTimer=setTimeout(()=>{
+          _mergeShardsIntoDb();
+          initDefaults();
+          renderAll();
+          populateBrandDropdowns();
+          setStatus('Live ✓ — all data shared','#16a34a');
+        },400);
+      }
+    }, err=>{
+      console.warn('Firebase listener error:',err);
+      setStatus('⚠ Firebase offline — local data shown','#f59e0b');
+    });
+  });
+}
+
+function _finishInitialLoad(anyDataFound){
+  _mergeShardsIntoDb();
+  const cp=Object.keys(db.parts||{}).length;
+  if(anyDataFound&&cp>0){
+    initDefaults();
+    writeLocal();
+    renderAll();
+    populateBrandDropdowns();
+    setStatus('Live ✓ — all data shared','#16a34a');
+  }else{
+    const local=readLocal();
+    if(local&&Object.keys(local.parts||{}).length>0){
+      db=local;initDefaults();
+      saveDB();
+      toast('Uploading your data to Firebase…','info');
+      renderAll();populateBrandDropdowns();
+    }
+    setStatus('Live ✓ — ready','#16a34a');
+  }
+  updateUserCount();
+  if(currentUser)revalidateAdmin();
+}
+
 async function manualSave(){
   if(_saveTimer)clearTimeout(_saveTimer);
   setStatus('Saving…','#f59e0b');
   try{
-    await DATA_REF.child('data').set(JSON.stringify(db));
+    await DATA_REF.update(_buildShardWrites());
     setStatus('Live ✓ — all data shared','#16a34a');
     toast('Saved to Firebase ✓');
   }catch(e){
@@ -7987,6 +8083,19 @@ function browseAddToCheckout(code){
 // part photos) before a save silently fails and loses whatever you were just adding.
 const FIREBASE_SIZE_LIMIT=10485760;
 function byteSize(str){return new TextEncoder().encode(str||'').length;}
+function downloadFullBackup(){
+  const json=JSON.stringify(db,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`workshop-backup-${nowD().replace(/\//g,'-')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✓ Backup downloaded');
+}
 function renderDbSizeDiagnostic(){
   const summaryEl=document.getElementById('db-size-summary');
   const topEl=document.getElementById('db-size-top');
@@ -9128,6 +9237,10 @@ loadUserSession();
 if(currentUser){
   const wall=document.getElementById('login-wall');
   if(wall)wall.style.display='none';
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{/* installability is a nice-to-have, never block the app on it */});
 }
 
 loadFirebaseConfig().then(ok=>{
