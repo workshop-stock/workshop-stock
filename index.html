@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 150 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 151 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1505,7 +1505,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=150; // bump this with every deploy — version.json must be updated to match
+const APP_REV=151; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -1634,6 +1634,37 @@ function _mergeShardsIntoDb(){
   db={...rest,parts:mergedParts};
 }
 
+// ─── STALE-WRITE PROTECTION ─────────────────────────────────────────────────
+// The root cause behind every data-loss incident so far: a tab that's been open a long time
+// has an old, smaller copy of the data sitting in memory. When it saves — even for something
+// tiny and unrelated — it overwrites the live data with that stale snapshot, silently wiping
+// out everything anyone else added since. "Close old tabs" is not a real fix for that, since
+// it relies on everyone remembering every time. This is the actual fix: a small revision
+// counter in Firebase, bumped atomically on every save. Before writing, each tab checks
+// whether the counter has moved since it last synced — if it has, someone else saved more
+// recently, so this tab's copy is stale and the write is refused rather than allowed to clobber
+// the newer data. The tab is reloaded instead, picking up the current data automatically.
+let _lastKnownRev=0;
+async function _guardedShardWrite(){
+  const myPartCount=Object.keys(db.parts||{}).length;
+  const txResult=await DATA_REF.child('meta').transaction(current=>{
+    const currentRev=(current&&current.rev)||0;
+    if(currentRev>_lastKnownRev)return; // abort — someone else has saved since we last synced
+    return{rev:currentRev+1,partCount:myPartCount,lastSavedAt:new Date().toISOString()};
+  });
+  if(!txResult.committed){
+    const e=new Error('STALE_DATA');throw e;
+  }
+  const writes=_buildShardWrites();
+  await DATA_REF.update(writes);
+  _lastKnownRev=(txResult.snapshot.val()||{}).rev||_lastKnownRev;
+}
+function _handleStaleWrite(){
+  setStatus('⚠ Out of date — reloading…','#991b1b');
+  alert('Someone else has saved changes since this page last loaded. To avoid overwriting their work, this page will now reload with the latest data.\n\nPlease redo whatever you just did after it reloads.');
+  location.reload();
+}
+
 async function saveDB(){
   writeLocal();
   if(!_firebaseReady||!DATA_REF){return;}
@@ -1646,9 +1677,10 @@ async function saveDB(){
         const l=readLocal();
         if(l&&Object.keys(l.parts||{}).length>0){console.warn('saveDB blocked');return;}
       }
-      await DATA_REF.update(_buildShardWrites());
+      await _guardedShardWrite();
       setStatus('Live ✓ — all data shared','#16a34a');
     }catch(e){
+      if(e.message==='STALE_DATA'){_handleStaleWrite();return;}
       console.error('Firebase save error:',e);
       setStatus('⚠ Save failed — data safe locally','#f59e0b');
       if((e.message||'').includes('10485760')||(e.message||'').toLowerCase().includes('greater than')){
@@ -1670,9 +1702,10 @@ async function saveDBNow(){
   if(!_firebaseReady||!DATA_REF)return;
   setStatus('Saving…','#f59e0b');
   try{
-    await DATA_REF.update(_buildShardWrites());
+    await _guardedShardWrite();
     setStatus('Live ✓ — all data shared','#16a34a');
   }catch(e){
+    if(e.message==='STALE_DATA'){_handleStaleWrite();return;}
     console.error('Firebase save error:',e);
     setStatus('⚠ Save failed — data safe locally','#f59e0b');
     if((e.message||'').includes('10485760')||(e.message||'').toLowerCase().includes('greater than')){
@@ -1724,12 +1757,17 @@ function startFirebaseListener(){
 
 let _liveShardUpdateTimer=null;
 function _attachShardListeners(){
-  const shardKeys=[...Array.from({length:PARTS_SHARD_COUNT},(_,i)=>'parts'+i),'rest'];
+  const shardKeys=[...Array.from({length:PARTS_SHARD_COUNT},(_,i)=>'parts'+i),'rest','meta'];
   let loadedCount=0,initialLoadDone=false,anyDataFound=false;
 
   shardKeys.forEach(key=>{
     DATA_REF.child(key).on('value', snapshot=>{
       const raw=snapshot.val();
+      if(key==='meta'){
+        _lastKnownRev=(raw&&raw.rev)||0;
+        if(!initialLoadDone){loadedCount++;if(loadedCount>=shardKeys.length){initialLoadDone=true;_finishInitialLoad(anyDataFound);}}
+        return;
+      }
       try{
         _shardCache[key]=raw?(typeof raw==='string'?JSON.parse(raw):raw):(key==='rest'?{}:{});
         if(raw)anyDataFound=true;
@@ -1790,10 +1828,11 @@ async function manualSave(){
   if(_saveTimer)clearTimeout(_saveTimer);
   setStatus('Saving…','#f59e0b');
   try{
-    await DATA_REF.update(_buildShardWrites());
+    await _guardedShardWrite();
     setStatus('Live ✓ — all data shared','#16a34a');
     toast('Saved to Firebase ✓');
   }catch(e){
+    if(e.message==='STALE_DATA'){_handleStaleWrite();return;}
     setStatus('⚠ Save failed','#f59e0b');
     toast('Save error: '+e.message,'err');
   }
