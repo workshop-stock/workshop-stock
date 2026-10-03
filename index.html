@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 146 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 148 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1444,7 +1444,11 @@ tr:hover td{background:#f9fafb}
       <div class="card" style="border:2px solid #f59e0b">
         <div class="sec">📊 Database size &amp; backup</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Your data is split across several pieces in Firebase (parts spread over multiple buckets, everything else in its own piece) — each piece has a 10MB hard limit, so splitting it up buys a lot of headroom over one giant block. The usual cause of size growth is accumulated part photos.</div>
-        <button onclick="downloadFullBackup()" style="font-size:12px;margin-bottom:12px">📥 Download full backup (.json)</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button onclick="downloadFullBackup()" style="font-size:12px">📥 Download full backup (.json)</button>
+          <button onclick="document.getElementById('restore-file-input').click()" class="admin-only" style="display:none;font-size:12px;color:#991b1b;border-color:#fca5a5">📤 Restore from backup file</button>
+          <input type="file" id="restore-file-input" accept="application/json" style="display:none" onchange="restoreFromBackupFile(this.files[0])">
+        </div>
         <div id="db-size-summary" style="margin-bottom:12px"></div>
         <div id="db-size-top" style="margin-bottom:12px"></div>
         <button onclick="compressAllImages()" class="btn-amber" style="font-weight:700">🗜 Re-compress all part images to reclaim space</button>
@@ -1495,7 +1499,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=146; // bump this with every deploy — version.json must be updated to match
+const APP_REV=148; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -5941,6 +5945,13 @@ async function deleteDeliveryRecord(delId){
 }
 
 // ─── ALLOCATIONS ──────────────────────────────────────────────────────────────
+let _collapsedAllocGroups=new Set();
+function toggleAllocGroupCollapse(groupId){
+  if(_collapsedAllocGroups.has(groupId))_collapsedAllocGroups.delete(groupId);
+  else _collapsedAllocGroups.add(groupId);
+  renderAllocations();
+}
+
 function renderAllocations(){
   if(!db.allocations)db.allocations=[];
   const q=((document.getElementById('alloc-search')||{value:''}).value||'').toLowerCase();
@@ -5978,11 +5989,16 @@ function renderAllocations(){
   el.innerHTML=Object.entries(byProject).map(([project,items])=>{
     const active=items.filter(i=>i.status!=='released'&&i.status!=='used');
     const finished=items.filter(i=>i.status==='released'||i.status==='used');
+    const projGroupId='proj-'+normalise(project);
+    const isCollapsed=_collapsedAllocGroups.has(projGroupId);
     return`<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">
-      <div style="padding:12px 14px;background:#f5f0ff;border-bottom:1px solid #e9d5ff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div>
-          <span style="font-weight:700;font-size:14px;color:#6d28d9">▣ ${project}</span>
-          <span style="font-size:12px;color:#7c3aed;margin-left:10px">${active.length} part${active.length!==1?'s':''} held · ${active.reduce((s,i)=>s+i.qty,0)} total units</span>
+      <div style="padding:12px 14px;background:#f5f0ff;border-bottom:${isCollapsed?'none':'1px solid #e9d5ff'};display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="toggleAllocGroupCollapse('${projGroupId}')" title="${isCollapsed?'Expand':'Collapse'}" style="background:none;border:none;cursor:pointer;font-size:13px;color:#6d28d9;padding:2px 4px">${isCollapsed?'▶':'▼'}</button>
+          <div>
+            <span style="font-weight:700;font-size:14px;color:#6d28d9">▣ ${project}</span>
+            <span style="font-size:12px;color:#7c3aed;margin-left:10px">${active.length} part${active.length!==1?'s':''} held · ${active.reduce((s,i)=>s+i.qty,0)} total units</span>
+          </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button onclick="releaseAllProject('${project.replace(/'/g,"\\'")}',false)" style="font-size:12px;padding:4px 12px;background:#fee2e2;color:#991b1b;border-color:#fca5a5;font-weight:600">
@@ -5990,7 +6006,7 @@ function renderAllocations(){
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto">
+      ${isCollapsed?'':`<div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:#faf5ff">
             <th style="padding:7px 10px;text-align:left;font-size:11px;color:#6d28d9;font-weight:600;text-transform:uppercase">Part</th>
@@ -6076,7 +6092,7 @@ function renderAllocations(){
             </tr>`;
           }).join('')}</tbody>
         </table>
-      </div>
+      </div>`}
     </div>`;
   }).join('');
 }
@@ -6451,6 +6467,13 @@ async function orderCodeChanged(i,val){
   renderOrder();
 }
 
+let _collapsedOrderGroups=new Set();
+function toggleOrderGroupCollapse(groupId){
+  if(_collapsedOrderGroups.has(groupId))_collapsedOrderGroups.delete(groupId);
+  else _collapsedOrderGroups.add(groupId);
+  renderOrder();
+}
+
 function renderOrder(){
   renderOrderFlaggedPanel();
   const el=document.getElementById('order-content');
@@ -6622,9 +6645,11 @@ function renderOrder(){
     const supTotal=items.reduce((a,{o})=>a+((o.cost||0)*(o.qty||1)),0);
     const isReal=!sup.startsWith('—');
     const groupId=`grp-${sectionId}-${normalise(sup)}`;
+    const isCollapsed=_collapsedOrderGroups.has(groupId);
     return`<div style="margin-bottom:14px" id="${groupId}">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:${isReal?'#1e3a5f':'#f3f4f6'};border-radius:6px 6px 0 0;flex-wrap:wrap;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:${isReal?'#1e3a5f':'#f3f4f6'};border-radius:${isCollapsed?'6px':'6px 6px 0 0'};flex-wrap:wrap;gap:6px">
         <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="toggleOrderGroupCollapse('${groupId}')" title="${isCollapsed?'Expand':'Collapse'}" style="background:none;border:none;cursor:pointer;font-size:13px;color:${isReal?'#fff':'#6b7280'};padding:2px 4px">${isCollapsed?'▶':'▼'}</button>
           <input type="checkbox" id="chk-all-${groupId}" style="width:16px;height:16px;cursor:pointer"
             onchange="toggleGroupSelect('${groupId}',this.checked)">
           <span style="font-weight:700;font-size:13px;color:${isReal?'#fff':'#6b7280'}">${sup}</span>
@@ -6637,7 +6662,7 @@ function renderOrder(){
           <button onclick="openCreatePOModal('${groupId}','${sup.replace(/'/g,"\\'")}',${JSON.stringify(items.map(x=>x.i))})" style="font-size:11px;padding:3px 10px;background:#166534;border-color:#166534;color:#fff;font-weight:600">📄 Create PO</button>
         </div>
       </div>
-      ${tableHead}<tbody>${items.map(({o,i})=>rowHtml(o,i)).join('')}</tbody></table>
+      ${isCollapsed?'':`${tableHead}<tbody>${items.map(({o,i})=>rowHtml(o,i)).join('')}</tbody></table>`}
     </div>`;
   }
 
@@ -8150,6 +8175,56 @@ function downloadFullBackup(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('✓ Backup downloaded');
+}
+
+// Replaces the live database with the contents of an uploaded backup file. This is a
+// deliberately destructive, admin-only action — used for disaster recovery (a bad overwrite,
+// lost data) where restoring a known-good or merged backup is the right call.
+function restoreFromBackupFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    let uploaded;
+    try{
+      uploaded=JSON.parse(e.target.result);
+    }catch(err){
+      toast('⚠ That file isn\'t valid JSON — restore cancelled','err');
+      return;
+    }
+    if(!uploaded||typeof uploaded!=='object'||!uploaded.parts||typeof uploaded.parts!=='object'){
+      toast('⚠ That doesn\'t look like a Workshop Stock Control backup file (no parts found) — restore cancelled','err');
+      return;
+    }
+    const newPartCount=Object.keys(uploaded.parts).length;
+    const curPartCount=Object.keys(db.parts||{}).length;
+    const newOrderCount=(uploaded.order||[]).length;
+    const curOrderCount=(db.order||[]).length;
+    const msg=`Restore from this backup file?\n\n`+
+      `Parts: ${curPartCount} currently → ${newPartCount} in this file\n`+
+      `Order list: ${curOrderCount} currently → ${newOrderCount} in this file\n\n`+
+      `THIS REPLACES EVERYTHING currently in the database with what's in this file. `+
+      `Anything added or changed since this backup was taken (and not in the file) will be lost. `+
+      `This cannot be undone with the normal Undo button.\n\nType-safe check: are you sure?`;
+    if(!confirm(msg))return;
+    if(!confirm('Really sure? This is your last chance to cancel before it overwrites the live database.'))return;
+
+    pushUndo();
+    db=uploaded;
+    initDefaults();
+    try{
+      await saveDBNow();
+      writeLocal();
+      renderAll();
+      populateBrandDropdowns();
+      toast(`✓ Restored from backup — ${newPartCount} parts now in the database`);
+    }catch(err){
+      toast('⚠ Restore failed to save — see console for details. Your previous data has NOT been lost yet; do not refresh.','err');
+      console.error('Restore save failed:',err);
+    }
+  };
+  reader.onerror=()=>{toast('⚠ Could not read that file','err');};
+  reader.readAsText(file);
+  document.getElementById('restore-file-input').value='';
 }
 function renderDbSizeDiagnostic(){
   const summaryEl=document.getElementById('db-size-summary');
