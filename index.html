@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 144 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 146 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1495,7 +1495,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=144; // bump this with every deploy — version.json must be updated to match
+const APP_REV=146; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -1598,7 +1598,7 @@ function readLocal(){
 // everything else (history, deliveries, quotes, BOMs, etc.) sits in its own separate piece.
 // Each piece independently has to stay under 10MB, so this buys a lot of headroom — and the
 // bucket count can simply be raised later (PARTS_SHARD_COUNT) if the catalogue keeps growing.
-const PARTS_SHARD_COUNT=12;
+const PARTS_SHARD_COUNT=20;
 function _shardHash(str){
   let h=0;
   for(let i=0;i<(str||'').length;i++){h=(h*31+str.charCodeAt(i))|0;}
@@ -1648,6 +1648,30 @@ async function saveDB(){
       }
     }
   },1500);
+}
+
+// Writes immediately instead of waiting out the normal ~1.5s debounce — for one-off,
+// consequential actions (bulk merges, compression, cleanup tools) where the person might
+// reasonably navigate away or refresh right after, which would otherwise silently drop
+// the pending debounced write and make the action look like it never happened.
+async function saveDBNow(){
+  writeLocal();
+  if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}
+  if(!_firebaseReady||!DATA_REF)return;
+  setStatus('Saving…','#f59e0b');
+  try{
+    await DATA_REF.update(_buildShardWrites());
+    setStatus('Live ✓ — all data shared','#16a34a');
+  }catch(e){
+    console.error('Firebase save error:',e);
+    setStatus('⚠ Save failed — data safe locally','#f59e0b');
+    if((e.message||'').includes('10485760')||(e.message||'').toLowerCase().includes('greater than')){
+      toast('⚠ Save failed — one piece of your data is still too large even after splitting it up. Go to Settings → Database size to see what\'s using the space.','err');
+    }else{
+      toast('Save error: '+e.message,'err');
+    }
+    throw e;
+  }
 }
 
 function startFirebaseListener(){
@@ -3737,7 +3761,7 @@ async function bulkSetStandardised(val){
   if(!confirm(`${val?'Mark':'Unmark'} ${codes.length} part${codes.length!==1?'s':''} as standardised?`))return;
   pushUndo();
   codes.forEach(code=>{if(db.parts[code])db.parts[code].standardised=val;});
-  await saveDB();
+  await saveDBNow();
   doSearch();
   toast(`${codes.length} part${codes.length!==1?'s':''} ${val?'marked':'unmarked'} as standardised`);
 }
@@ -8153,7 +8177,20 @@ function renderDbSizeDiagnostic(){
       <div style="background:${barColor};height:100%;width:${pct}%"></div>
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-top:4px">${totalMb} MB total, spread across ${PARTS_SHARD_COUNT+1} pieces (parts in ${PARTS_SHARD_COUNT} buckets + everything else) — each piece has its own 10MB limit, so this is the number that matters, not the total.</div>
-    ${pct>80?`<div style="margin-top:8px;font-size:12px;color:#991b1b;font-weight:600">⚠ One piece is getting close to its own limit — saves touching that piece may start failing soon.</div>`:''}`;
+    ${pct>80?`<div style="margin-top:8px;font-size:12px;color:#991b1b;font-weight:600">⚠ One piece is getting close to its own limit — saves touching that piece may start failing soon.</div>`:''}
+    <details style="margin-top:8px">
+      <summary style="font-size:11px;color:#6d28d9;cursor:pointer">Show every piece individually</summary>
+      <div style="margin-top:6px">
+        ${shards.map((shard,i)=>{
+          const sz=shardSizes[i];const spct=Math.min(100,(sz/FIREBASE_SIZE_LIMIT)*100);
+          const sColor=spct>90?'#991b1b':spct>70?'#f59e0b':'#166534';
+          return`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0"><span>Parts bucket ${i} (${Object.keys(shard).length} parts)</span><span style="font-weight:600;color:${sColor}">${(sz/1024).toFixed(0)} KB</span></div>`;
+        }).join('')}
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-top:1px solid #e5e7eb;margin-top:4px;padding-top:4px">
+          <span>Everything else (history, deliveries, BOMs, etc.)</span><span style="font-weight:600">${(shardSizes[PARTS_SHARD_COUNT]/1024).toFixed(0)} KB</span>
+        </div>
+      </div>
+    </details>`;
 
   // Category breakdown — images are often the biggest, but not always; history/deliveries/
   // quotes etc. can add up too on a long-used catalogue, so this shows where to actually look.
@@ -8206,7 +8243,7 @@ async function removeDuplicateImageData(){
   if(!dupeParts.length){toast('No duplicates found','info');return;}
   pushUndo();
   dupeParts.forEach(p=>{p.img='';});
-  await saveDB();
+  await saveDBNow();
   renderDbSizeDiagnostic();
   toast(`✓ Cleaned up ${dupeParts.length} part(s) — no photos were removed, just the redundant copies`);
 }
@@ -8237,7 +8274,7 @@ async function compressAllImages(){
     p.img='';
     done++;
   }
-  await saveDB();
+  await saveDBNow();
   renderDbSizeDiagnostic();
   toast(`✓ Compressed ${done} part(s) — reclaimed ~${(savedBytes/1048576).toFixed(2)} MB`);
 }
@@ -8535,7 +8572,7 @@ async function autoMergeCaseOnlyDuplicates(){
     });
   });
 
-  await saveDB();
+  await saveDBNow();
   renderSettings();
   populateBrandDropdowns();
   toast(`✓ Auto-merged ${groups.length} case-duplicate group${groups.length!==1?'s':''} — ${partsUpdated} part${partsUpdated!==1?'s':''} updated`);
@@ -8627,7 +8664,7 @@ async function mergeSupplierNames(){
     return false;
   });
 
-  await saveDB();
+  await saveDBNow();
   document.getElementById('sup-cleanup-target').value='';
   renderSettings();
   populateBrandDropdowns();
