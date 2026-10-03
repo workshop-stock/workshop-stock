@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 143 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 144 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1495,9 +1495,40 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
+const APP_REV=144; // bump this with every deploy — version.json must be updated to match
+
 let fbdb = null;
 let DATA_REF = null;
 let _firebaseReady = false;
+
+// ─── UPDATE NOTIFICATION ────────────────────────────────────────────────────
+// Checks a tiny version.json file (deployed alongside index.html) every few minutes.
+// If it reports a newer revision than what this tab loaded with, shows a banner telling
+// whoever's using the app that an update is available, with a one-click refresh.
+async function checkForUpdate(){
+  try{
+    const res=await fetch('version.json?t='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const data=await res.json();
+    if(data&&typeof data.rev==='number'&&data.rev>APP_REV){
+      showUpdateBanner(data.rev);
+    }
+  }catch(e){/* network hiccup or file not deployed yet — not worth bothering anyone about */}
+}
+function showUpdateBanner(newRev){
+  if(document.getElementById('update-banner'))return;
+  const div=document.createElement('div');
+  div.id='update-banner';
+  div.style.cssText='position:fixed;top:0;left:0;right:0;z-index:10000;background:#1e3a5f;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2);flex-wrap:wrap';
+  div.innerHTML=`
+    <span>🔄 A new version is available (Rev ${newRev}) — refresh to get the latest fixes and features.</span>
+    <button onclick="location.reload(true)" style="background:#fff;color:#1e3a5f;border:none;padding:5px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px">Refresh now</button>
+    <button onclick="document.getElementById('update-banner').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px">Later</button>
+  `;
+  document.body.prepend(div);
+}
+setInterval(checkForUpdate,5*60*1000); // re-check every 5 minutes while the tab is open
+setTimeout(checkForUpdate,3000); // and once shortly after load, in case it was already stale
 
 async function loadFirebaseConfig(){
   try{
