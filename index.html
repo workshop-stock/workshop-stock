@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 149 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 150 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1505,7 +1505,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=149; // bump this with every deploy — version.json must be updated to match
+const APP_REV=150; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -2745,7 +2745,7 @@ function qtyOrFlagCell(p){
 async function toggleNeedsReorder(code,val){
   const p=db.parts[code];if(!p)return;
   p.needsReorder=val;
-  await saveDB();
+  await saveDBNow();
   toast(val?`🔴 ${p.name} flagged for reorder`:`✓ ${p.name} unflagged`);
   renderDash();
   const slPanel=document.getElementById('panel-stocklevels');
@@ -6446,7 +6446,7 @@ async function addFlaggedToOrder(code){
   if(existing){existing.qty+=qty;}
   else{db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});}
   p.needsReorder=false;
-  await saveDB();
+  await saveDBNow();
   renderOrder();
   toast(`${qty}× ${p.name} added to order list`);
 }
@@ -6459,7 +6459,7 @@ async function addAllFlaggedToOrder(){
     db.order.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,added:nowD(),bom:''});
     p.needsReorder=false;
   }
-  await saveDB();
+  await saveDBNow();
   renderOrder();
   toast(`${flagged.length} flagged part${flagged.length!==1?'s':''} added to order list`);
 }
