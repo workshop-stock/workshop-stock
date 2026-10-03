@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 151 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 152 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1505,7 +1505,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=151; // bump this with every deploy — version.json must be updated to match
+const APP_REV=152; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -1723,11 +1723,26 @@ function startFirebaseListener(){
   setStatus('Connecting…','#f59e0b');
 
   // One-time check: if the old single-blob format is still sitting there, migrate it into the
-  // new sharded format, then remove it. Only runs once per database — after migration, this
-  // node is empty and every subsequent load skips straight to the sharded listeners below.
-  DATA_REF.child('data').once('value').then(legacySnap=>{
+  // new sharded format, then remove it. CRITICAL: a stale 'data' node must never be treated as
+  // authoritative once sharded data already exists — if a prior removal silently failed, acting
+  // on 'data' again would revert every subsequent load back to that old frozen snapshot,
+  // overwriting anything added since (this is exactly what happened before this fix). So:
+  // sharded data, if present at all, always wins — 'data' only gets used the very first time,
+  // when no sharded data exists yet anywhere.
+  Promise.all([
+    DATA_REF.child('data').once('value'),
+    DATA_REF.child('rest').once('value')
+  ]).then(([legacySnap,restSnap])=>{
     const legacyRaw=legacySnap.val();
-    if(legacyRaw){
+    const shardedAlreadyExists=!!restSnap.val();
+    if(legacyRaw&&shardedAlreadyExists){
+      // Stale leftover from an earlier migration that didn't fully clean up — delete it without
+      // ever reading its content, so it can never again overwrite the current sharded data.
+      DATA_REF.child('data').remove();
+      _attachShardListeners();
+      return;
+    }
+    if(legacyRaw&&!shardedAlreadyExists){
       try{
         const legacyDb=typeof legacyRaw==='string'?JSON.parse(legacyRaw):legacyRaw;
         if(legacyDb&&typeof legacyDb==='object'){
