@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 152 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 153 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1425,7 +1425,7 @@ tr:hover td{background:#f9fafb}
           <button class="btn-blue" onclick="addBrandSupplier()">Assign</button>
         </div>
       </div>
-      <div class="card" style="border:2px solid #f59e0b">
+      <div class="card admin-only" style="display:none;border:2px solid #f59e0b">
         <div class="sec">🧹 Clean up duplicate supplier names</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">If typing suppliers on parts created slightly different spellings of the same company (e.g. "Adopt Automation" / "Adopt Automation Ltd" / "AdoptAuto"), tick the duplicates below and merge them into one correct name — every part using any of the ticked names gets updated. Already-merged names stay in the list below, greyed out with a strikethrough, so you can see what's already been cleaned up.</div>
         <div id="sup-case-dupe-banner" style="display:none;margin-bottom:10px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1441,7 +1441,7 @@ tr:hover td{background:#f9fafb}
           <button onclick="mergeSupplierNames()" class="btn-red" style="font-weight:700">Merge selected</button>
         </div>
       </div>
-      <div class="card" style="border:2px solid #f59e0b">
+      <div class="card admin-only" style="display:none;border:2px solid #f59e0b">
         <div class="sec">📊 Database size &amp; backup</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Your data is split across several pieces in Firebase (parts spread over multiple buckets, everything else in its own piece) — each piece has a 10MB hard limit, so splitting it up buys a lot of headroom over one giant block. The usual cause of size growth is accumulated part photos.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -1453,7 +1453,7 @@ tr:hover td{background:#f9fafb}
         <div id="db-size-top" style="margin-bottom:12px"></div>
         <button onclick="compressAllImages()" class="btn-amber" style="font-weight:700">🗜 Re-compress all part images to reclaim space</button>
       </div>
-      <div class="card" style="border:2px solid #991b1b">
+      <div class="card admin-only" style="display:none;border:2px solid #991b1b">
         <div class="sec">🔍 Stock audit — past release over-counts</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Fixed bug: releasing a manually-allocated part used to add its quantity back to stock even when it was never actually subtracted in the first place (manual allocations don't touch stock while they're held — only delivery-sourced ones do). Any release done before this fix may have quietly inflated that part's count. This scans your allocation history for exactly those cases.</div>
         <button onclick="auditReleaseOvercounts()" style="font-size:12px;background:#fee2e2;color:#991b1b;border-color:#fca5a5;font-weight:700">Scan for affected parts</button>
@@ -1505,7 +1505,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=152; // bump this with every deploy — version.json must be updated to match
+const APP_REV=153; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
