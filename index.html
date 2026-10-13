@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 153 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 155 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -744,6 +744,10 @@ tr:hover td{background:#f9fafb}
   </div>
 </div>
 <div class="panel" id="panel-addpart">
+  <div id="ap-return-banner" style="display:none;background:#eff6ff;border:2px solid #3b82f6;border-radius:10px;padding:10px 14px;margin-bottom:12px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <div id="ap-return-text" style="font-size:13px;color:#1e40af;font-weight:600"></div>
+    <button onclick="skipAddPartReturn()" style="font-size:12px" id="ap-return-skip">Cancel</button>
+  </div>
   <div class="card">
     <div class="sec">Add new part to catalogue</div>
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px">
@@ -1136,12 +1140,16 @@ tr:hover td{background:#f9fafb}
       <div id="npo-search-results" style="max-height:320px;overflow-y:auto;margin-bottom:14px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
 
       <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:#6b7280">Or add something not yet in stock</label><input id="npo-new-code" placeholder="Part number…" style="margin-top:2px"></div>
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:#6b7280">New part not in the catalogue yet? Type what you know, then Create — you'll fill in the rest and come straight back here</label><input id="npo-new-code" placeholder="Part number…" style="margin-top:2px"></div>
         <div style="flex:2;min-width:160px"><input id="npo-new-name" placeholder="Description…"></div>
         <div style="width:70px"><input type="number" id="npo-new-qty" value="1" min="1"></div>
-        <button onclick="npoAddNewItem()" class="btn-blue">+ Add</button>
+        <button onclick="npoCreateNewPart()" class="btn-blue" style="font-weight:700">➕ Create new part</button>
       </div>
 
+      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button onclick="startPdfImport('po')" style="font-size:12px;background:#eff6ff;color:#1e40af;border-color:#93c5fd;font-weight:600">📎 Import supplier PDF (quote / confirmation)</button>
+        <span style="font-size:11px;color:#9ca3af">Fills quotation number and adds the lines automatically</span>
+      </div>
       <div class="sec">Items on this PO (<span id="npo-count">0</span>)</div>
       <div id="npo-items-list" style="margin-bottom:16px"></div>
 
@@ -1173,6 +1181,21 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <!-- CREATE PO MODAL — builds a delivery-tracking record directly from the Order List, no BOM needed -->
+<input type="file" id="pdf-import-input" accept="application/pdf" style="display:none" onchange="pdfImportFileChosen(this)">
+<div class="imp-overlay" id="pdf-import-modal">
+  <div class="imp-box" style="max-width:720px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2>📎 Import from supplier PDF</h2>
+      <button onclick="closePdfImport()" style="font-size:18px;border:none;background:none;cursor:pointer;color:#6b7280;padding:0 4px">&times;</button>
+    </div>
+    <p>Check what was picked up from the PDF, fix anything that's wrong, then apply. Nothing is changed until you press Apply.</p>
+    <div id="pdf-import-body"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="applyPdfImport()" class="btn-green" style="font-weight:700;flex:1;padding:10px">✓ Apply</button>
+      <button onclick="closePdfImport()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div class="imp-overlay" id="create-po-modal">
   <div class="imp-box" style="max-width:640px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1282,10 +1305,10 @@ tr:hover td{background:#f9fafb}
       </div>
       <div id="qt-search-results" style="max-height:260px;overflow-y:auto;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px"></div>
       <div style="display:flex;gap:8px;align-items:flex-end;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:#6b7280">Or add something not yet in stock</label><input id="qtb-new-code" placeholder="Part number…" style="margin-top:2px"></div>
+        <div style="flex:1;min-width:120px"><label style="font-size:11px;color:#6b7280">New part not in the catalogue yet? Type what you know, then Create — you'll fill in the rest and come straight back here</label><input id="qtb-new-code" placeholder="Part number…" style="margin-top:2px"></div>
         <div style="flex:2;min-width:160px"><input id="qtb-new-name" placeholder="Description…"></div>
         <div style="width:70px"><input type="number" id="qtb-new-qty" value="1" min="1"></div>
-        <button onclick="qtAddNewItem()" class="btn-blue">+ Add</button>
+        <button onclick="qtCreateNewPart()" class="btn-blue" style="font-weight:700">➕ Create new part</button>
       </div>
     </div>
 
@@ -1505,7 +1528,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=153; // bump this with every deploy — version.json must be updated to match
+const APP_REV=155; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -3993,6 +4016,7 @@ async function addPart(){
   ['ap-loc','ap-loc2','ap-loc3'].forEach(id=>document.getElementById(id).value='');
   _pendingImages.ap=[];renderImageGallery('ap');
   renderDash();doSearch();
+  if(_apReturn)finishAddPartReturn(db.parts[code]);
 }
 
 function printBOMShelfCheck(){
@@ -6958,7 +6982,7 @@ function renderNpoItemsList(){
         <div style="font-weight:600;font-size:13px">${it.name}${!it.fromStock?' <span style="font-size:10px;color:#92400e">(new — not in catalogue yet)</span>':''}</div>
         <div style="font-size:11px;color:#9ca3af">${it.code}</div>
       </div>
-      <input type="number" value="${it.qty}" min="1" style="width:60px;font-size:13px" onchange="npoUpdateQty(${i},this.value)">
+      <input type="number" id="npo-iq-${i}" value="${it.qty}" min="1" style="width:60px;font-size:13px" onchange="npoUpdateQty(${i},this.value)">
       <button onclick="npoRemoveItem(${i})" style="font-size:12px;padding:4px 8px;color:#991b1b;border-color:#fca5a5">✕</button>
     </div>`;
   }).join('');
@@ -7777,6 +7801,7 @@ function renderCoCard(qtId,co){
     <div style="padding:8px 16px 0;display:flex;align-items:center;gap:8px">
       <label style="font-size:11px;color:#6b7280;white-space:nowrap">Their quote #:</label>
       <input value="${co.theirQuoteRef||''}" placeholder="e.g. RS-Q-88213 (once they send it back)" style="font-size:12px;padding:4px 8px;max-width:240px" onchange="updateQuoteCoField('${qtId}',${coIdx},'theirQuoteRef',this.value)">
+      <button onclick="startPdfImport('quote','${qtId}',${coIdx})" style="font-size:12px;padding:4px 10px;background:#eff6ff;color:#1e40af;border-color:#93c5fd;font-weight:600;white-space:nowrap">📎 Import quote PDF</button>
     </div>
     <div class="qt-company-body">
       <div class="qt-line-hdr"><span></span><span>Part</span><span>Qty</span><span>Unit price £</span><span>Total £</span><span>Lead time</span><span>Status</span></div>
@@ -7796,6 +7821,287 @@ function renderCoCard(qtId,co){
       </div>`).join('')}
     </div>
   </div>`;
+}
+
+// ─── Supplier PDF import (RS / other quotes & order confirmations) ───
+// Reads the PDF in the browser (nothing is uploaded), finds rows containing part numbers we already know
+// (code, mfr no, supplier part no, RS stock no, aliases), pulls qty / unit price / lead time from the same row,
+// and shows a review screen before anything is changed.
+let _pdfjsLoading=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsLoading)return _pdfjsLoading;
+  const base='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  _pdfjsLoading=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=base+'pdf.min.js';
+    s.onload=async()=>{
+      try{
+        const w=await (await fetch(base+'pdf.worker.min.js')).text();
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([w],{type:'text/javascript'}));
+        res(window.pdfjsLib);
+      }catch(e){_pdfjsLoading=null;rej(new Error('Could not load PDF reader'));}
+    };
+    s.onerror=()=>{_pdfjsLoading=null;rej(new Error('Could not load PDF reader — check internet connection'));};
+    document.head.appendChild(s);
+  });
+  return _pdfjsLoading;
+}
+async function pdfToRows(file){
+  const lib=await loadPdfJs();
+  const pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise;
+  const out=[];
+  for(let pn=1;pn<=pdf.numPages;pn++){
+    const tc=await (await pdf.getPage(pn)).getTextContent();
+    const items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5]}));
+    items.sort((a,b)=>b.y-a.y||a.x-b.x);
+    let cur=null;const rows=[];
+    items.forEach(it=>{
+      if(cur&&Math.abs(cur.y-it.y)<=3)cur.cells.push(it);
+      else{cur={y:it.y,cells:[it]};rows.push(cur);}
+    });
+    rows.forEach(r=>{r.cells.sort((a,b)=>a.x-b.x);out.push(r.cells.map(c=>c.s));});
+  }
+  return out;
+}
+function _pdfPartIndex(){
+  const m=new Map();
+  const add=(k,p)=>{const n=normalise(k);if(n.length>=4&&!m.has(n))m.set(n,p);};
+  Object.values(db.parts).forEach(p=>{
+    add(p.code,p);add(p.mfrno,p);add(p.supPartNo,p);add(p.barcode,p);
+    (p.altSuppliers||[]).forEach(a=>add(a.partNo,p));
+    (p.aliases||[]).forEach(a=>add(a,p));
+    add(stripVendorPrefix(p.code),p);
+  });
+  return m;
+}
+function parseSupplierPdf(rows){
+  const idx=_pdfPartIndex();
+  const text=rows.map(r=>r.join(' ')).join('\n');
+  let quoteNo='';
+  const qre=/(?:quotation|quote)\s*(?:no\.?|number|ref\.?|reference|#)?\s*[:#]?\s*([A-Z0-9][A-Z0-9\-\/]{4,})/gi;
+  let mm;
+  while((mm=qre.exec(text))){if(/\d/.test(mm[1])){quoteNo=mm[1];break;}}
+  const numRe=/^[£€$]?\s*\d[\d,]*(\.\d+)?$/;
+  const toNum=c=>parseFloat(c.replace(/[£€$,\s]/g,''));
+  const grab=(i)=>{
+    const cells=rows[i];let part=null,codeCell=null;
+    for(const c of cells){
+      const toks=[c,...c.split(/\s+/)];
+      for(const t of toks){const p=idx.get(normalise(t));if(p){part=p;codeCell=c;break;}}
+      if(part)break;
+    }
+    return{part,codeCell};
+  };
+  const result=[];
+  rows.forEach((cells,i)=>{
+    let {part,codeCell}=grab(i);
+    // unmatched rows: only keep if they look like a line (code-ish cell + price)
+    let span=[cells];
+    const hasPrice=cs=>cs.some(c=>numRe.test(c)&&c.includes('.'));
+    if(!hasPrice(cells)&&rows[i+1])span.push(rows[i+1]);
+    if(!hasPrice(cells)&&!hasPrice(span[span.length-1])&&rows[i+2])span.push(rows[i+2]);
+    const all=span.flat();
+    const nums=all.filter(c=>c!==codeCell&&numRe.test(c)&&!idx.has(normalise(c)));
+    const prices=nums.filter(c=>c.includes('.')).map(toNum);
+    const ints=nums.filter(c=>!c.includes('.')).map(toNum).filter(n=>n>0&&n<=99999);
+    if(!prices.length)return;
+    if(!part){
+      // need something that looks like a part number to treat an unknown row as a line
+      const cand=cells.find(c=>/^[A-Z0-9][A-Z0-9\-\.\/]{4,}$/i.test(c)&&/\d/.test(c)&&!numRe.test(c));
+      if(!cand||!ints.length)return;
+      codeCell=cand;
+    }
+    const qty=ints.length?ints[0]:0;
+    let unit=prices[0],total=prices.length>1?prices[prices.length-1]:0;
+    if(qty&&prices.length>=2){
+      outer:for(let a=0;a<prices.length;a++)for(let b=0;b<prices.length;b++){
+        if(a!==b&&Math.abs(prices[a]*qty-prices[b])<0.011){unit=prices[a];total=prices[b];break outer;}
+      }
+    }
+    const lm=all.join(' ').match(/(\d+\s*(?:-|to)?\s*\d*\s*(?:working\s+)?(?:days?|weeks?|wks?))|in stock/i);
+    const desc=cells.filter(c=>c!==codeCell&&!numRe.test(c)).sort((a,b)=>b.length-a.length)[0]||'';
+    result.push({text:cells.join('  '),desc,part,code:part?part.code:(codeCell||''),qty,unit,total,lead:lm?lm[0].trim():''});
+  });
+  return{quoteNo,rows:result};
+}
+let _pdfImp=null;
+function startPdfImport(mode,qtId,coIdx){
+  _pdfImp={mode,qtId,coIdx};
+  document.getElementById('pdf-import-input').click();
+}
+async function pdfImportFileChosen(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f||!_pdfImp)return;
+  toast('Reading PDF…','info');
+  try{
+    const rows=await pdfToRows(f);
+    if(!rows.length){toast('No text found in that PDF (scanned image?) — enter prices by hand','err');return;}
+    _pdfImp.parsed=parseSupplierPdf(rows);
+    renderPdfImport(f.name);
+  }catch(e){toast('PDF import failed: '+e.message,'err');}
+}
+function _pe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function renderPdfImport(fname){
+  const st=_pdfImp,P=st.parsed;
+  const body=document.getElementById('pdf-import-body');
+  let html=`<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <label style="font-size:12px;color:#6b7280">${st.mode==='quote'?"Supplier's quote number":'Quotation number'}</label>
+    <input id="pdfi-quoteno" value="${_pe(P.quoteNo)}" placeholder="not found — type it in" style="max-width:240px;font-size:13px">
+    <span style="font-size:11px;color:#9ca3af">${_pe(fname)}</span></div>`;
+  if(st.mode==='quote'){
+    const co=db.quotes[st.qtId].companies[st.coIdx];
+    st.map=co.lines.map(l=>{
+      const ln=normalise(l.code);
+      const hit=P.rows.find(r=>r.part&&normalise(r.part.code)===ln&&r.unit)||P.rows.find(r=>normalise(r.code)===ln&&r.unit);
+      return hit||null;
+    });
+    const matched=st.map.filter(Boolean).length;
+    html+=`<div style="font-size:12px;margin-bottom:8px;color:${matched===co.lines.length?'#166534':'#92400e'}">Matched <strong>${matched}</strong> of ${co.lines.length} lines on this request.</div>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">`;
+    co.lines.forEach((l,i)=>{
+      const h=st.map[i];
+      html+=`<div style="display:grid;grid-template-columns:24px 1fr 90px 110px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid #f3f4f6;${h?'':'background:#f9fafb;color:#9ca3af'}">
+        <input type="checkbox" id="pdfi-ck-${i}" ${h?'checked':'disabled'}>
+        <div><div style="font-weight:600;font-size:13px">${_pe(l.name)} <span style="font-size:11px;font-weight:400">× ${l.qty}</span></div>
+          <div style="font-size:11px;color:#9ca3af">${h?'PDF: '+_pe(h.text.slice(0,90)):'Not found in PDF'}</div></div>
+        <input type="number" step="0.01" id="pdfi-u-${i}" value="${h?h.unit:''}" placeholder="£ unit" style="font-size:12px" ${h?'':'disabled'}>
+        <input id="pdfi-l-${i}" value="${h?_pe(h.lead):''}" placeholder="lead time" style="font-size:12px" ${h?'':'disabled'}>
+      </div>`;
+    });
+    html+='</div>';
+  }else{
+    st.rowsList=P.rows;
+    html+=`<div style="font-size:12px;margin-bottom:8px;color:#6b7280">Tick the lines to add to the PO. Lines in stock are ticked; lines not recognised are unticked — tick them to add as new items.</div>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">`;
+    P.rows.forEach((r,i)=>{
+      html+=`<div style="display:grid;grid-template-columns:24px 1fr 60px 80px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid #f3f4f6;${r.part?'':'background:#fffbeb'}">
+        <input type="checkbox" id="pdfi-ck-${i}" ${r.part&&r.qty?'checked':''}>
+        <div><div style="font-weight:600;font-size:13px">${r.part?_pe(r.part.name):'<span style="color:#92400e">Not in stock:</span> <input id="pdfi-c-'+i+'" value="'+_pe(r.code)+'" style="font-size:12px;width:150px">'}</div>
+          <div style="font-size:11px;color:#9ca3af">${_pe(r.text.slice(0,90))}</div></div>
+        <input type="number" min="1" id="pdfi-q-${i}" value="${r.qty||1}" style="font-size:12px">
+        <input type="number" step="0.01" id="pdfi-u-${i}" value="${r.unit}" style="font-size:12px">
+      </div>`;
+    });
+    html+='</div>';
+    if(!P.rows.length)html+='<div style="padding:10px;color:#9ca3af;font-size:13px">No part lines recognised in this PDF.</div>';
+  }
+  body.innerHTML=html;
+  document.getElementById('pdf-import-modal').classList.add('open');
+}
+function closePdfImport(){document.getElementById('pdf-import-modal').classList.remove('open');_pdfImp=null;}
+async function applyPdfImport(){
+  const st=_pdfImp;if(!st)return;
+  const qno=(document.getElementById('pdfi-quoteno').value||'').trim();
+  if(st.mode==='quote'){
+    const co=db.quotes[st.qtId].companies[st.coIdx];
+    let n=0;
+    co.lines.forEach((l,i)=>{
+      const ck=document.getElementById('pdfi-ck-'+i);
+      if(!ck||!ck.checked)return;
+      const u=parseFloat(document.getElementById('pdfi-u-'+i).value)||0;
+      if(!u)return;
+      l.unitPrice=String(u);l.totalPrice=(u*l.qty).toFixed(2);
+      const lead=document.getElementById('pdfi-l-'+i).value.trim();
+      if(lead)l.notes=lead;
+      l.status='quoted';n++;
+    });
+    if(qno)co.theirQuoteRef=qno;
+    if(n)co.status='quoted';
+    addEventHist('QUOTE_IMPORT',`Quote PDF imported from ${co.name}`,`${n} line${n!==1?'s':''} priced${qno?' · '+qno:''}`);
+    await saveDBNow();closePdfImport();renderQuotations();
+    toast(`✓ ${n} line${n!==1?'s':''} priced from PDF${qno?' · quote '+qno:''}`);
+  }else{
+    let n=0;const newQueue=[];
+    st.rowsList.forEach((r,i)=>{
+      const ck=document.getElementById('pdfi-ck-'+i);
+      if(!ck||!ck.checked)return;
+      const qty=Math.max(1,parseInt(document.getElementById('pdfi-q-'+i).value)||1);
+      const unit=parseFloat(document.getElementById('pdfi-u-'+i).value)||0;
+      if(r.part){
+        const ex=npoItems.find(x=>x.code===r.part.code);
+        if(ex){ex.qty+=qty;if(unit)ex.cost=unit;}
+        else npoItems.push({code:r.part.code,name:r.part.name,qty,sup:r.part.sup||'',cost:unit||r.part.cost||0,fromStock:true});
+      }else{
+        const c=(document.getElementById('pdfi-c-'+i).value||'').trim();
+        newQueue.push({code:c,name:r.desc||'',qty,cost:unit,suppartno:c});
+        return;
+      }
+      n++;
+    });
+    if(qno)document.getElementById('npo-quote').value=qno;
+    renderNpoItemsList();closePdfImport();
+    toast(`✓ ${n} line${n!==1?'s':''} added to PO from PDF`);
+    if(newQueue.length){
+      toast(`${newQueue.length} new part${newQueue.length!==1?'s':''} to set up — opening Add Part`,'info');
+      startAddPartFor('po',newQueue.shift(),newQueue);
+    }
+  }
+}
+
+// ─── Create a new part from inside a PO / quote, then come straight back ───
+let _apReturn=null; // {kind:'po'|'qt', panel, cur, queue, total, done}
+function startAddPartFor(kind,seed,queue){
+  const act=document.querySelector('.panel.active');
+  const prev=_apReturn;
+  _apReturn={kind,panel:prev?prev.panel:(act?act.id.replace('panel-',''):'orders'),cur:seed,queue:queue||[],total:1+(queue||[]).length,done:0};
+  if(kind==='qt')document.getElementById('qt-overlay').classList.remove('open');
+  go('addpart');
+  prefillAddPart();
+  window.scrollTo(0,0);
+}
+function prefillAddPart(){
+  const r=_apReturn,s=r.cur;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v==null?'':v;};
+  set('ap-code',s.code||'');set('ap-name',s.name||'');
+  set('ap-suppartno',s.suppartno||'');
+  set('ap-sup',s.sup||(r.kind==='po'?(document.getElementById('npo-sup').value||''):''));
+  set('ap-cost',s.cost||'');set('ap-qty',0);
+  const b=document.getElementById('ap-return-banner');
+  b.style.display='flex';
+  const n=r.done+1;
+  document.getElementById('ap-return-text').textContent=(r.kind==='po'?'📄 Adding a part for your PO':'📋 Adding a part for your quotation')+(r.total>1?` — part ${n} of ${r.total}`:'')+'. Save it and you\'ll go straight back.';
+  document.getElementById('ap-return-skip').textContent=r.queue.length?'Skip this one':'Cancel — back without adding';
+}
+function _apNext(){
+  const r=_apReturn;
+  if(r.queue.length){r.done++;r.cur=r.queue.shift();prefillAddPart();window.scrollTo(0,0);return;}
+  _apReturn=null;
+  document.getElementById('ap-return-banner').style.display='none';
+  go(r.panel);
+  if(r.kind==='po'){
+    setOrderSubTab('po');renderNpoItemsList();
+    const last=document.getElementById('npo-iq-'+(npoItems.length-1));
+    if(last&&r.added){last.focus();last.select();}
+  }else{
+    document.getElementById('qt-overlay').classList.add('open');
+    renderQtSplitTable();
+  }
+}
+function finishAddPartReturn(p){
+  const r=_apReturn;if(!r||!p)return;
+  const qty=Math.max(1,parseInt(r.cur.qty)||1);
+  if(r.kind==='po'){
+    const ex=npoItems.find(i=>i.code===p.code);
+    if(ex)ex.qty+=qty;else npoItems.push({code:p.code,name:p.name,qty,sup:p.sup||'',cost:p.cost||0,fromStock:true});
+  }else{
+    const ex=qtBOMLines.find(l=>l.code===p.code);
+    if(ex)ex.qty+=qty;else qtBOMLines.push({code:p.code,name:p.name,qty,cat:p.cat,inStock:p.qty});
+  }
+  r.added=true;
+  toast(`✓ ${p.name} saved and added — set the quantity`);
+  _apNext();
+}
+function skipAddPartReturn(){if(_apReturn)_apNext();}
+function npoCreateNewPart(){
+  startAddPartFor('po',{code:(document.getElementById('npo-new-code').value||'').trim(),name:(document.getElementById('npo-new-name').value||'').trim(),qty:parseInt(document.getElementById('npo-new-qty').value)||1},[]);
+  ['npo-new-code','npo-new-name'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('npo-new-qty').value=1;
+}
+function qtCreateNewPart(){
+  startAddPartFor('qt',{code:(document.getElementById('qtb-new-code').value||'').trim(),name:(document.getElementById('qtb-new-name').value||'').trim(),qty:parseInt(document.getElementById('qtb-new-qty').value)||1},[]);
+  ['qtb-new-code','qtb-new-name'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('qtb-new-qty').value=1;
 }
 
 async function updateQuoteCoField(qtId,coIdx,field,val){
