@@ -328,7 +328,7 @@ tr:hover td{background:#f9fafb}
       <div>
         <div style="color:#fff;font-size:16px;font-weight:700">Workshop Stock Control</div>
         <div style="color:#93c5fd;font-size:12px;margin-top:2px">Electrical &bull; PLC &bull; HMI &bull; Automation</div>
-        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 155 — Firebase</div>
+        <div style="color:#86efac;font-size:11px;margin-top:2px">Rev 156 — Firebase</div>
         <div id="active-users-dash" style="font-size:11px;color:#86efac;margin-top:3px"></div>
       </div>
     </div>
@@ -1528,7 +1528,7 @@ tr:hover td{background:#f9fafb}
 <div id="toast" class="toast"></div>
 
 <script>
-const APP_REV=155; // bump this with every deploy — version.json must be updated to match
+const APP_REV=156; // bump this with every deploy — version.json must be updated to match
 
 let fbdb = null;
 let DATA_REF = null;
@@ -2358,6 +2358,10 @@ function findPartCandidates(v,limit){
   limit=limit||8;
   const vn=normalise(v);
   if(!vn)return[];
+  // An exact internal part number is unambiguous — picking a part from the list re-runs the lookup with
+  // its code, and without this it could match the same part plus loose word matches and loop forever.
+  const byCode=Object.values(db.parts).filter(p=>normalise(p.code)===vn);
+  if(byCode.length===1)return byCode;
   const exact=[],prefix=[],fuzzy=[];
   Object.values(db.parts).forEach(p=>{
     const codeN=normalise(p.code),barN=normalise(p.barcode||''),mfrN=normalise(p.mfrno||''),supN=normalise(p.supPartNo||'');
